@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: participant-api
+  labels:
+    app.kubernetes.io/name: participant-service-api
+    app.kubernetes.io/part-of: participant-platform

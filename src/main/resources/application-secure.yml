@@ -1,0 +1,26 @@
+# Microsoft Entra ID (Azure AD) secured profile
+#
+# Prerequisites in Azure Portal:
+#   1. App registration for this API (Expose an API → Application ID URI + scope, e.g. access_as_user)
+#   2. Optional: App roles under "App roles"
+#   3. A client app authorized for that scope (or client credentials with an app role)
+#
+# Run:
+#   export AZURE_TENANT_ID=<tenant-guid>
+#   export AZURE_API_CLIENT_ID=<api-app-client-id>
+#   # optional: export AZURE_REQUIRED_SCOPE=access_as_user
+#   ./mvnw spring-boot:run -Dspring-boot.run.profiles=secure
+
+spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: https://login.microsoftonline.com/${AZURE_TENANT_ID}/v2.0
+          audiences: ${AZURE_API_CLIENT_ID}
+
+app:
+  security:
+    permit-all: false
+    # Set when you want to require a specific delegated scope or app role name
+    required-scope: ${AZURE_REQUIRED_SCOPE:}
