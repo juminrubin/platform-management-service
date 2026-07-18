@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: platform-management
+  labels:
+    app.kubernetes.io/name: platform-management-service
+    app.kubernetes.io/part-of: platform-management

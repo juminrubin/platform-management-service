@@ -1,0 +1,39 @@
+# Profile intended for container / AKS runtime.
+# Security (Entra JWT) is always on in application.yml — set AZURE_TENANT_ID and
+# AZURE_API_CLIENT_ID via Secret / env. Typical: SPRING_PROFILES_ACTIVE=k8s
+
+server:
+  shutdown: graceful
+  # Trust X-Forwarded-* from Azure Load Balancer / Ingress
+  forward-headers-strategy: framework
+
+spring:
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+
+  h2:
+    console:
+      enabled: false
+
+management:
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when_authorized
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+
+# Patterns and appenders come from logback-spring.xml (profile "k8s")
+logging:
+  level:
+    root: INFO
+    com.example.platformmanagement: INFO
+    org.springframework.security: WARN

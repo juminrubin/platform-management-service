@@ -1,5 +1,5 @@
 # =============================================================================
-# Participant Service API — GitLab CI/CD
+# Platform Management Service — GitLab CI/CD
 # =============================================================================
 # Pipeline stages:
 #   validate  → compile / static checks
@@ -19,15 +19,20 @@
 #     AKS_CLUSTER_NAME           AKS cluster name
 #
 #   App secrets applied to the cluster:
-#     APP_AZURE_TENANT_ID        Tenant ID used by the Spring secure profile
+#     APP_AZURE_TENANT_ID        Tenant ID for Entra JWT (application.yml)
 #     APP_AZURE_API_CLIENT_ID    API app registration client ID (JWT audience)
 #
 #   Optional:
 #     ACR_NAME                   If set, also push image to Azure Container Registry
 #     ACR_LOGIN_SERVER           e.g. myacr.azurecr.io (auto-detected if ACR_NAME set)
-#     KUBE_NAMESPACE             default: participant-api
+#     KUBE_NAMESPACE             default: platform-management
 #     DEPLOY_HOST                Ingress host override for staging/prod
 #     SKIP_TRIVY                 "true" to skip security scan
+#
+# Monorepo layout:
+#   backend/   Spring Boot API (Maven)
+#   frontend/  React SPA (Vite)
+#   deploy/    compose + k8s + deploy scripts
 #
 # Image destinations:
 #   - Always: GitLab Container Registry ($CI_REGISTRY_IMAGE)
@@ -60,13 +65,13 @@ variables:
   CACHE_COMPRESSION_LEVEL: "fastest"
 
   # --- Image ---
-  IMAGE_NAME: participant-service-api
+  IMAGE_NAME: platform-management-service
   # Immutable tag per commit; also branch/tag aliases in package job
   IMAGE_TAG: $CI_COMMIT_SHORT_SHA
   GITLAB_IMAGE: $CI_REGISTRY_IMAGE/$IMAGE_NAME
 
   # --- Kubernetes ---
-  KUBE_NAMESPACE: participant-api
+  KUBE_NAMESPACE: platform-management
 
   # --- Tools ---
   MAVEN_IMAGE: maven:3.9.11-eclipse-temurin-17
@@ -86,7 +91,7 @@ default:
   cache:
     key:
       files:
-        - pom.xml
+        - backend/pom.xml
     paths:
       - .m2/repository
     policy: pull-push
@@ -94,6 +99,7 @@ default:
     - export MAVEN_OPTS="$MAVEN_OPTS"
     - java -version
     - mvn -version
+    - cd backend
 
 .rules_mr_and_branch:
   rules:
@@ -140,11 +146,11 @@ test:unit:
     expire_in: 14 days
     reports:
       junit:
-        - target/surefire-reports/TEST-*.xml
-        - target/failsafe-reports/TEST-*.xml
+        - backend/target/surefire-reports/TEST-*.xml
+        - backend/target/failsafe-reports/TEST-*.xml
     paths:
-      - target/surefire-reports/
-      - target/failsafe-reports/
+      - backend/target/surefire-reports/
+      - backend/target/failsafe-reports/
   rules:
     - !reference [.rules_mr_and_branch, rules]
     - !reference [.rules_tags, rules]
@@ -161,8 +167,9 @@ package:image:
     - job: test:unit
       optional: false
   variables:
-    # Kaniko needs the Dockerfile context at project root
-    DOCKERFILE_PATH: Dockerfile
+    # Monorepo: build API image from backend/
+    DOCKERFILE_PATH: backend/Dockerfile
+    DOCKER_CONTEXT: backend
   before_script:
     - mkdir -p /kaniko/.docker
     # Auth to GitLab Container Registry
@@ -234,7 +241,7 @@ package:image:
 
       # shellcheck disable=SC2086
       /kaniko/executor \
-        --context "${CI_PROJECT_DIR}" \
+        --context "${CI_PROJECT_DIR}/${DOCKER_CONTEXT}" \
         --dockerfile "${CI_PROJECT_DIR}/${DOCKERFILE_PATH}" \
         --cache=true \
         --cache-repo="${GITLAB_IMAGE}/cache" \
@@ -359,7 +366,7 @@ security:trivy:
         --only-show-errors
       kubectl cluster-info
   script:
-    - bash scripts/ci-deploy.sh
+    - bash deploy/scripts/ci-deploy.sh
   environment:
     # overridden per job
     name: review/$CI_COMMIT_REF_SLUG
@@ -418,7 +425,7 @@ deploy:production:
 #   stage: deploy
 #   variables:
 #     DEPLOY_ENV: review
-#     KUBE_NAMESPACE: "participant-api-mr-${CI_MERGE_REQUEST_IID}"
+#     KUBE_NAMESPACE: "platform-management-mr-${CI_MERGE_REQUEST_IID}"
 #   environment:
 #     name: review/$CI_COMMIT_REF_SLUG
 #     on_stop: stop:review

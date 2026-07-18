@@ -1,0 +1,24 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: platform-management
+
+resources:
+  - namespace.yaml
+  - serviceaccount.yaml
+  - configmap.yaml
+  - secret.yaml
+  - deployment.yaml
+  - service.yaml
+  - ingress.yaml
+  - hpa.yaml
+  # - networkpolicy.yaml   # enable when CNI enforces NetworkPolicy
+
+commonLabels:
+  app.kubernetes.io/managed-by: kustomize
+  app.kubernetes.io/part-of: platform-management
+
+images:
+  - name: platform-management-service
+    newName: YOUR_ACR_NAME.azurecr.io/platform-management-service
+    newTag: "1.0.0"

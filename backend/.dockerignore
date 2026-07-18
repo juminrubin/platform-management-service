@@ -1,0 +1,14 @@
+target/
+.git/
+.idea/
+.vscode/
+*.iml
+*.md
+.DS_Store
+.env
+.env.*
+**/node_modules/
+*.log
+mvnw
+mvnw.cmd
+.mvn/
