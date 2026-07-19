@@ -38,7 +38,7 @@ platform-management-service/
 cd backend
 export APP_AZURE_TENANT_ID=<tenant-guid>
 export APP_AZURE_API_CLIENT_ID=<api-app-client-id>
-# optional: export APP_CORS_ALLOWED_ORIGINS=http://localhost:5173,http://localhost:3000
+# optional: export APP_CORS_ALLOWED_ORIGINS=http://localhost:3000
 mvn spring-boot:run
 ```
 
@@ -60,7 +60,7 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173 — Vite proxies `/api` → http://localhost:8080.
+Open http://localhost:3000 — Vite proxies `/api` → http://localhost:8080.
 
 ### 3. Docker Compose (API + UI)
 
@@ -81,7 +81,7 @@ docker compose -f deploy/docker-compose.yml up --build
 | Registration | Type | Used by |
 |--------------|------|---------|
 | **API** (resource) | App roles + scope `access_as_user` | Backend JWT validation |
-| **SPA** (public client) | Redirect URI `http://localhost:5173` (dev) | Frontend MSAL |
+| **SPA** (public client) | Redirect URI `http://localhost:3000` (dev) | Frontend MSAL |
 
 Human users: assign API app roles (`System.Maintainer`, `System.Reader`, …) to **security groups**, put users in those groups.
 

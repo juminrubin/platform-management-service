@@ -94,8 +94,73 @@ class MicrosoftEntraSecurityTest {
     }
 
     @Test
+    fun `auth me is open to any authenticated JWT without app roles`() {
+        mockMvc.get("/api/v1/auth/me") {
+            accept = MediaType.APPLICATION_JSON
+            with(
+                jwt()
+                    .jwt { token ->
+                        token.subject("user-no-roles")
+                        token.claim("preferred_username", "noroles@contoso.com")
+                        token.claim("tid", "tenant-guid")
+                        token.claim("azp", "spa-client-id")
+                    }
+            )
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.subject") { value("user-no-roles") }
+            jsonPath("$.preferredUsername") { value("noroles@contoso.com") }
+        }
+    }
+
+    @Test
     fun `health remains public without JWT`() {
         mockMvc.get("/actuator/health").andExpect {
+            status { isOk() }
+        }
+    }
+
+    @Test
+    fun `OpenAPI docs and Swagger UI are public without JWT`() {
+        mockMvc.get("/v3/api-docs").andExpect {
+            status { isOk() }
+            content { contentTypeCompatibleWith(MediaType.APPLICATION_JSON) }
+            jsonPath("$.openapi") { exists() }
+            jsonPath("$.paths./api/v1/participants") { exists() }
+            jsonPath("$.components.securitySchemes.bearer-jwt") { exists() }
+            // Bearer scheme is advertised for Try it out, not required to open the UI
+            jsonPath("$.security[0].bearer-jwt") { exists() }
+        }
+
+        mockMvc.get("/swagger-ui/index.html").andExpect {
+            status { isOk() }
+        }
+
+        mockMvc.get("/swagger-ui.html").andExpect {
+            // springdoc welcome path redirects into /swagger-ui/index.html
+            status { is3xxRedirection() }
+        }
+
+        // Bare directory URL is redirected to the SPA index (SwaggerUiRedirectConfig)
+        mockMvc.get("/swagger-ui/").andExpect {
+            status { is3xxRedirection() }
+            header { string("Location", org.hamcrest.Matchers.containsString("/swagger-ui/index.html")) }
+        }
+        mockMvc.get("/swagger-ui").andExpect {
+            status { is3xxRedirection() }
+            header { string("Location", org.hamcrest.Matchers.containsString("/swagger-ui/index.html")) }
+        }
+    }
+
+    @Test
+    fun `API still requires JWT while Swagger docs do not`() {
+        mockMvc.get("/api/v1/participants") {
+            accept = MediaType.APPLICATION_JSON
+        }.andExpect {
+            status { isUnauthorized() }
+        }
+
+        mockMvc.get("/v3/api-docs").andExpect {
             status { isOk() }
         }
     }

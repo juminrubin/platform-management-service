@@ -5,6 +5,8 @@ import com.example.platformmanagement.dto.CallerIdentityResponse
 import com.example.platformmanagement.dto.CreateCallerIdentityRequest
 import com.example.platformmanagement.dto.UpdateCallerIdentityRequest
 import com.example.platformmanagement.service.CallerIdentityService
+import io.swagger.v3.oas.annotations.security.SecurityRequirement
+import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -28,6 +30,8 @@ import java.util.UUID
  */
 @RestController
 @RequestMapping("/api/v1/caller-identities")
+@Tag(name = "Caller identities")
+@SecurityRequirement(name = "bearer-jwt")
 class CallerIdentityController(
     private val callerIdentityService: CallerIdentityService
 ) {

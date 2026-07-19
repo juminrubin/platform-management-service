@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
-import { screen, waitFor } from '@testing-library/react'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Route, Routes } from 'react-router-dom'
 import { ConsumptionListPage } from './ConsumptionListPage'
@@ -116,5 +116,161 @@ describe('Consumption pages', () => {
         }),
       )
     })
+  })
+
+  it('rejects invalid consumption JSON', async () => {
+    const user = userEvent.setup()
+    renderWithRouter(
+      <Routes>
+        <Route path="/consumptions/new" element={<ConsumptionFormPage />} />
+      </Routes>,
+      { route: '/consumptions/new' },
+    )
+    await screen.findByRole('option', { name: /alice@acme.example/ })
+    await user.selectOptions(screen.getByLabelText(/^Caller identity/), callerIdentityActive.id)
+    await user.selectOptions(screen.getByLabelText(/^Service offering/), 'gpt-5.1')
+    const data = screen.getByLabelText(/Consumption data/i)
+    await user.clear(data)
+    await user.type(data, '{{bad')
+    await user.click(screen.getByRole('button', { name: /^Create$/i }))
+    expect(await screen.findByText(/consumptionData must be valid JSON/i)).toBeInTheDocument()
+  })
+
+  it('creates with optional event time', async () => {
+    const user = userEvent.setup()
+    renderWithRouter(
+      <Routes>
+        <Route path="/consumptions/new" element={<ConsumptionFormPage />} />
+        <Route path="/consumptions/:id" element={<div>detail</div>} />
+      </Routes>,
+      { route: '/consumptions/new' },
+    )
+    await screen.findByRole('option', { name: /alice@acme.example/ })
+    await user.selectOptions(screen.getByLabelText(/^Caller identity/), callerIdentityActive.id)
+    await user.selectOptions(screen.getByLabelText(/^Service offering/), 'gpt-5.1')
+    // datetime-local typing is flaky in jsdom — set value via change event
+    fireEvent.change(screen.getByLabelText(/Event time/i), {
+      target: { value: '2024-08-01T10:30' },
+    })
+    await user.click(screen.getByRole('button', { name: /^Create$/i }))
+    await waitFor(() => {
+      expect(api.createConsumption).toHaveBeenCalledWith(
+        expect.objectContaining({
+          participantCallerIdentityId: callerIdentityActive.id,
+          consumedAt: expect.stringMatching(/2024-08-01/),
+        }),
+      )
+    })
+  })
+
+  it('deletes from detail after confirm', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    renderWithRouter(
+      <Routes>
+        <Route path="/consumptions/:id" element={<ConsumptionDetailPage />} />
+        <Route path="/consumptions" element={<div>cons list</div>} />
+      </Routes>,
+      { route: `/consumptions/${consumptionSample.id}` },
+    )
+    await screen.findByText(/input_token/)
+    await user.click(screen.getByRole('button', { name: /delete/i }))
+    await waitFor(() => {
+      expect(api.deleteConsumption).toHaveBeenCalledWith(consumptionSample.id)
+    })
+    expect(await screen.findByText('cons list')).toBeInTheDocument()
+  })
+
+  it('deletes from list after confirm', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    renderWithRouter(<ConsumptionListPage />)
+    await screen.findByText(/input_token=1200/)
+    const deleteButtons = screen.getAllByRole('button', { name: /delete/i })
+    await user.click(deleteButtons[0])
+    await waitFor(() => {
+      expect(api.deleteConsumption).toHaveBeenCalled()
+    })
+  })
+
+  it('shows list load error', async () => {
+    vi.mocked(api.listConsumptions).mockRejectedValue(new Error('list failed'))
+    renderWithRouter(<ConsumptionListPage />)
+    expect(await screen.findByText(/list failed/)).toBeInTheDocument()
+  })
+
+  it('applies client participant and caller filters and reset', async () => {
+    const user = userEvent.setup()
+    renderWithRouter(<ConsumptionListPage />)
+    await screen.findByText(/input_token=1200/)
+    await user.selectOptions(screen.getByLabelText(/Participant \(client\)/i), 'acme-corp')
+    await user.type(screen.getByPlaceholderText(/email \/ client id/i), 'alice')
+    fireEvent.change(screen.getByLabelText(/To \(client/i), { target: { value: '2024-12-31T23:59' } })
+    expect(screen.getAllByText(/alice@acme.example/).length).toBeGreaterThan(0)
+    await user.click(screen.getByRole('button', { name: /reset/i }))
+    await waitFor(() => {
+      expect(api.listConsumptions).toHaveBeenCalledWith()
+    })
+  })
+
+  it('shows detail load error', async () => {
+    vi.mocked(api.getConsumption).mockRejectedValue(new Error('404 gone'))
+    renderWithRouter(
+      <Routes>
+        <Route path="/consumptions/:id" element={<ConsumptionDetailPage />} />
+      </Routes>,
+      { route: `/consumptions/${consumptionSample.id}` },
+    )
+    expect(await screen.findByText(/404 gone/)).toBeInTheDocument()
+  })
+
+  it('shows form options load error', async () => {
+    vi.mocked(api.listCallerIdentities).mockRejectedValue(new Error('options failed'))
+    renderWithRouter(
+      <Routes>
+        <Route path="/consumptions/new" element={<ConsumptionFormPage />} />
+      </Routes>,
+      { route: '/consumptions/new' },
+    )
+    expect(await screen.findByText(/options failed/)).toBeInTheDocument()
+  })
+
+  it('shows create API error', async () => {
+    vi.mocked(api.createConsumption).mockRejectedValue(new Error('create failed'))
+    const user = userEvent.setup()
+    renderWithRouter(
+      <Routes>
+        <Route path="/consumptions/new" element={<ConsumptionFormPage />} />
+      </Routes>,
+      { route: '/consumptions/new' },
+    )
+    await screen.findByRole('option', { name: /alice@acme.example/ })
+    await user.selectOptions(screen.getByLabelText(/^Caller identity/), callerIdentityActive.id)
+    await user.selectOptions(screen.getByLabelText(/^Service offering/), 'gpt-5.1')
+    await user.click(screen.getByRole('button', { name: /^Create$/i }))
+    expect(await screen.findByText(/create failed/)).toBeInTheDocument()
+  })
+
+  it('shows detail and list delete errors', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    vi.mocked(api.deleteConsumption).mockRejectedValue(new Error('delete blocked'))
+    renderWithRouter(
+      <Routes>
+        <Route path="/consumptions/:id" element={<ConsumptionDetailPage />} />
+      </Routes>,
+      { route: `/consumptions/${consumptionSample.id}` },
+    )
+    await screen.findByText(/input_token/)
+    await user.click(screen.getByRole('button', { name: /delete/i }))
+    expect(await screen.findByText(/delete blocked/)).toBeInTheDocument()
+  })
+
+  it('filters out records by non-matching caller text', async () => {
+    const user = userEvent.setup()
+    renderWithRouter(<ConsumptionListPage />)
+    await screen.findByText(/input_token=1200/)
+    await user.type(screen.getByPlaceholderText(/email \/ client id/i), 'nobody@example.com')
+    expect(screen.getByText(/No consumption records match/i)).toBeInTheDocument()
   })
 })

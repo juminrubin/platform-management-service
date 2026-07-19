@@ -1,0 +1,117 @@
+# =====================================================
+# Grok Build CLI Config - Production-Grade Multi-Stack
+# Kotlin / Java / Spring Boot / React / Azure / Python etc.
+# =====================================================
+
+[general]
+editor = "idea"                    # VS Code (change to "idea", "vim", etc.)
+theme = "oscura-midnight"
+show_token_usage = true
+
+[session]
+auto_save = true
+resume_last_session = true
+prompt_history_size = 2000         # Generous history for complex projects
+
+[history]
+prompt_history_size = 2000
+save_on_exit = true
+
+[cli]
+installer = "internal"
+
+[ui]
+max_thoughts_width = 120
+fork_secondary_model = "grok-build"
+yolo = false
+compact_mode = false
+permission_mode = "always-approve"
+
+[marketplace]
+official_marketplace_auto_installed = true
+
+[[marketplace.sources]]
+name = "xAI Official"
+git = "https://github.com/xai-org/plugin-marketplace.git"
+
+# ====================== Tools & Commands ======================
+[tools]
+always_approve = [
+    "mvn", "gradle", "npm", "yarn", "pnpm", "uv", "pip", "python",
+    "buildah", "docker", "podman", "kubectl", "helm", "az",
+    "flyway", "psql", "redis-cli", "git"
+]
+
+allowed_commands = [
+    "mvn", "gradle", "./mvnw", "./gradlew", "npm", "yarn", "pnpm",
+    "uv", "cargo", "kotlinc", "java", "node", "python", "az",
+    "buildah", "docker", "kubectl", "rancher", "rg", "fd", "jq", "yq"
+]
+
+# ====================== Language & Framework Support ======================
+[language]
+preferred_languages = ["kotlin", "java", "typescript", "javascript", "python"]
+kotlin_version = "2.3"
+spring_boot_version = "4.1"
+quarkus_version = "3.36.x"
+ktor_version = "3.5.x"
+
+# ====================== Build & Package Management ======================
+[maven]
+default_goals = ["clean", "verify", "package"]
+maven_wrapper = true
+
+[gradle]
+use_wrapper = true
+
+[npm]
+package_manager = "npm"   # or "pnpm" / "yarn"
+default_scripts = ["dev", "build", "test", "lint"]
+
+[uv]
+enabled = true
+
+# ====================== Security & Auth ======================
+[security]
+common_patterns = ["oauth2", "openid-connect", "jwt", "entra-id", "microsoft", "keycloak"]
+default_auth = "oauth2"
+
+# ====================== Testing Frameworks ======================
+[testing]
+kotlin = ["JUnit5", "Kotest", "MockK", "Spring Boot Test"]
+java = ["JUnit5", "AssertJ", "Mockito", "Testcontainers"]
+javascript_typescript = ["Jest", "Vitest", "React Testing Library", "Cypress", "Playwright"]
+python = ["pytest", "pytest-asyncio", "Hypothesis", "Testcontainers"]
+
+# ====================== Context & File Prioritization ======================
+[context]
+include_patterns = [
+    "pom.xml", "build.gradle.kts", "build.gradle",
+    "settings.gradle.kts",
+    "package.json", "pnpm-lock.yaml", "yarn.lock",
+    "uv.lock", "pyproject.toml", "requirements*.txt",
+    "src/main/kotlin/**/*.kt",
+    "src/main/java/**/*.java",
+    "src/main/resources/application*.yml",
+    "src/main/resources/application*.properties",
+    "*.kt", "*.java", "*.ts", "*.tsx", "*.js", "*.py",
+    "Dockerfile", "docker-compose.yml",
+    "AGENTS.md", "README.md",
+    ".github/workflows/*.yml"
+]
+
+exclude_patterns = ["**/target/**", "**/node_modules/**", "**/.gradle/**", "**/dist/**", "**/build/**"]
+
+# ====================== Azure & Production ======================
+[azure]
+common_services = ["apim", "keyvault", "blob", "eventhub", "cosmos", "aks", "container-apps"]
+managed_identity = true
+
+[production]
+focus = ["observability", "security", "scalability", "resilience", "ci-cd"]
+default_linters = ["ktlint", "eslint", "black", "ruff"]
+
+[privacy]
+trace_upload_enabled = false
+improve_model = false
+

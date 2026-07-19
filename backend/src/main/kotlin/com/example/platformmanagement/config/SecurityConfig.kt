@@ -7,17 +7,19 @@ import jakarta.servlet.http.HttpServletResponse
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.core.annotation.Order
 import org.springframework.core.convert.converter.Converter
 import org.springframework.http.HttpMethod
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
+import com.example.platformmanagement.security.JwtAuthorityMapper
 import org.springframework.security.authentication.AbstractAuthenticationToken
+import org.springframework.security.authorization.AuthorizationDecision
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity
 import org.springframework.security.config.http.SessionCreationPolicy
 import org.springframework.security.core.GrantedAuthority
-import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter
 import org.springframework.security.web.AuthenticationEntryPoint
@@ -38,6 +40,9 @@ import java.net.InetAddress
  * JWT issuer/audience come from application.yml (APP_AZURE_TENANT_ID, APP_AZURE_API_CLIENT_ID).
  * app.security.permit-all=true is only for automated tests, never for runtime.
  *
+ * OpenAPI / Swagger UI is on a separate public filter chain (no JWT required to open docs).
+ * Calling /api from Swagger "Try it out" still requires a Bearer token via Authorize.
+ *
  * H2 console paths are allowed only from loopback (localhost); remote clients get 403.
  */
 @Configuration
@@ -50,8 +55,40 @@ class SecurityConfig(
 
     private val problemMapper = ObjectMapper()
 
+    /**
+     * Public docs chain — no OAuth2 resource-server filter, no token required.
+     * Covers OpenAPI JSON and Swagger UI static assets only.
+     */
     @Bean
-    fun securityFilterChain(http: HttpSecurity): SecurityFilterChain {
+    @Order(1)
+    fun swaggerSecurityFilterChain(http: HttpSecurity): SecurityFilterChain {
+        http
+            .securityMatcher(
+                "/v3/api-docs",
+                "/v3/api-docs/**",
+                "/swagger-ui.html",
+                "/swagger-ui/**",
+                "/webjars/**",
+            )
+            .csrf { it.disable() }
+            .cors { it.configurationSource(corsConfigurationSource()) }
+            .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
+            .authorizeHttpRequests { auth ->
+                auth.anyRequest().permitAll()
+            }
+            // Explicitly no oauth2ResourceServer on this chain
+            .httpBasic { it.disable() }
+            .formLogin { it.disable() }
+        return http.build()
+    }
+
+    /**
+     * API / app chain — JWT required for /api (unless test permit-all).
+     * Swagger "Authorize" + Try it out sends Bearer tokens here.
+     */
+    @Bean
+    @Order(2)
+    fun apiSecurityFilterChain(http: HttpSecurity): SecurityFilterChain {
         http
             .csrf { it.disable() }
             .cors { it.configurationSource(corsConfigurationSource()) }
@@ -72,10 +109,23 @@ class SecurityConfig(
                 if (securityProperties.permitAll) {
                     auth.anyRequest().permitAll()
                 } else {
+                    // /auth/me is for any valid JWT principal (no app-role / required-scope gate)
+                    auth.requestMatchers("/api/v1/auth/**").authenticated()
+
                     val scope = securityProperties.requiredScope.trim()
                     if (scope.isNotEmpty()) {
-                        auth.requestMatchers("/api/**")
-                            .hasAnyAuthority("SCOPE_$scope", "ROLE_$scope")
+                        // Optional tenant-wide scope gate on remaining API routes.
+                        // Accepts short names (access_as_user) and full URI scopes (api://…/access_as_user).
+                        auth.requestMatchers("/api/**").access { authentication, _ ->
+                            val authn = authentication.get()
+                            if (!authn.isAuthenticated) {
+                                return@access AuthorizationDecision(false)
+                            }
+                            val names = authn.authorities.mapNotNull { it.authority }
+                            AuthorizationDecision(JwtAuthorityMapper.matchesRequiredScope(names, scope))
+                        }
+                    } else {
+                        auth.requestMatchers("/api/**").authenticated()
                     }
                     auth.anyRequest().authenticated()
                 }
@@ -133,28 +183,8 @@ class SecurityConfig(
     @Bean
     fun microsoftJwtAuthenticationConverter(): Converter<Jwt, out AbstractAuthenticationToken> {
         val converter = JwtAuthenticationConverter()
-        converter.setJwtGrantedAuthoritiesConverter { jwt -> extractAuthorities(jwt) }
+        converter.setJwtGrantedAuthoritiesConverter { jwt -> JwtAuthorityMapper.extractAuthorities(jwt) }
         return converter
-    }
-
-    private fun extractAuthorities(jwt: Jwt): Collection<GrantedAuthority> {
-        val authorities = mutableSetOf<GrantedAuthority>()
-
-        val scopeClaim = jwt.getClaimAsString("scp")
-            ?: jwt.getClaimAsString("scope")
-            ?: ""
-        scopeClaim.split(" ")
-            .map { it.trim() }
-            .filter { it.isNotEmpty() }
-            .forEach { authorities += SimpleGrantedAuthority("SCOPE_$it") }
-
-        val roles = jwt.getClaimAsStringList("roles") ?: emptyList()
-        roles.forEach { role ->
-            val normalized = if (role.startsWith("ROLE_")) role else "ROLE_$role"
-            authorities += SimpleGrantedAuthority(normalized)
-        }
-
-        return authorities
     }
 
     @Bean

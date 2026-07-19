@@ -27,4 +27,4 @@ logs/
 .env
 .env.*
 !.env.example
-frontend/.env.example
+!**/.env.example

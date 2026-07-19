@@ -1,0 +1,254 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { InteractionRequiredAuthError } from '@azure/msal-browser'
+import {
+  apiFetch,
+  createCallerIdentity,
+  createConsumption,
+  createEntitlement,
+  createParticipant,
+  createServiceOffering,
+  deleteCallerIdentity,
+  deleteConsumption,
+  deleteEntitlement,
+  deleteParticipant,
+  deleteServiceOffering,
+  getCallerIdentity,
+  getConsumption,
+  getEntitlement,
+  getMe,
+  getParticipant,
+  getServiceOffering,
+  listCallerIdentities,
+  listConsumptions,
+  listEntitlements,
+  listParticipants,
+  listServiceOfferings,
+  updateCallerIdentity,
+  updateEntitlement,
+  updateParticipant,
+  updateServiceOffering,
+} from './client'
+
+const acquireTokenSilent = vi.fn()
+const acquireTokenPopup = vi.fn()
+const getAllAccounts = vi.fn()
+const getActiveAccount = vi.fn()
+const setActiveAccount = vi.fn()
+const account = { username: 'alice@contoso.com', homeAccountId: 'a.b' }
+
+vi.mock('../auth/msalConfig', () => ({
+  msalInstance: {
+    getAllAccounts: (...args: unknown[]) => getAllAccounts(...args),
+    getActiveAccount: (...args: unknown[]) => getActiveAccount(...args),
+    setActiveAccount: (...args: unknown[]) => setActiveAccount(...args),
+    acquireTokenSilent: (...args: unknown[]) => acquireTokenSilent(...args),
+    acquireTokenPopup: (...args: unknown[]) => acquireTokenPopup(...args),
+  },
+  apiScopes: ['api://test/access_as_user'],
+  tokenRequest: { scopes: ['api://test/access_as_user'] },
+  getAccount: () => getActiveAccount() ?? getAllAccounts()[0] ?? null,
+  setActiveAccountFromResult: vi.fn((result?: { account?: unknown } | null) => {
+    if (result?.account) setActiveAccount(result.account)
+  }),
+}))
+
+function mockJsonResponse(body: unknown, init: { status?: number; statusText?: string } = {}) {
+  const status = init.status ?? 200
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    statusText: init.statusText ?? 'OK',
+    text: vi.fn().mockResolvedValue(typeof body === 'string' ? body : JSON.stringify(body)),
+    json: vi.fn().mockResolvedValue(body),
+  }
+}
+
+describe('api client', () => {
+  beforeEach(() => {
+    getAllAccounts.mockReturnValue([account])
+    getActiveAccount.mockReturnValue(account)
+    acquireTokenSilent.mockResolvedValue({ accessToken: 'silent-token', account })
+    acquireTokenPopup.mockResolvedValue({ accessToken: 'popup-token', account })
+    vi.stubGlobal('fetch', vi.fn())
+  })
+
+  describe('apiFetch / auth', () => {
+    it('throws when no MSAL accounts are present', async () => {
+      getActiveAccount.mockReturnValue(null)
+      getAllAccounts.mockReturnValue([])
+      await expect(apiFetch('/api/v1/auth/me')).rejects.toThrow('Not signed in')
+      expect(fetch).not.toHaveBeenCalled()
+    })
+
+    it('attaches bearer token and parses JSON success', async () => {
+      vi.mocked(fetch).mockResolvedValue(mockJsonResponse({ subject: 'u1' }) as Response)
+      await expect(getMe()).resolves.toEqual({ subject: 'u1' })
+      expect(fetch).toHaveBeenCalledWith(
+        '/api/v1/auth/me',
+        expect.objectContaining({
+          headers: expect.any(Headers),
+        }),
+      )
+      const init = vi.mocked(fetch).mock.calls[0][1] as RequestInit
+      expect((init.headers as Headers).get('Authorization')).toBe('Bearer silent-token')
+    })
+
+    it('falls back to popup when silent acquisition requires interaction', async () => {
+      acquireTokenSilent.mockRejectedValue(new InteractionRequiredAuthError('interaction_required', 'need login'))
+      vi.mocked(fetch).mockResolvedValue(mockJsonResponse([]) as Response)
+      await listParticipants()
+      expect(acquireTokenPopup).toHaveBeenCalled()
+      const init = vi.mocked(fetch).mock.calls[0][1] as RequestInit
+      expect((init.headers as Headers).get('Authorization')).toBe('Bearer popup-token')
+    })
+
+    it('re-throws non-interaction silent token errors', async () => {
+      acquireTokenSilent.mockRejectedValue(new Error('network down'))
+      await expect(getMe()).rejects.toThrow('network down')
+    })
+
+    it('sets Content-Type for JSON bodies and throws on HTTP error', async () => {
+      vi.mocked(fetch).mockResolvedValue(
+        mockJsonResponse('bad request', { status: 400, statusText: 'Bad Request' }) as Response,
+      )
+      await expect(createParticipant({ id: 'x', name: 'X' })).rejects.toThrow('400 Bad Request: bad request')
+      const init = vi.mocked(fetch).mock.calls[0][1] as RequestInit
+      expect((init.headers as Headers).get('Content-Type')).toBe('application/json')
+      expect(init.method).toBe('POST')
+    })
+
+    it('returns undefined for 204 No Content', async () => {
+      vi.mocked(fetch).mockResolvedValue(mockJsonResponse(undefined, { status: 204 }) as Response)
+      await expect(deleteParticipant('acme-corp')).resolves.toBeUndefined()
+    })
+  })
+
+  describe('resource helpers and query strings', () => {
+    beforeEach(() => {
+      vi.mocked(fetch).mockResolvedValue(mockJsonResponse([]) as Response)
+    })
+
+    it('lists participants with optional status', async () => {
+      await listParticipants()
+      expect(fetch).toHaveBeenLastCalledWith('/api/v1/participants', expect.anything())
+      await listParticipants('ACTIVE')
+      expect(fetch).toHaveBeenLastCalledWith('/api/v1/participants?status=ACTIVE', expect.anything())
+    })
+
+    it('gets / updates / deletes a participant', async () => {
+      vi.mocked(fetch).mockResolvedValue(mockJsonResponse({ id: 'acme-corp' }) as Response)
+      await getParticipant('acme/corp')
+      expect(fetch).toHaveBeenLastCalledWith('/api/v1/participants/acme%2Fcorp', expect.anything())
+
+      await updateParticipant('acme-corp', { name: 'Acme', status: 'ACTIVE' })
+      expect(fetch).toHaveBeenLastCalledWith(
+        '/api/v1/participants/acme-corp',
+        expect.objectContaining({ method: 'PUT' }),
+      )
+
+      vi.mocked(fetch).mockResolvedValue(mockJsonResponse(undefined, { status: 204 }) as Response)
+      await deleteParticipant('acme-corp')
+      expect(fetch).toHaveBeenLastCalledWith(
+        '/api/v1/participants/acme-corp',
+        expect.objectContaining({ method: 'DELETE' }),
+      )
+    })
+
+    it('lists caller identities with filters and supports CRUD', async () => {
+      await listCallerIdentities({ participantId: 'acme-corp', status: 'ACTIVE' })
+      expect(fetch).toHaveBeenLastCalledWith(
+        '/api/v1/caller-identities?participantId=acme-corp&status=ACTIVE',
+        expect.anything(),
+      )
+      await listCallerIdentities()
+      expect(fetch).toHaveBeenLastCalledWith('/api/v1/caller-identities', expect.anything())
+
+      vi.mocked(fetch).mockResolvedValue(mockJsonResponse({ id: 'c1' }) as Response)
+      await getCallerIdentity('c1')
+      await createCallerIdentity({ participantId: 'acme-corp', callerIdentity: 'a@b.com' })
+      await updateCallerIdentity('c1', { status: 'INACTIVE' })
+      vi.mocked(fetch).mockResolvedValue(mockJsonResponse(undefined, { status: 204 }) as Response)
+      await deleteCallerIdentity('c1')
+      expect(vi.mocked(fetch).mock.calls.map((c) => [c[0], (c[1] as RequestInit)?.method])).toEqual(
+        expect.arrayContaining([
+          ['/api/v1/caller-identities/c1', undefined],
+          ['/api/v1/caller-identities', 'POST'],
+          ['/api/v1/caller-identities/c1', 'PUT'],
+          ['/api/v1/caller-identities/c1', 'DELETE'],
+        ]),
+      )
+    })
+
+    it('lists service offerings with filters and supports CRUD', async () => {
+      await listServiceOfferings({ activeOnly: true, category: 'LLM' })
+      expect(fetch).toHaveBeenLastCalledWith(
+        '/api/v1/service-offerings?activeOnly=true&category=LLM',
+        expect.anything(),
+      )
+      await listServiceOfferings({})
+      expect(fetch).toHaveBeenLastCalledWith('/api/v1/service-offerings', expect.anything())
+
+      vi.mocked(fetch).mockResolvedValue(mockJsonResponse({ id: 'gpt-5.1' }) as Response)
+      await getServiceOffering('gpt-5.1')
+      await createServiceOffering({ id: 'm', name: 'M', category: 'LLM' })
+      await updateServiceOffering('m', {
+        name: 'M',
+        category: 'LLM',
+        config: '{}',
+        active: true,
+      })
+      vi.mocked(fetch).mockResolvedValue(mockJsonResponse(undefined, { status: 204 }) as Response)
+      await deleteServiceOffering('m')
+    })
+
+    it('lists entitlements with filters and supports CRUD', async () => {
+      await listEntitlements({
+        participantId: 'acme-corp',
+        serviceOfferingId: 'gpt-5.1',
+        status: 'ACTIVE',
+      })
+      expect(fetch).toHaveBeenLastCalledWith(
+        '/api/v1/entitlements?participantId=acme-corp&serviceOfferingId=gpt-5.1&status=ACTIVE',
+        expect.anything(),
+      )
+
+      vi.mocked(fetch).mockResolvedValue(mockJsonResponse({ id: 'e1' }) as Response)
+      await getEntitlement('e1')
+      await createEntitlement({
+        participantId: 'acme-corp',
+        serviceOfferingId: 'gpt-5.1',
+        validFrom: '2024-01-01',
+      })
+      await updateEntitlement('e1', {
+        status: 'ACTIVE',
+        validFrom: '2024-01-01',
+        config: '{}',
+      })
+      vi.mocked(fetch).mockResolvedValue(mockJsonResponse(undefined, { status: 204 }) as Response)
+      await deleteEntitlement('e1')
+    })
+
+    it('lists consumptions with filters and supports create/get/delete', async () => {
+      await listConsumptions({
+        participantCallerIdentityId: 'c1',
+        serviceOfferingId: 'gpt-5.1',
+      })
+      expect(fetch).toHaveBeenLastCalledWith(
+        '/api/v1/consumptions?participantCallerIdentityId=c1&serviceOfferingId=gpt-5.1',
+        expect.anything(),
+      )
+      await listConsumptions()
+      expect(fetch).toHaveBeenLastCalledWith('/api/v1/consumptions', expect.anything())
+
+      vi.mocked(fetch).mockResolvedValue(mockJsonResponse({ id: 'd1' }) as Response)
+      await getConsumption('d1')
+      await createConsumption({
+        participantCallerIdentityId: 'c1',
+        serviceOfferingId: 'gpt-5.1',
+        consumptionData: '{}',
+      })
+      vi.mocked(fetch).mockResolvedValue(mockJsonResponse(undefined, { status: 204 }) as Response)
+      await deleteConsumption('d1')
+    })
+  })
+})

@@ -3,6 +3,8 @@ package com.example.platformmanagement.controller
 import com.example.platformmanagement.dto.ConsumptionResponse
 import com.example.platformmanagement.dto.CreateConsumptionRequest
 import com.example.platformmanagement.service.ConsumptionService
+import io.swagger.v3.oas.annotations.security.SecurityRequirement
+import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -26,6 +28,8 @@ import java.util.UUID
  */
 @RestController
 @RequestMapping("/api/v1/consumptions")
+@Tag(name = "Consumptions")
+@SecurityRequirement(name = "bearer-jwt")
 class ConsumptionController(
     private val consumptionService: ConsumptionService
 ) {

@@ -61,4 +61,49 @@ describe('ParticipantListPage', () => {
       expect(api.deleteParticipant).toHaveBeenCalledWith('acme-corp')
     })
   })
+
+  it('skips delete when confirm is cancelled', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(window, 'confirm').mockReturnValue(false)
+    renderWithRouter(<ParticipantListPage />)
+    await screen.findByText('Acme Corporation')
+    const row = screen.getByText('Acme Corporation').closest('tr')!
+    await user.click(within(row).getByRole('button', { name: /delete/i }))
+    expect(api.deleteParticipant).not.toHaveBeenCalled()
+  })
+
+  it('shows list load error', async () => {
+    vi.mocked(api.listParticipants).mockRejectedValue(new Error('500 Server Error'))
+    renderWithRouter(<ParticipantListPage />)
+    expect(await screen.findByText(/500 Server Error/)).toBeInTheDocument()
+  })
+
+  it('shows empty state', async () => {
+    vi.mocked(api.listParticipants).mockResolvedValue([])
+    renderWithRouter(<ParticipantListPage />)
+    expect(await screen.findByText(/No participants match filters/i)).toBeInTheDocument()
+  })
+
+  it('resets filters', async () => {
+    const user = userEvent.setup()
+    renderWithRouter(<ParticipantListPage />)
+    await screen.findByText('Acme Corporation')
+    await user.selectOptions(screen.getByLabelText(/status \(api\)/i), 'ACTIVE')
+    await user.type(screen.getByPlaceholderText(/filter current results/i), 'acme')
+    await user.click(screen.getByRole('button', { name: /reset/i }))
+    await waitFor(() => {
+      expect(api.listParticipants).toHaveBeenCalledWith()
+    })
+  })
+
+  it('shows delete API error', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    vi.mocked(api.deleteParticipant).mockRejectedValue(new Error('403 Forbidden'))
+    renderWithRouter(<ParticipantListPage />)
+    await screen.findByText('Acme Corporation')
+    const row = screen.getByText('Acme Corporation').closest('tr')!
+    await user.click(within(row).getByRole('button', { name: /delete/i }))
+    expect(await screen.findByText(/403 Forbidden/)).toBeInTheDocument()
+  })
 })

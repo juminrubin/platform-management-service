@@ -37,3 +37,6 @@ logging:
     root: INFO
     com.example.platformmanagement: INFO
     org.springframework.security: WARN
+
+# Optional: set APP_SWAGGER_ENABLED=false in the deployment secret/config to hide docs in prod.
+# Defaults remain enabled so internal clusters can use Swagger with a JWT.

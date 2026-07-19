@@ -4,6 +4,8 @@ import com.example.platformmanagement.dto.CreateServiceOfferingRequest
 import com.example.platformmanagement.dto.ServiceOfferingResponse
 import com.example.platformmanagement.dto.UpdateServiceOfferingRequest
 import com.example.platformmanagement.service.ServiceOfferingService
+import io.swagger.v3.oas.annotations.security.SecurityRequirement
+import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -26,6 +28,8 @@ import org.springframework.web.bind.annotation.RestController
  */
 @RestController
 @RequestMapping("/api/v1/service-offerings")
+@Tag(name = "Service offerings")
+@SecurityRequirement(name = "bearer-jwt")
 class ServiceOfferingController(
     private val serviceOfferingService: ServiceOfferingService
 ) {

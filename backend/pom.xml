@@ -21,6 +21,22 @@
         <!-- Spring Boot 4.x: Java 17+; Kotlin 2.3.x (Boot 4.1 BOM manages 2.3.21) -->
         <java.version>17</java.version>
         <kotlin.version>2.3.21</kotlin.version>
+        <jacoco.version>0.8.13</jacoco.version>
+        <!-- Industry common gate: ≥80% line coverage on production code -->
+        <jacoco.line.coverage.minimum>0.80</jacoco.line.coverage.minimum>
+
+        <!--
+          Database stack (override Spring Boot 4.1.0 BOM where newer stable releases exist).
+          - Flyway: Boot 4.1.0 manages 12.4.0; latest Community release is 12.11.0 (2026-07-09).
+            H2 support remains in flyway-core (no separate flyway-database-h2 module).
+            Pure Java API — compatible with Spring Boot 4.x starters and Kotlin 2.3 (no Kotlin API surface).
+          - H2: Boot 4.1.0 already manages 2.4.240, which is the current latest on Maven Central.
+            Used with MODE=PostgreSQL + TIME ZONE=UTC (see application.yml).
+        -->
+        <flyway.version>12.11.0</flyway.version>
+        <h2.version>2.4.240</h2.version>
+        <!-- springdoc 3.x is required for Spring Boot 4.x (2.x targets Boot 3 only) -->
+        <springdoc.version>3.0.3</springdoc.version>
     </properties>
 
     <dependencies>
@@ -45,7 +61,7 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
-        <!-- Boot 4: Flyway requires dedicated starter (not flyway-core alone) -->
+        <!-- Boot 4: Flyway requires dedicated starter (version via flyway.version property) -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-flyway</artifactId>
@@ -68,10 +84,18 @@
             <artifactId>kotlin-stdlib</artifactId>
         </dependency>
 
+        <!-- H2: version via h2.version (latest 2.4.240; Boot BOM already aligned) -->
         <dependency>
             <groupId>com.h2database</groupId>
             <artifactId>h2</artifactId>
             <scope>runtime</scope>
+        </dependency>
+
+        <!-- OpenAPI 3 + Swagger UI (springdoc 3.x for Spring Boot 4.x) -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>${springdoc.version}</version>
         </dependency>
 
         <!-- Tests: Boot 4 recommends technology-specific test starters -->
@@ -147,6 +171,52 @@
                         <version>${kotlin.version}</version>
                     </dependency>
                 </dependencies>
+            </plugin>
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>${jacoco.version}</version>
+                <executions>
+                    <execution>
+                        <id>prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>report</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>check</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <excludes>
+                        <!-- Boot entrypoint / pure config wiring -->
+                        <exclude>com/example/platformmanagement/PlatformManagementServiceApplication*</exclude>
+                        <exclude>com/example/platformmanagement/config/UtcTimeConfig*</exclude>
+                    </excludes>
+                    <rules>
+                        <rule>
+                            <element>BUNDLE</element>
+                            <limits>
+                                <limit>
+                                    <counter>LINE</counter>
+                                    <value>COVEREDRATIO</value>
+                                    <minimum>${jacoco.line.coverage.minimum}</minimum>
+                                </limit>
+                            </limits>
+                        </rule>
+                    </rules>
+                </configuration>
             </plugin>
         </plugins>
     </build>

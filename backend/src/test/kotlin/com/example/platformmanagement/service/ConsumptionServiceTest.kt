@@ -37,6 +37,36 @@ class ConsumptionServiceTest {
     private lateinit var consumptionService: ConsumptionService
 
     @Test
+    fun `findAll by caller identity id`() {
+        val id = UUID.randomUUID()
+        whenever(consumptionRepository.findByParticipantCallerIdentityId(id)).thenReturn(emptyList())
+        assertThat(consumptionService.findAll(id, null)).isEmpty()
+        verify(consumptionRepository).findByParticipantCallerIdentityId(id)
+    }
+
+    @Test
+    fun `findAll by service offering id`() {
+        whenever(consumptionRepository.findByServiceOfferingId("gpt-5.1")).thenReturn(emptyList())
+        assertThat(consumptionService.findAll(null, "gpt-5.1")).isEmpty()
+        verify(consumptionRepository).findByServiceOfferingId("gpt-5.1")
+    }
+
+    @Test
+    fun `findAll without filters uses findAllWithRelations`() {
+        whenever(consumptionRepository.findAllWithRelations()).thenReturn(emptyList())
+        assertThat(consumptionService.findAll(null, null)).isEmpty()
+        verify(consumptionRepository).findAllWithRelations()
+    }
+
+    @Test
+    fun `delete throws when missing`() {
+        val id = UUID.randomUUID()
+        whenever(consumptionRepository.existsById(id)).thenReturn(false)
+        assertThatThrownBy { consumptionService.delete(id) }
+            .isInstanceOf(ResourceNotFoundException::class.java)
+    }
+
+    @Test
     fun `create records consumption`() {
         val callerRecordId = UUID.randomUUID()
         val savedId = UUID.randomUUID()

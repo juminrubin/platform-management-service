@@ -78,15 +78,43 @@ management:
       exposure:
         include: health,info
 
+# OpenAPI 3 / Swagger UI (springdoc-openapi)
+# Canonical UI entries (all work):
+#   http://localhost:8080/swagger-ui.html      (springdoc default welcome → index)
+#   http://localhost:8080/swagger-ui/          (redirect → index; see SwaggerUiRedirectConfig)
+#   http://localhost:8080/swagger-ui/index.html
+# OpenAPI JSON: http://localhost:8080/v3/api-docs
+# Disable with APP_SWAGGER_ENABLED=false (e.g. locked-down production)
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+    enabled: ${APP_SWAGGER_ENABLED:true}
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: ${APP_SWAGGER_ENABLED:true}
+    operations-sorter: method
+    tags-sorter: alpha
+    try-it-out-enabled: true
+    display-request-duration: true
+    # Remember the Bearer token in the browser across reloads (docs stay public)
+    persist-authorization: true
+    # Do not auto-prompt for credentials just to open the UI
+    disable-swagger-default-url: true
+  show-actuator: false
+  # Scan only our REST controllers (security scheme still applies to these operations)
+  packages-to-scan: com.example.platformmanagement.controller
+  paths-to-match: /api/**
+
 # App roles (JWT "roles" claim) drive @PreAuthorize — see security/AppRoles.kt
 #   System.Maintainer | System.Reader | Entitlement.Reader | Consumption.Registrator
 app:
   security:
     # Always require Entra JWT + roles (never open the API)
     permit-all: false
-    # Optional extra gate: SCOPE_<name> or ROLE_<name> on all /api/**
+    # Optional extra gate: SCOPE_<name> or ROLE_<name> on /api/** except /api/v1/auth/**
+    # (auth/me stays open to any authenticated JWT).
     required-scope: ${APP_AZURE_REQUIRED_SCOPE:}
-    cors-allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173}
+    cors-allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:3000}
 
 # Logging is configured in logback-spring.xml (Logback).
 # Levels here still work as overrides via Spring Boot's LoggingSystem.

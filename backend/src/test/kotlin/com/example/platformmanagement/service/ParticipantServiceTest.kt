@@ -38,6 +38,44 @@ class ParticipantServiceTest {
     }
 
     @Test
+    fun `findAll with status filters via repository`() {
+        whenever(participantRepository.findByStatus(ParticipantStatus.ACTIVE))
+            .thenReturn(listOf(participant("a", "A")))
+        assertThat(participantService.findAll(ParticipantStatus.ACTIVE)).hasSize(1)
+        verify(participantRepository).findByStatus(ParticipantStatus.ACTIVE)
+    }
+
+    @Test
+    fun `findById returns mapped response`() {
+        whenever(participantRepository.findById("a")).thenReturn(Optional.of(participant("a", "A")))
+        val result = participantService.findById("a")
+        assertThat(result.id).isEqualTo("a")
+        assertThat(result.name).isEqualTo("A")
+    }
+
+    @Test
+    fun `update succeeds when name is free`() {
+        whenever(participantRepository.findById("p1")).thenReturn(Optional.of(participant("p1", "Old")))
+        whenever(participantRepository.existsByNameAndIdNot("New", "p1")).thenReturn(false)
+        whenever(participantRepository.save(any(Participant::class.java))).thenAnswer { it.getArgument(0) }
+
+        val result = participantService.update(
+            "p1",
+            UpdateParticipantRequest(name = " New ", contact = " c@x.com ", status = ParticipantStatus.INACTIVE)
+        )
+        assertThat(result.name).isEqualTo("New")
+        assertThat(result.contact).isEqualTo("c@x.com")
+        assertThat(result.status).isEqualTo(ParticipantStatus.INACTIVE)
+    }
+
+    @Test
+    fun `delete removes existing participant`() {
+        whenever(participantRepository.existsById("p1")).thenReturn(true)
+        participantService.delete("p1")
+        verify(participantRepository).deleteById("p1")
+    }
+
+    @Test
     fun `create persists trimmed fields`() {
         whenever(participantRepository.existsById("acme")).thenReturn(false)
         whenever(participantRepository.existsByName("Acme")).thenReturn(false)

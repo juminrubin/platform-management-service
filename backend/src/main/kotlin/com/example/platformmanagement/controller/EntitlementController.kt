@@ -6,6 +6,9 @@ import com.example.platformmanagement.dto.EntitlementCheckResponse
 import com.example.platformmanagement.dto.EntitlementResponse
 import com.example.platformmanagement.dto.UpdateEntitlementRequest
 import com.example.platformmanagement.service.EntitlementService
+import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.security.SecurityRequirement
+import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -31,6 +34,8 @@ import java.util.UUID
  */
 @RestController
 @RequestMapping("/api/v1/entitlements")
+@Tag(name = "Entitlements")
+@SecurityRequirement(name = "bearer-jwt")
 class EntitlementController(
     private val entitlementService: EntitlementService
 ) {
@@ -44,6 +49,11 @@ class EntitlementController(
      */
     @GetMapping("/check")
     @PreAuthorize("@authz.canCheckEntitlement()")
+    @Operation(
+        summary = "Check entitlement for a caller identity",
+        description = "Requires System.Maintainer, System.Reader, or Entitlement.Reader. " +
+            "Provide either callerIdentity or participantCallerIdentityId (not both)."
+    )
     fun check(
         @RequestParam(required = false) callerIdentity: String?,
         @RequestParam(required = false) participantCallerIdentityId: UUID?,

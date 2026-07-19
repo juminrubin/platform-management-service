@@ -11,7 +11,7 @@ npm install
 npm run dev
 ```
 
-Dev server: http://localhost:5173  
+Dev server: http://localhost:3000  
 Proxies `/api` and `/actuator` to `http://localhost:8080`.
 
 ## Tests
@@ -28,19 +28,32 @@ Coverage includes list/detail/form pages for all domain modules plus shared UI h
 
 ## Entra SPA registration
 
-1. App registration → SPA platform → redirect `http://localhost:5173`
+1. App registration → **Single-page application** platform → add **both** redirect URIs:
+   - `http://localhost:3000` (app origin; full-page redirect / logout)
+   - `http://localhost:3000/auth-redirect.html` (popup / silent token completion — **required** for Sign in with Microsoft popup)
 2. API permissions → your API → delegated `access_as_user` → admin consent
 3. Users get **app roles** via security groups on the **API** enterprise app (not this SPA)
+
+Popup **login and logout** use `public/auth-redirect.html` (not the full React app).  
+With **@azure/msal-browser v5**, that page loads `msal-redirect-bridge.min.js` and calls
+`broadcastResponseToMainFrame()` when an auth payload is present, then closes the popup.
+After logout, Entra also redirects the popup here — never to `/` — so the SPA does not open
+inside the dialog. Vite copies the bridge script from `node_modules` into `public/` automatically.
+
+Register both SPA redirect URIs in Entra (login + logout):
+
+- `http://localhost:3000`
+- `http://localhost:3000/auth-redirect.html`
 
 ## Production image
 
 ```bash
 docker build -t platform-management-service-ui:local \
-  --build-arg VITE_AZURE_TENANT_ID=... \
-  --build-arg VITE_AZURE_CLIENT_ID=... \
-  --build-arg VITE_AZURE_API_CLIENT_ID=... \
-  --build-arg VITE_AZURE_API_SCOPE=api://.../access_as_user \
-  --build-arg VITE_API_BASE_URL=https://api.example.com \
+  --build-arg APP_AZURE_TENANT_ID=... \
+  --build-arg APP_AZURE_CLIENT_ID=... \
+  --build-arg APP_AZURE_API_CLIENT_ID=... \
+  --build-arg APP_AZURE_API_SCOPE=api://.../access_as_user \
+  --build-arg APP_API_BASE_URL=https://api.example.com \
   .
 ```
 

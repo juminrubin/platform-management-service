@@ -35,6 +35,56 @@ class CallerIdentityServiceTest {
     private lateinit var callerIdentityService: CallerIdentityService
 
     @Test
+    fun `findAll by participant and status`() {
+        val entity = ParticipantCallerIdentity(
+            id = UUID.randomUUID(),
+            participant = Participant(id = "acme", name = "Acme", status = ParticipantStatus.ACTIVE),
+            callerIdentity = "a@x.com",
+            status = CallerIdentityStatus.ACTIVE
+        )
+        whenever(callerIdentityRepository.findByParticipantId("acme")).thenReturn(listOf(entity))
+        val result = callerIdentityService.findAll("acme", CallerIdentityStatus.ACTIVE)
+        assertThat(result).hasSize(1)
+        assertThat(result[0].callerIdentity).isEqualTo("a@x.com")
+    }
+
+    @Test
+    fun `findAll without participant loads all and filters status`() {
+        val participant = Participant(id = "acme", name = "Acme", status = ParticipantStatus.ACTIVE)
+        val active = ParticipantCallerIdentity(
+            id = UUID.randomUUID(),
+            participant = participant,
+            callerIdentity = "a@x.com",
+            status = CallerIdentityStatus.ACTIVE
+        )
+        val inactive = ParticipantCallerIdentity(
+            id = UUID.randomUUID(),
+            participant = participant,
+            callerIdentity = "b@x.com",
+            status = CallerIdentityStatus.INACTIVE
+        )
+        whenever(callerIdentityRepository.findAllWithParticipant()).thenReturn(listOf(active, inactive))
+        assertThat(callerIdentityService.findAll(null, CallerIdentityStatus.INACTIVE)).hasSize(1)
+    }
+
+    @Test
+    fun `findById throws when missing`() {
+        val id = UUID.randomUUID()
+        whenever(callerIdentityRepository.findByIdWithParticipant(id)).thenReturn(null)
+        assertThatThrownBy { callerIdentityService.findById(id) }
+            .isInstanceOf(ResourceNotFoundException::class.java)
+    }
+
+    @Test
+    fun `update throws when missing`() {
+        val id = UUID.randomUUID()
+        whenever(callerIdentityRepository.findByIdWithParticipant(id)).thenReturn(null)
+        assertThatThrownBy {
+            callerIdentityService.update(id, UpdateCallerIdentityRequest(status = CallerIdentityStatus.REVOKED))
+        }.isInstanceOf(ResourceNotFoundException::class.java)
+    }
+
+    @Test
     fun `create succeeds`() {
         val savedId = UUID.randomUUID()
         val participant = Participant(id = "acme", name = "Acme", status = ParticipantStatus.ACTIVE)

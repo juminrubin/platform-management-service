@@ -1,6 +1,6 @@
 import { useIsAuthenticated, useMsal } from '@azure/msal-react'
 import { Link } from 'react-router-dom'
-import { loginRequest } from '../auth/msalConfig'
+import { signInWithPopup } from '../auth/msalConfig'
 
 const modules = [
   { to: '/participants', title: 'Participants', desc: 'Organizations that consume services' },
@@ -11,8 +11,16 @@ const modules = [
 ]
 
 export function HomePage() {
-  const { instance, accounts } = useMsal()
+  const { accounts } = useMsal()
   const isAuthenticated = useIsAuthenticated()
+
+  async function onSignIn() {
+    try {
+      await signInWithPopup()
+    } catch (err) {
+      console.error('Sign-in failed', err)
+    }
+  }
 
   return (
     <section className="card">
@@ -24,7 +32,7 @@ export function HomePage() {
       </p>
 
       {!isAuthenticated ? (
-        <button type="button" className="primary" onClick={() => instance.loginPopup(loginRequest)}>
+        <button type="button" className="primary" onClick={() => void onSignIn()}>
           Sign in with Microsoft
         </button>
       ) : (

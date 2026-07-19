@@ -1,6 +1,6 @@
 import { Link, NavLink, Outlet } from 'react-router-dom'
 import { useIsAuthenticated, useMsal } from '@azure/msal-react'
-import { loginRequest } from '../auth/msalConfig'
+import { signInWithPopup, signOutWithPopup } from '../auth/msalConfig'
 
 const nav = [
   { to: '/participants', label: 'Participants' },
@@ -12,8 +12,24 @@ const nav = [
 ]
 
 export function Layout() {
-  const { instance, accounts } = useMsal()
+  const { accounts } = useMsal()
   const isAuthenticated = useIsAuthenticated()
+
+  async function onSignIn() {
+    try {
+      await signInWithPopup()
+    } catch (err) {
+      console.error('Sign-in failed', err)
+    }
+  }
+
+  async function onSignOut() {
+    try {
+      await signOutWithPopup()
+    } catch (err) {
+      console.error('Sign-out failed', err)
+    }
+  }
 
   return (
     <div className="layout">
@@ -36,13 +52,13 @@ export function Layout() {
         )}
         <div className="topbar-actions">
           {!isAuthenticated ? (
-            <button type="button" className="primary" onClick={() => instance.loginPopup(loginRequest)}>
+            <button type="button" className="primary" onClick={() => void onSignIn()}>
               Sign in
             </button>
           ) : (
             <>
               <span className="user-chip">{accounts[0]?.username ?? accounts[0]?.name}</span>
-              <button type="button" onClick={() => instance.logoutPopup()}>
+              <button type="button" className="button-ghost" onClick={() => void onSignOut()}>
                 Sign out
               </button>
             </>

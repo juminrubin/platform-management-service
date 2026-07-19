@@ -1,5 +1,9 @@
-import { InteractionRequiredAuthError } from '@azure/msal-browser'
-import { msalInstance, apiScopes } from '../auth/msalConfig'
+import {
+  BrowserAuthError,
+  InteractionRequiredAuthError,
+  type SilentRequest,
+} from '@azure/msal-browser'
+import { getAccount, msalInstance, setActiveAccountFromResult, tokenRequest } from '../auth/msalConfig'
 import type {
   AuthenticatedUser,
   CallerIdentity,
@@ -18,29 +22,50 @@ import type {
   UpdateServiceOffering,
 } from './types'
 
-const baseUrl = (import.meta.env.VITE_API_BASE_URL as string | undefined) || ''
+const baseUrl = (import.meta.env.APP_API_BASE_URL as string | undefined) || ''
+
+function isInteractionRequired(error: unknown): boolean {
+  if (error instanceof InteractionRequiredAuthError) return true
+  if (error instanceof BrowserAuthError) {
+    // Popup/redirect cache glitches and empty silent cache → try interactive once.
+    return (
+      error.errorCode === 'no_token_request_cache_error' ||
+      error.errorCode === 'monitor_window_timeout' ||
+      error.errorCode === 'interaction_in_progress'
+    )
+  }
+  return false
+}
 
 async function getAccessToken(): Promise<string> {
-  const accounts = msalInstance.getAllAccounts()
-  if (accounts.length === 0) {
+  const account = getAccount()
+  if (!account) {
     throw new Error('Not signed in')
   }
-  const account = accounts[0]
+
+  const silentRequest: SilentRequest = {
+    ...tokenRequest,
+    account,
+  }
+
   try {
-    const result = await msalInstance.acquireTokenSilent({
-      account,
-      scopes: apiScopes,
-    })
+    const result = await msalInstance.acquireTokenSilent(silentRequest)
+    setActiveAccountFromResult(result)
     return result.accessToken
   } catch (e) {
-    if (e instanceof InteractionRequiredAuthError) {
-      const result = await msalInstance.acquireTokenPopup({
-        account,
-        scopes: apiScopes,
-      })
-      return result.accessToken
+    if (!isInteractionRequired(e)) {
+      throw e
     }
-    throw e
+    // One interactive attempt; avoid nested popups if another interaction is running.
+    if (e instanceof BrowserAuthError && e.errorCode === 'interaction_in_progress') {
+      throw new Error('Sign-in already in progress — complete the popup and retry')
+    }
+    const result = await msalInstance.acquireTokenPopup({
+      ...tokenRequest,
+      account,
+    })
+    setActiveAccountFromResult(result)
+    return result.accessToken
   }
 }
 

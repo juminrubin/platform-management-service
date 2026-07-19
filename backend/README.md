@@ -77,6 +77,11 @@ mvn spring-boot:run -Dspring-boot.run.profiles=local
 - Health: `http://localhost:8080/actuator/health` (public)
 - H2 console: `http://localhost:8080/h2-console` (**localhost only** — remote clients get 403)  
   JDBC URL: `jdbc:h2:mem:platformmanagementdb` · User: `sa` · Password: _(empty)_
+- **OpenAPI / Swagger UI (public — no token to open):** `http://localhost:8080/swagger-ui.html`  
+  OpenAPI JSON: `http://localhost:8080/v3/api-docs`  
+  **Calling `/api/**` from Try it out still needs a JWT:** click **Authorize**, paste an Entra
+  access token from `scripts/get-token-*.sh` (raw JWT, no `Bearer ` prefix).  
+  Disable docs with `APP_SWAGGER_ENABLED=false`.
 
 ---
 
@@ -391,7 +396,7 @@ For interactive human access (SPA, desktop, or “login with Azure CLI” style 
 1. **App registrations** → **New registration** (e.g. `platform-management-cli` or your SPA).
 2. **Authentication**
    - Public client / native: enable public client flows if using device code.
-   - SPA: add redirect URI (e.g. `http://localhost:5173`).
+   - SPA: add redirect URI (e.g. `http://localhost:3000`).
 3. **API permissions** → **Add a permission** → **My APIs** → select the API app → **Delegated** → `access_as_user` → **Grant admin consent**.
 4. Note the client’s **Application (client) ID** → `AZURE_HUMAN_CLIENT_ID` below.
 

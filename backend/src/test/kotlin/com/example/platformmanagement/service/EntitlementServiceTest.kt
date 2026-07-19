@@ -1,7 +1,9 @@
 package com.example.platformmanagement.service
 
+import com.example.platformmanagement.domain.CallerIdentityStatus
 import com.example.platformmanagement.domain.EntitlementStatus
 import com.example.platformmanagement.domain.Participant
+import com.example.platformmanagement.domain.ParticipantCallerIdentity
 import com.example.platformmanagement.domain.ParticipantServiceEntitlement
 import com.example.platformmanagement.domain.ParticipantStatus
 import com.example.platformmanagement.domain.ServiceOffering
@@ -49,6 +51,149 @@ class EntitlementServiceTest {
         whenever(entitlementRepository.findAllWithRelations()).thenReturn(listOf(entitlement()))
         assertThat(entitlementService.findAll(null, null, null)).hasSize(1)
     }
+
+    @Test
+    fun `findAll filters by participant and status`() {
+        val active = entitlement(status = EntitlementStatus.ACTIVE)
+        val pending = entitlement(status = EntitlementStatus.PENDING)
+        whenever(entitlementRepository.findByParticipantId("p1")).thenReturn(listOf(active, pending))
+        assertThat(entitlementService.findAll("p1", null, EntitlementStatus.ACTIVE)).hasSize(1)
+    }
+
+    @Test
+    fun `findAll by service offering`() {
+        whenever(entitlementRepository.findByServiceOfferingId("gpt")).thenReturn(listOf(entitlement()))
+        assertThat(entitlementService.findAll(null, "gpt", null)).hasSize(1)
+    }
+
+    @Test
+    fun `delete removes existing entitlement`() {
+        val id = UUID.randomUUID()
+        whenever(entitlementRepository.existsById(id)).thenReturn(true)
+        entitlementService.delete(id)
+        verify(entitlementRepository).deleteById(id)
+    }
+
+    @Test
+    fun `delete throws when missing`() {
+        val id = UUID.randomUUID()
+        whenever(entitlementRepository.existsById(id)).thenReturn(false)
+        assertThatThrownBy { entitlementService.delete(id) }
+            .isInstanceOf(ResourceNotFoundException::class.java)
+    }
+
+    @Test
+    fun `update throws when missing`() {
+        val id = UUID.randomUUID()
+        whenever(entitlementRepository.findByIdWithRelations(id)).thenReturn(null)
+        assertThatThrownBy {
+            entitlementService.update(
+                id,
+                UpdateEntitlementRequest(
+                    status = EntitlementStatus.ACTIVE,
+                    validFrom = LocalDate.of(2025, 1, 1),
+                    validTo = null,
+                    config = "{}",
+                    notes = null
+                )
+            )
+        }.isInstanceOf(ResourceNotFoundException::class.java)
+    }
+
+    @Test
+    fun `check requires service offering id`() {
+        assertThatThrownBy {
+            entitlementService.checkByCallerAndService(null, null, "  ", null)
+        }.isInstanceOf(BadRequestException::class.java)
+    }
+
+    @Test
+    fun `check requires exactly one caller key`() {
+        assertThatThrownBy {
+            entitlementService.checkByCallerAndService(null, null, "gpt", LocalDate.of(2024, 6, 1))
+        }.isInstanceOf(BadRequestException::class.java)
+
+        whenever(serviceOfferingService.getEntity("gpt")).thenReturn(offering("gpt"))
+        assertThatThrownBy {
+            entitlementService.checkByCallerAndService("a@x.com", UUID.randomUUID(), "gpt", null)
+        }.isInstanceOf(BadRequestException::class.java)
+    }
+
+    @Test
+    fun `check returns CALLER_NOT_FOUND`() {
+        whenever(serviceOfferingService.getEntity("gpt")).thenReturn(offering("gpt"))
+        whenever(callerIdentityRepository.findByCallerIdentity("missing@x.com")).thenReturn(emptyList())
+        val result = entitlementService.checkByCallerAndService("missing@x.com", null, "gpt", LocalDate.of(2024, 6, 1))
+        assertThat(result.allowed).isFalse()
+        assertThat(result.reason).isEqualTo("CALLER_NOT_FOUND")
+    }
+
+    @Test
+    fun `check returns CALLER_NOT_ACTIVE`() {
+        val callerId = UUID.randomUUID()
+        val caller = ParticipantCallerIdentity(
+            id = callerId,
+            participant = participant("p1"),
+            callerIdentity = "a@x.com",
+            status = CallerIdentityStatus.INACTIVE
+        )
+        whenever(serviceOfferingService.getEntity("gpt")).thenReturn(offering("gpt"))
+        whenever(callerIdentityRepository.findByIdWithParticipant(callerId)).thenReturn(caller)
+        val result = entitlementService.checkByCallerAndService(null, callerId, "gpt", LocalDate.of(2024, 6, 1))
+        assertThat(result.allowed).isFalse()
+        assertThat(result.reason).isEqualTo("CALLER_NOT_ACTIVE")
+    }
+
+    @Test
+    fun `check returns NO_ENTITLEMENT`() {
+        val caller = activeCaller()
+        whenever(serviceOfferingService.getEntity("gpt")).thenReturn(offering("gpt"))
+        whenever(callerIdentityRepository.findByCallerIdentity("a@x.com")).thenReturn(listOf(caller))
+        whenever(entitlementRepository.findByParticipantId("p1")).thenReturn(emptyList())
+        val result = entitlementService.checkByCallerAndService("a@x.com", null, "gpt", LocalDate.of(2024, 6, 1))
+        assertThat(result.allowed).isFalse()
+        assertThat(result.reason).isEqualTo("NO_ENTITLEMENT")
+    }
+
+    @Test
+    fun `check returns date and status reasons`() {
+        val caller = activeCaller()
+        whenever(serviceOfferingService.getEntity("gpt")).thenReturn(offering("gpt"))
+        whenever(callerIdentityRepository.findByCallerIdentity("a@x.com")).thenReturn(listOf(caller))
+
+        whenever(entitlementRepository.findByParticipantId("p1")).thenReturn(
+            listOf(entitlement(status = EntitlementStatus.PENDING))
+        )
+        assertThat(
+            entitlementService.checkByCallerAndService("a@x.com", null, "gpt", LocalDate.of(2025, 6, 1)).reason
+        ).isEqualTo("ENTITLEMENT_NOT_ACTIVE")
+
+        whenever(entitlementRepository.findByParticipantId("p1")).thenReturn(
+            listOf(
+                entitlement(
+                    status = EntitlementStatus.ACTIVE,
+                    validFrom = LocalDate.of(2025, 1, 1),
+                    validTo = LocalDate.of(2025, 12, 31)
+                )
+            )
+        )
+        assertThat(
+            entitlementService.checkByCallerAndService("a@x.com", null, "gpt", LocalDate.of(2024, 6, 1)).reason
+        ).isEqualTo("ENTITLEMENT_NOT_YET_VALID")
+        assertThat(
+            entitlementService.checkByCallerAndService("a@x.com", null, "gpt", LocalDate.of(2026, 1, 1)).reason
+        ).isEqualTo("ENTITLEMENT_EXPIRED")
+        assertThat(
+            entitlementService.checkByCallerAndService("a@x.com", null, "gpt", LocalDate.of(2025, 6, 1)).reason
+        ).isEqualTo("ALLOWED")
+    }
+
+    private fun activeCaller() = ParticipantCallerIdentity(
+        id = UUID.randomUUID(),
+        participant = participant("p1"),
+        callerIdentity = "a@x.com",
+        status = CallerIdentityStatus.ACTIVE
+    )
 
     @Test
     fun `create validates date range`() {
@@ -139,13 +284,16 @@ class EntitlementServiceTest {
 
     private fun entitlement(
         id: UUID = UUID.randomUUID(),
-        status: EntitlementStatus = EntitlementStatus.ACTIVE
+        status: EntitlementStatus = EntitlementStatus.ACTIVE,
+        validFrom: LocalDate = LocalDate.of(2025, 1, 1),
+        validTo: LocalDate? = null
     ) = ParticipantServiceEntitlement(
         id = id,
         participant = participant("p1"),
         serviceOffering = offering("gpt"),
         status = status,
-        validFrom = LocalDate.of(2025, 1, 1),
+        validFrom = validFrom,
+        validTo = validTo,
         config = """{"max_tpm":10}"""
     )
 }

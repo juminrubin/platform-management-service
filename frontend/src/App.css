@@ -69,11 +69,15 @@ a {
 
 .user-chip {
   font-size: 0.85rem;
-  color: #94a3b8;
+  color: #e2e8f0;
   max-width: 220px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 10%);
+  border: 1px solid rgb(255 255 255 / 14%);
 }
 
 main {
@@ -145,6 +149,30 @@ button.primary,
   background: #2563eb;
   border-color: #2563eb;
   color: #fff;
+}
+
+button.primary:hover,
+.button.primary:hover {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+  filter: none;
+}
+
+/* Outlined control for dark surfaces (e.g. topbar Sign out) */
+button.button-ghost,
+.button.button-ghost {
+  background: rgb(255 255 255 / 10%);
+  border: 1px solid #94a3b8;
+  color: #f8fafc;
+  font-weight: 500;
+}
+
+button.button-ghost:hover,
+.button.button-ghost:hover {
+  background: rgb(255 255 255 / 18%);
+  border-color: #e2e8f0;
+  color: #fff;
+  filter: none;
 }
 
 button:hover,

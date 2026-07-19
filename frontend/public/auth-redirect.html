@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Completing Microsoft sign-in…</title>
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        color: #334155;
+        background: #f8fafc;
+        text-align: center;
+        padding: 1.5rem;
+      }
+      p {
+        max-width: 28rem;
+        line-height: 1.5;
+      }
+      .error {
+        color: #b91c1c;
+      }
+    </style>
+  </head>
+  <body>
+    <!--
+      Popup completion page for MSAL Browser v5 (login + logout).
+
+      After Entra redirects here:
+      - Login responses (code/state) must run the redirect bridge so the opener
+        receives the payload via BroadcastChannel and can close this window.
+      - Logout often lands here without an auth code; still close the popup so
+        the full SPA never stays open inside the dialog.
+    -->
+    <p id="status">Completing Microsoft authentication…</p>
+    <script src="/msal-redirect-bridge.min.js"></script>
+    <script>
+      ;(function () {
+        var statusEl = document.getElementById('status')
+
+        function setMessage(html, isError) {
+          if (!statusEl) return
+          statusEl.className = isError ? 'error' : ''
+          statusEl.innerHTML = html
+        }
+
+        function closeSelf() {
+          try {
+            window.close()
+          } catch (e) {
+            /* ignore */
+          }
+          // If the browser blocks window.close(), tell the user to close manually.
+          setTimeout(function () {
+            if (!window.closed) {
+              setMessage(
+                'You can close this window and return to the application.',
+                false,
+              )
+            }
+          }, 250)
+        }
+
+        function hasAuthPayload() {
+          var hash = window.location.hash || ''
+          var search = window.location.search || ''
+          return (
+            hash.indexOf('code=') >= 0 ||
+            hash.indexOf('error=') >= 0 ||
+            hash.indexOf('state=') >= 0 ||
+            search.indexOf('code=') >= 0 ||
+            search.indexOf('error=') >= 0 ||
+            search.indexOf('state=') >= 0
+          )
+        }
+
+        try {
+          if (
+            window.msalRedirectBridge &&
+            typeof window.msalRedirectBridge.broadcastResponseToMainFrame === 'function' &&
+            hasAuthPayload()
+          ) {
+            window.msalRedirectBridge
+              .broadcastResponseToMainFrame()
+              .then(function () {
+                // Bridge already tries window.close(); ensure UI message if it fails.
+                setTimeout(function () {
+                  if (!window.closed) {
+                    setMessage(
+                      'You can close this window and return to the application.',
+                      false,
+                    )
+                  }
+                }, 300)
+              })
+              .catch(function (err) {
+                console.error('MSAL redirect bridge failed', err)
+                // Still close so the popup never becomes a second SPA instance.
+                closeSelf()
+              })
+            return
+          }
+
+          // Logout (or empty redirect): no auth payload — just close the popup.
+          closeSelf()
+        } catch (e) {
+          console.error(e)
+          closeSelf()
+        }
+      })()
+    </script>
+  </body>
+</html>

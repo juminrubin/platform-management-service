@@ -24,7 +24,7 @@ services:
       SPRING_PROFILES_ACTIVE: k8s
       APP_AZURE_TENANT_ID: ${APP_AZURE_TENANT_ID}
       APP_AZURE_API_CLIENT_ID: ${APP_AZURE_API_CLIENT_ID}
-      APP_CORS_ALLOWED_ORIGINS: http://localhost:5173,http://localhost:3000,http://localhost
+      APP_CORS_ALLOWED_ORIGINS: http://localhost:3000,http://localhost
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/actuator/health"]
       interval: 10s

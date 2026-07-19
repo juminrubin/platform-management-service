@@ -5,6 +5,9 @@ import com.example.platformmanagement.dto.CreateParticipantRequest
 import com.example.platformmanagement.dto.ParticipantResponse
 import com.example.platformmanagement.dto.UpdateParticipantRequest
 import com.example.platformmanagement.service.ParticipantService
+import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.security.SecurityRequirement
+import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -27,23 +30,28 @@ import org.springframework.web.bind.annotation.RestController
  */
 @RestController
 @RequestMapping("/api/v1/participants")
+@Tag(name = "Participants")
+@SecurityRequirement(name = "bearer-jwt")
 class ParticipantController(
     private val participantService: ParticipantService
 ) {
 
     @GetMapping
     @PreAuthorize("@authz.canRead()")
+    @Operation(summary = "List participants", description = "Requires System.Maintainer or System.Reader.")
     fun list(
         @RequestParam(required = false) status: ParticipantStatus?
     ): List<ParticipantResponse> = participantService.findAll(status)
 
     @GetMapping("/{id}")
     @PreAuthorize("@authz.canRead()")
+    @Operation(summary = "Get participant by id")
     fun get(@PathVariable id: String): ParticipantResponse =
         participantService.findById(id)
 
     @PostMapping
     @PreAuthorize("@authz.canMaintain()")
+    @Operation(summary = "Create participant", description = "Requires System.Maintainer.")
     fun create(
         @Valid @RequestBody request: CreateParticipantRequest
     ): ResponseEntity<ParticipantResponse> =
@@ -51,6 +59,7 @@ class ParticipantController(
 
     @PutMapping("/{id}")
     @PreAuthorize("@authz.canMaintain()")
+    @Operation(summary = "Update participant")
     fun update(
         @PathVariable id: String,
         @Valid @RequestBody request: UpdateParticipantRequest
@@ -59,6 +68,7 @@ class ParticipantController(
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("@authz.canMaintain()")
+    @Operation(summary = "Delete participant")
     fun delete(@PathVariable id: String) {
         participantService.delete(id)
     }

@@ -94,4 +94,24 @@ class MicrosoftEntraRequiredScopeTest {
             status { isOk() }
         }
     }
+
+    @Test
+    fun `auth me does not require the configured required-scope`() {
+        // Valid JWT without access_as_user still may call /auth/me
+        mockMvc.get("/api/v1/auth/me") {
+            accept = MediaType.APPLICATION_JSON
+            with(
+                jwt()
+                    .jwt { token ->
+                        token.subject("user-object-id")
+                        token.claim("scp", "other_scope")
+                        token.claim("preferred_username", "alice@contoso.com")
+                    }
+                    .authorities(SimpleGrantedAuthority("SCOPE_other_scope"))
+            )
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.subject") { value("user-object-id") }
+        }
+    }
 }

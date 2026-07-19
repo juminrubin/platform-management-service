@@ -1,12 +1,11 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { msalInstance } from './auth/msalConfig'
+import { initializeMsal } from './auth/msalConfig'
 import App from './App.tsx'
 import './index.css'
 
 async function bootstrap() {
-  await msalInstance.initialize()
-  await msalInstance.handleRedirectPromise()
+  await initializeMsal()
 
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
@@ -17,5 +16,6 @@ async function bootstrap() {
 
 bootstrap().catch((err) => {
   console.error('Failed to start UI', err)
-  document.body.innerHTML = `<pre style="padding:1rem;color:#b91c1c">Failed to start UI: ${String(err)}</pre>`
+  const message = err instanceof Error ? err.message : String(err)
+  document.body.innerHTML = `<pre style="padding:1rem;color:#b91c1c;white-space:pre-wrap">Failed to start UI:\n${message}</pre>`
 })

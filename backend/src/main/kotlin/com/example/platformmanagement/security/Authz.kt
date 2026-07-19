@@ -3,6 +3,8 @@ package com.example.platformmanagement.security
 import com.example.platformmanagement.config.AppSecurityProperties
 import org.springframework.security.authentication.AnonymousAuthenticationToken
 import org.springframework.security.core.context.SecurityContextHolder
+import org.springframework.security.oauth2.jwt.Jwt
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 import org.springframework.stereotype.Component
 
 /**
@@ -14,6 +16,9 @@ import org.springframework.stereotype.Component
  * Prefer controller-layer `@PreAuthorize` for HTTP role gates (see README).
  * Keep services free of security annotations so they compose without
  * re-checking roles on internal calls.
+ *
+ * App roles are matched from Spring authorities (`ROLE_System.Reader`) and, as a
+ * fallback, from the JWT `roles` claim on the principal (in case claim mapping differs).
  */
 @Component("authz")
 class Authz(
@@ -87,6 +92,24 @@ class Authz(
     private fun currentAuthorities(): Set<String> {
         val authentication = SecurityContextHolder.getContext().authentication
             ?: return emptySet()
-        return authentication.authorities.mapNotNull { it?.authority }.toSet()
+
+        val fromGranted = authentication.authorities.mapNotNull { it?.authority }.toMutableSet()
+
+        // Fallback: if ROLE_* was not mapped into GrantedAuthority, read JWT `roles` claim.
+        // /auth/me can show claim roles while method security would otherwise still 403.
+        val jwt: Jwt? = when (val principal = authentication.principal) {
+            is Jwt -> principal
+            else -> (authentication as? JwtAuthenticationToken)?.token
+        }
+        if (jwt != null) {
+            JwtAuthorityMapper.extractRoles(jwt).forEach { role ->
+                fromGranted += if (role.startsWith("ROLE_")) role else "ROLE_$role"
+                if (!role.startsWith("ROLE_")) {
+                    fromGranted += role
+                }
+            }
+        }
+
+        return fromGranted
     }
 }

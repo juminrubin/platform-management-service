@@ -37,6 +37,36 @@ class ServiceOfferingServiceTest {
     }
 
     @Test
+    fun `findAll filters by category case-insensitively`() {
+        whenever(serviceOfferingRepository.findAll()).thenReturn(
+            listOf(offering("gpt", active = true), offering("stt", active = true).also { it.category = "SPEECH" })
+        )
+        val result = serviceOfferingService.findAll(activeOnly = false, category = "speech")
+        assertThat(result).hasSize(1)
+        assertThat(result[0].id).isEqualTo("stt")
+    }
+
+    @Test
+    fun `findById returns offering`() {
+        whenever(serviceOfferingRepository.findById("gpt")).thenReturn(Optional.of(offering("gpt")))
+        assertThat(serviceOfferingService.findById("gpt").id).isEqualTo("gpt")
+    }
+
+    @Test
+    fun `findById throws when missing`() {
+        whenever(serviceOfferingRepository.findById("missing")).thenReturn(Optional.empty())
+        assertThatThrownBy { serviceOfferingService.findById("missing") }
+            .isInstanceOf(ResourceNotFoundException::class.java)
+    }
+
+    @Test
+    fun `delete removes existing offering`() {
+        whenever(serviceOfferingRepository.existsById("gpt")).thenReturn(true)
+        serviceOfferingService.delete("gpt")
+        verify(serviceOfferingRepository).deleteById("gpt")
+    }
+
+    @Test
     fun `create uppercases category and keeps id`() {
         whenever(serviceOfferingRepository.existsById("gpt-5.1")).thenReturn(false)
         whenever(serviceOfferingRepository.save(any(ServiceOffering::class.java))).thenAnswer { it.getArgument(0) }
