@@ -1,0 +1,26 @@
+# DISABLED — ACR build/push needs Azure OIDC secrets and was failing CI without them.
+# GitHub only loads workflows named *.yml / *.yaml under .github/workflows/, so this
+# file is intentionally not active.
+#
+# To re-enable later:
+#   1. Configure repository secrets:
+#        AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID (OIDC), ACR_NAME
+#   2. Rename this file to build-push-acr.yml
+#
+# Artifact build/test CI: see .github/workflows/ci.yml
+#
+# --- original workflow (reference) ---
+# name: Build and push to ACR
+# on:
+#   push:
+#     branches: [main]
+#     tags: ["v*"]
+#   workflow_dispatch:
+# jobs:
+#   build-push:
+#     runs-on: ubuntu-latest
+#     steps:
+#       - uses: actions/checkout@v4
+#       - uses: azure/login@v2
+#       - az acr login --name ${{ secrets.ACR_NAME }}
+#       - docker/build-push-action (backend Dockerfile → ACR)

@@ -1,0 +1,88 @@
+# Continuous integration: compile, test, and package artifacts (no registry push).
+# Replaces the disabled ACR push workflow (.github/workflows/build-push-acr.yml.disabled).
+name: Build and test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (Maven)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Test and package
+        # verify runs unit/integration tests + JaCoCo coverage gate, then packages the JAR
+        run: mvn -B verify
+
+      - name: Upload backend JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-jar
+          path: backend/target/platform-management-service-*.jar
+          if-no-files-found: error
+          retention-days: 7
+
+  frontend:
+    name: Frontend (npm)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Production build
+        # Placeholder Entra values — only needed so Vite can bundle msalConfig (not a live login).
+        env:
+          APP_AZURE_TENANT_ID: "00000000-0000-0000-0000-000000000000"
+          APP_AZURE_CLIENT_ID: "00000000-0000-0000-0000-000000000000"
+          APP_AZURE_API_CLIENT_ID: "00000000-0000-0000-0000-000000000000"
+          APP_AZURE_API_SCOPE: "api://00000000-0000-0000-0000-000000000000/access_as_user"
+          APP_API_BASE_URL: ""
+        run: npm run build
+
+      - name: Upload frontend dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
+          if-no-files-found: error
+          retention-days: 7
