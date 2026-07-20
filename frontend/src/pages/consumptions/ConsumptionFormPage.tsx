@@ -11,7 +11,7 @@ export function ConsumptionFormPage() {
   const [offerings, setOfferings] = useState<ServiceOffering[]>([])
   const [callerId, setCallerId] = useState('')
   const [serviceOfferingId, setServiceOfferingId] = useState('')
-  const [sourceRefId, setSourceRefId] = useState(() => crypto.randomUUID())
+  const [sourceRefId, setSourceRefId] = useState<string>(() => crypto.randomUUID())
   const [consumptionData, setConsumptionData] = useState(
     '{\n  "endpoint_url": "",\n  "input_token": 0,\n  "output_token": 0,\n  "cache_token": 0\n}',
   )

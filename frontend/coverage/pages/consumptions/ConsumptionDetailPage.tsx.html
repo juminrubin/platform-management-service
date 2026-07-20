@@ -23,16 +23,16 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">93.33% </span>
+                <span class="strong">93.75% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>14/15</span>
+                <span class='fraction'>15/16</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">87.5% </span>
+                <span class="strong">83.33% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>7/8</span>
+                <span class='fraction'>10/12</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>14/14</span>
+                <span class='fraction'>15/15</span>
             </div>
         
             
@@ -148,13 +148,23 @@
 <a name='L83'></a><a href='#L83'>83</a>
 <a name='L84'></a><a href='#L84'>84</a>
 <a name='L85'></a><a href='#L85'>85</a>
-<a name='L86'></a><a href='#L86'>86</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L86'></a><a href='#L86'>86</a>
+<a name='L87'></a><a href='#L87'>87</a>
+<a name='L88'></a><a href='#L88'>88</a>
+<a name='L89'></a><a href='#L89'>89</a>
+<a name='L90'></a><a href='#L90'>90</a>
+<a name='L91'></a><a href='#L91'>91</a>
+<a name='L92'></a><a href='#L92'>92</a>
+<a name='L93'></a><a href='#L93'>93</a>
+<a name='L94'></a><a href='#L94'>94</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">9x</span>
 <span class="cline-any cline-yes">9x</span>
 <span class="cline-any cline-yes">9x</span>
 <span class="cline-any cline-yes">9x</span>
@@ -186,7 +196,13 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -237,11 +253,13 @@
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { deleteConsumption, getConsumption } from '../../api/client'
 import type { Consumption } from '../../api/types'
+import { useAuthorization } from '../../auth/AuthorizationContext'
 import { CodeBlock, DetailGrid, ErrorBox, Loading, PageHeader, formatDateTime } from '../../components/ui'
 &nbsp;
 export function ConsumptionDetailPage() {
   const { id = '' } = useParams()
   const navigate = useNavigate()
+  const { canMaintain } = useAuthorization()
   const [item, setItem] = useState&lt;Consumption | null&gt;(null)
   const [error, setError] = useState&lt;string | null&gt;(null)
 &nbsp;
@@ -271,9 +289,11 @@ export function ConsumptionDetailPage() {
             &lt;Link className="button" to="/consumptions"&gt;
               Back
             &lt;/Link&gt;
-            &lt;button type="button" onClick={() =&gt; void onDelete()}&gt;
-              Delete
-            &lt;/button&gt;
+            {canMaintain &amp;&amp; (
+              &lt;button type="button" onClick={() =&gt; void onDelete()}&gt;
+                Delete
+              &lt;/button&gt;
+            )}
           &lt;/div&gt;
         }
       /&gt;
@@ -284,12 +304,16 @@ export function ConsumptionDetailPage() {
           &lt;DetailGrid
             entries={[
               { label: 'ID', value: &lt;code&gt;{item.id}&lt;/code&gt; },
+              {
+                label: 'Source reference ID',
+                value: item.sourceRefId ? &lt;code&gt;{item.sourceRefId}&lt;/code&gt; : <span class="branch-1 cbranch-no" title="branch not covered" >'—',</span>
+              },
               { label: 'Event time', value: formatDateTime(item.createdAt) },
               {
-                label: 'Caller identity',
+                label: 'Caller ID',
                 value: (
-                  &lt;Link to={`/caller-identities/${item.participantCallerIdentityId}`}&gt;
-                    &lt;code&gt;{item.callerIdentity}&lt;/code&gt;
+                  &lt;Link to={`/caller-registrations/${encodeURIComponent(item.callerId)}`}&gt;
+                    &lt;code&gt;{item.callerId}&lt;/code&gt;
                   &lt;/Link&gt;
                 ),
               },
@@ -325,7 +349,7 @@ export function ConsumptionDetailPage() {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-07-19T12:15:11.913Z
+                at 2026-07-20T20:54:52.981Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

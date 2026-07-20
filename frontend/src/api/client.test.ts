@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { InteractionRequiredAuthError } from '@azure/msal-browser'
+import { BrowserAuthError, InteractionRequiredAuthError } from '@azure/msal-browser'
 import {
   apiFetch,
   createCallerRegistration,
@@ -52,15 +52,24 @@ vi.mock('../auth/msalConfig', () => ({
   }),
 }))
 
-function mockJsonResponse(body: unknown, init: { status?: number; statusText?: string } = {}) {
+/** Real Fetch Response so `tsc` and runtime both accept the mock. */
+function mockJsonResponse(body: unknown, init: { status?: number; statusText?: string } = {}): Response {
   const status = init.status ?? 200
-  return {
-    ok: status >= 200 && status < 300,
-    status,
-    statusText: init.statusText ?? 'OK',
-    text: vi.fn().mockResolvedValue(typeof body === 'string' ? body : JSON.stringify(body)),
-    json: vi.fn().mockResolvedValue(body),
+  const statusText = init.statusText ?? (status === 204 ? 'No Content' : 'OK')
+  if (status === 204) {
+    return new Response(null, { status, statusText })
   }
+  const payload = typeof body === 'string' ? body : JSON.stringify(body ?? null)
+  return new Response(payload, {
+    status,
+    statusText,
+    headers: { 'Content-Type': 'application/json' },
+  })
+}
+
+/** Always return a fresh Response (body streams are single-use). */
+function stubFetchJson(body: unknown, init: { status?: number; statusText?: string } = {}) {
+  vi.mocked(fetch).mockImplementation(async () => mockJsonResponse(body, init))
 }
 
 describe('api client', () => {
@@ -81,7 +90,7 @@ describe('api client', () => {
     })
 
     it('attaches bearer token and parses JSON success', async () => {
-      vi.mocked(fetch).mockResolvedValue(mockJsonResponse({ subject: 'u1' }) as Response)
+      stubFetchJson({ subject: 'u1' })
       await expect(getMe()).resolves.toEqual({ subject: 'u1' })
       expect(fetch).toHaveBeenCalledWith(
         '/api/v1/auth/me',
@@ -95,7 +104,7 @@ describe('api client', () => {
 
     it('falls back to popup when silent acquisition requires interaction', async () => {
       acquireTokenSilent.mockRejectedValue(new InteractionRequiredAuthError('interaction_required', 'need login'))
-      vi.mocked(fetch).mockResolvedValue(mockJsonResponse([]) as Response)
+      stubFetchJson([])
       await listParticipants()
       expect(acquireTokenPopup).toHaveBeenCalled()
       const init = vi.mocked(fetch).mock.calls[0][1] as RequestInit
@@ -107,10 +116,21 @@ describe('api client', () => {
       await expect(getMe()).rejects.toThrow('network down')
     })
 
+    it('treats BrowserAuthError cache codes as interaction-required', async () => {
+      acquireTokenSilent.mockRejectedValue(new BrowserAuthError('no_token_request_cache_error', 'cache'))
+      stubFetchJson({ ok: true })
+      await getMe()
+      expect(acquireTokenPopup).toHaveBeenCalled()
+    })
+
+    it('fails fast when another interactive login is already in progress', async () => {
+      acquireTokenSilent.mockRejectedValue(new BrowserAuthError('interaction_in_progress', 'busy'))
+      await expect(getMe()).rejects.toThrow(/Sign-in already in progress/)
+      expect(acquireTokenPopup).not.toHaveBeenCalled()
+    })
+
     it('sets Content-Type for JSON bodies and throws on HTTP error', async () => {
-      vi.mocked(fetch).mockResolvedValue(
-        mockJsonResponse('bad request', { status: 400, statusText: 'Bad Request' }) as Response,
-      )
+      stubFetchJson('bad request', { status: 400, statusText: 'Bad Request' })
       await expect(createParticipant({ id: 'x', name: 'X' })).rejects.toThrow('400 Bad Request: bad request')
       const init = vi.mocked(fetch).mock.calls[0][1] as RequestInit
       expect((init.headers as Headers).get('Content-Type')).toBe('application/json')
@@ -118,14 +138,14 @@ describe('api client', () => {
     })
 
     it('returns undefined for 204 No Content', async () => {
-      vi.mocked(fetch).mockResolvedValue(mockJsonResponse(undefined, { status: 204 }) as Response)
+      stubFetchJson(undefined, { status: 204 })
       await expect(deleteParticipant('acme-corp')).resolves.toBeUndefined()
     })
   })
 
   describe('resource helpers and query strings', () => {
     beforeEach(() => {
-      vi.mocked(fetch).mockResolvedValue(mockJsonResponse([]) as Response)
+      stubFetchJson([])
     })
 
     it('lists participants with optional status', async () => {
@@ -136,7 +156,7 @@ describe('api client', () => {
     })
 
     it('gets / updates / deletes a participant', async () => {
-      vi.mocked(fetch).mockResolvedValue(mockJsonResponse({ id: 'acme-corp' }) as Response)
+      stubFetchJson({ id: 'acme-corp' })
       await getParticipant('acme/corp')
       expect(fetch).toHaveBeenLastCalledWith('/api/v1/participants/acme%2Fcorp', expect.anything())
 
@@ -146,7 +166,7 @@ describe('api client', () => {
         expect.objectContaining({ method: 'PUT' }),
       )
 
-      vi.mocked(fetch).mockResolvedValue(mockJsonResponse(undefined, { status: 204 }) as Response)
+      stubFetchJson(undefined, { status: 204 })
       await deleteParticipant('acme-corp')
       expect(fetch).toHaveBeenLastCalledWith(
         '/api/v1/participants/acme-corp',
@@ -163,11 +183,11 @@ describe('api client', () => {
       await listCallerRegistrations()
       expect(fetch).toHaveBeenLastCalledWith('/api/v1/caller-registrations', expect.anything())
 
-      vi.mocked(fetch).mockResolvedValue(mockJsonResponse({ callerId: 'a@b.com' }) as Response)
+      stubFetchJson({ callerId: 'a@b.com' })
       await getCallerRegistration('a@b.com')
       await createCallerRegistration({ participantId: 'acme-corp', callerId: 'a@b.com' })
       await updateCallerRegistration('a@b.com', { status: 'INACTIVE' })
-      vi.mocked(fetch).mockResolvedValue(mockJsonResponse(undefined, { status: 204 }) as Response)
+      stubFetchJson(undefined, { status: 204 })
       await deleteCallerRegistration('a@b.com')
       expect(vi.mocked(fetch).mock.calls.map((c) => [c[0], (c[1] as RequestInit)?.method])).toEqual(
         expect.arrayContaining([
@@ -188,7 +208,7 @@ describe('api client', () => {
       await listServiceOfferings({})
       expect(fetch).toHaveBeenLastCalledWith('/api/v1/service-offerings', expect.anything())
 
-      vi.mocked(fetch).mockResolvedValue(mockJsonResponse({ id: 'gpt-5.1' }) as Response)
+      stubFetchJson({ id: 'gpt-5.1' })
       await getServiceOffering('gpt-5.1')
       await createServiceOffering({ id: 'm', name: 'M', category: 'LLM' })
       await updateServiceOffering('m', {
@@ -197,7 +217,7 @@ describe('api client', () => {
         config: '{}',
         active: true,
       })
-      vi.mocked(fetch).mockResolvedValue(mockJsonResponse(undefined, { status: 204 }) as Response)
+      stubFetchJson(undefined, { status: 204 })
       await deleteServiceOffering('m')
     })
 
@@ -212,7 +232,7 @@ describe('api client', () => {
         expect.anything(),
       )
 
-      vi.mocked(fetch).mockResolvedValue(mockJsonResponse({ id: 'e1' }) as Response)
+      stubFetchJson({ id: 'e1' })
       await getEntitlement('e1')
       await createEntitlement({
         participantId: 'acme-corp',
@@ -224,7 +244,7 @@ describe('api client', () => {
         validFrom: '2024-01-01',
         config: '{}',
       })
-      vi.mocked(fetch).mockResolvedValue(mockJsonResponse(undefined, { status: 204 }) as Response)
+      stubFetchJson(undefined, { status: 204 })
       await deleteEntitlement('e1')
     })
 
@@ -240,14 +260,14 @@ describe('api client', () => {
       await listConsumptions()
       expect(fetch).toHaveBeenLastCalledWith('/api/v1/consumptions', expect.anything())
 
-      vi.mocked(fetch).mockResolvedValue(mockJsonResponse({ id: 'd1' }) as Response)
+      stubFetchJson({ id: 'd1' })
       await getConsumption('d1')
       await createConsumption({
         callerId: 'alice@acme.example',
         serviceOfferingId: 'gpt-5.1',
         consumptionData: '{}',
       })
-      vi.mocked(fetch).mockResolvedValue(mockJsonResponse(undefined, { status: 204 }) as Response)
+      stubFetchJson(undefined, { status: 204 })
       await deleteConsumption('d1')
     })
   })

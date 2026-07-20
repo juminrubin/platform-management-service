@@ -37,4 +37,14 @@ describe('HomePage', () => {
     await user.click(screen.getByRole('button', { name: /sign in with microsoft/i }))
     expect(signInWithPopup).toHaveBeenCalled()
   })
+
+  it('logs failed home sign-in', async () => {
+    isAuthenticated = false
+    const user = userEvent.setup()
+    const err = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    signInWithPopup.mockRejectedValueOnce(new Error('cancelled'))
+    renderWithRouter(<HomePage />)
+    await user.click(screen.getByRole('button', { name: /sign in with microsoft/i }))
+    expect(err).toHaveBeenCalled()
+  })
 })

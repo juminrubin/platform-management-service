@@ -47,7 +47,6 @@ export const msalConfig: Configuration = {
     redirectUri: popupRedirectUri,
     // Logout popup also lands on the blank page (MSAL opens postLogoutRedirectUri in the popup).
     postLogoutRedirectUri: popupRedirectUri,
-    navigateToLoginRequestUrl: false,
   },
   cache: {
     cacheLocation: 'sessionStorage',
@@ -62,12 +61,11 @@ export const msalConfig: Configuration = {
         }
       },
     },
-    allowNativeBroker: false,
+    // Disable WAM / native broker; SPA uses browser popups only (msal-browser v5+ name).
+    allowPlatformBroker: false,
     // Give the popup enough time to round-trip through Entra on slow networks
-    windowHashTimeout: 60_000,
-    iframeHashTimeout: 10_000,
-    loadFrameTimeout: 10_000,
     popupBridgeTimeout: 120_000,
+    iframeBridgeTimeout: 10_000,
   },
 }
 

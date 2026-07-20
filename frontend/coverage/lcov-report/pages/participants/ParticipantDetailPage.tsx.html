@@ -3,7 +3,7 @@
 <html lang="en">
 
 <head>
-    <title>Code coverage report for pages/callerIdentities/CallerIdentityDetailPage.tsx</title>
+    <title>Code coverage report for pages/participants/ParticipantDetailPage.tsx</title>
     <meta charset="utf-8" />
     <link rel="stylesheet" href="../../prettify.css" />
     <link rel="stylesheet" href="../../base.css" />
@@ -19,20 +19,20 @@
 <body>
 <div class='wrapper'>
     <div class='pad1'>
-        <h1><a href="../../index.html">All files</a> / <a href="index.html">pages/callerIdentities</a> CallerIdentityDetailPage.tsx</h1>
+        <h1><a href="../../index.html">All files</a> / <a href="index.html">pages/participants</a> ParticipantDetailPage.tsx</h1>
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>15/15</span>
+                <span class='fraction'>16/16</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>8/8</span>
+                <span class='fraction'>10/10</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>14/14</span>
+                <span class='fraction'>15/15</span>
             </div>
         
             
@@ -140,13 +140,15 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">11x</span>
-<span class="cline-any cline-yes">11x</span>
-<span class="cline-any cline-yes">11x</span>
-<span class="cline-any cline-yes">11x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">11x</span>
-<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -161,7 +163,10 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">11x</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -174,11 +179,6 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -205,27 +205,29 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { deleteCallerIdentity, getCallerIdentity } from '../../api/client'
-import type { CallerIdentity } from '../../api/types'
+import { deleteParticipant, getParticipant } from '../../api/client'
+import type { Participant } from '../../api/types'
+import { useAuthorization } from '../../auth/AuthorizationContext'
 import { DetailGrid, ErrorBox, Loading, PageHeader, formatDateTime } from '../../components/ui'
 &nbsp;
-export function CallerIdentityDetailPage() {
+export function ParticipantDetailPage() {
   const { id = '' } = useParams()
   const navigate = useNavigate()
-  const [item, setItem] = useState&lt;CallerIdentity | null&gt;(null)
+  const { canMaintain } = useAuthorization()
+  const [item, setItem] = useState&lt;Participant | null&gt;(null)
   const [error, setError] = useState&lt;string | null&gt;(null)
 &nbsp;
   useEffect(() =&gt; {
-    getCallerIdentity(id)
+    getParticipant(id)
       .then(setItem)
       .catch((e: Error) =&gt; setError(e.message))
   }, [id])
 &nbsp;
   async function onDelete() {
-    if (!confirm('Delete this caller identity?')) return
+    if (!confirm(`Delete participant ${id}?`)) return
     try {
-      await deleteCallerIdentity(id)
-      navigate('/caller-identities')
+      await deleteParticipant(id)
+      navigate('/participants')
     } catch (e) {
       setError((e as Error).message)
     }
@@ -234,18 +236,23 @@ export function CallerIdentityDetailPage() {
   return (
     &lt;section className="card"&gt;
       &lt;PageHeader
-        title="Caller identity"
+        title="Participant"
+        subtitle={id}
         actions={
           &lt;div className="row gap"&gt;
-            &lt;Link className="button" to="/caller-identities"&gt;
-              Back
+            &lt;Link className="button" to="/participants"&gt;
+              Back to list
             &lt;/Link&gt;
-            &lt;Link className="button primary" to={`/caller-identities/${id}/edit`}&gt;
-              Edit status
-            &lt;/Link&gt;
-            &lt;button type="button" onClick={() =&gt; void onDelete()}&gt;
-              Delete
-            &lt;/button&gt;
+            {canMaintain &amp;&amp; (
+              &lt;&gt;
+                &lt;Link className="button primary" to={`/participants/${encodeURIComponent(id)}/edit`}&gt;
+                  Edit
+                &lt;/Link&gt;
+                &lt;button type="button" onClick={() =&gt; void onDelete()}&gt;
+                  Delete
+                &lt;/button&gt;
+              &lt;/&gt;
+            )}
           &lt;/div&gt;
         }
       /&gt;
@@ -255,15 +262,8 @@ export function CallerIdentityDetailPage() {
         &lt;DetailGrid
           entries={[
             { label: 'ID', value: &lt;code&gt;{item.id}&lt;/code&gt; },
-            { label: 'Caller identity', value: &lt;code&gt;{item.callerIdentity}&lt;/code&gt; },
-            {
-              label: 'Participant',
-              value: (
-                &lt;Link to={`/participants/${encodeURIComponent(item.participantId)}`}&gt;
-                  {item.participantName} ({item.participantId})
-                &lt;/Link&gt;
-              ),
-            },
+            { label: 'Name', value: item.name },
+            { label: 'Contact', value: item.contact },
             { label: 'Status', value: &lt;span className={`badge status-${item.status}`}&gt;{item.status}&lt;/span&gt; },
             { label: 'Created', value: formatDateTime(item.createdAt) },
             { label: 'Updated', value: formatDateTime(item.updatedAt) },
@@ -280,7 +280,7 @@ export function CallerIdentityDetailPage() {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-07-19T12:15:11.913Z
+                at 2026-07-20T20:54:52.993Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

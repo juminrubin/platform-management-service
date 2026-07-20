@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
+                <span class="strong">97.56% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>38/38</span>
+                <span class='fraction'>40/41</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">75% </span>
+                <span class="strong">70% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>6/8</span>
+                <span class='fraction'>7/10</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
+                <span class="strong">93.33% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>13/13</span>
+                <span class='fraction'>14/15</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
+                <span class="strong">97.5% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>38/38</span>
+                <span class='fraction'>39/40</span>
             </div>
         
             
@@ -183,7 +183,17 @@
 <a name='L118'></a><a href='#L118'>118</a>
 <a name='L119'></a><a href='#L119'>119</a>
 <a name='L120'></a><a href='#L120'>120</a>
-<a name='L121'></a><a href='#L121'>121</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L121'></a><a href='#L121'>121</a>
+<a name='L122'></a><a href='#L122'>122</a>
+<a name='L123'></a><a href='#L123'>123</a>
+<a name='L124'></a><a href='#L124'>124</a>
+<a name='L125'></a><a href='#L125'>125</a>
+<a name='L126'></a><a href='#L126'>126</a>
+<a name='L127'></a><a href='#L127'>127</a>
+<a name='L128'></a><a href='#L128'>128</a>
+<a name='L129'></a><a href='#L129'>129</a>
+<a name='L130'></a><a href='#L130'>130</a>
+<a name='L131'></a><a href='#L131'>131</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -191,6 +201,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">29x</span>
 <span class="cline-any cline-yes">29x</span>
 <span class="cline-any cline-yes">29x</span>
 <span class="cline-any cline-yes">29x</span>
@@ -228,6 +239,7 @@
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -261,11 +273,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">23x</span>
@@ -280,6 +288,18 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">23x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -306,16 +326,17 @@
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import type { FormEvent } from 'react'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { createConsumption, listCallerIdentities, listServiceOfferings } from '../../api/client'
-import type { CallerIdentity, ServiceOffering } from '../../api/types'
+import { createConsumption, listCallerRegistrations, listServiceOfferings } from '../../api/client'
+import type { CallerRegistration, ServiceOffering } from '../../api/types'
 import { ErrorBox, Field, Loading, PageHeader } from '../../components/ui'
 &nbsp;
 export function ConsumptionFormPage() {
   const navigate = useNavigate()
-  const [callers, setCallers] = useState&lt;CallerIdentity[]&gt;([])
+  const [callers, setCallers] = useState&lt;CallerRegistration[]&gt;([])
   const [offerings, setOfferings] = useState&lt;ServiceOffering[]&gt;([])
-  const [participantCallerIdentityId, setParticipantCallerIdentityId] = useState('')
+  const [callerId, setCallerId] = useState('')
   const [serviceOfferingId, setServiceOfferingId] = useState('')
+  const [sourceRefId, setSourceRefId] = useState&lt;string&gt;(() =&gt; crypto.randomUUID())
   const [consumptionData, setConsumptionData] = useState(
     '{\n  "endpoint_url": "",\n  "input_token": 0,\n  "output_token": 0,\n  "cache_token": 0\n}',
   )
@@ -324,7 +345,7 @@ export function ConsumptionFormPage() {
   const [loading, setLoading] = useState(true)
 &nbsp;
   useEffect(() =&gt; {
-    Promise.all([listCallerIdentities(), listServiceOfferings()])
+    Promise.all([listCallerRegistrations(), listServiceOfferings()])
       .then(([c, o]) =&gt; {
         setCallers(c)
         setOfferings(o)
@@ -348,8 +369,9 @@ export function ConsumptionFormPage() {
         consumedAtIso = new Date(consumedAt).toISOString()
       }
       const created = await createConsumption({
-        participantCallerIdentityId,
+        callerId,
         serviceOfferingId,
+        sourceRefId: sourceRefId.trim() || <span class="branch-1 cbranch-no" title="branch not covered" >null,</span>
         consumptionData: consumptionData.trim() || <span class="branch-1 cbranch-no" title="branch not covered" >'{}',</span>
         consumedAt: consumedAtIso,
       })
@@ -380,16 +402,12 @@ export function ConsumptionFormPage() {
       /&gt;
       &lt;ErrorBox error={error} /&gt;
       &lt;form className="form" onSubmit={(e) =&gt; void onSubmit(e)}&gt;
-        &lt;Field label="Caller identity"&gt;
-          &lt;select
-            required
-            value={participantCallerIdentityId}
-            onChange={(e) =&gt; setParticipantCallerIdentityId(e.target.value)}
-          &gt;
+        &lt;Field label="Caller ID"&gt;
+          &lt;select required value={callerId} onChange={(e) =&gt; setCallerId(e.target.value)}&gt;
             &lt;option value=""&gt;Select…&lt;/option&gt;
             {callers.map((c) =&gt; (
-              &lt;option key={c.id} value={c.id}&gt;
-                {c.callerIdentity} — {c.participantName} ({c.participantId})
+              &lt;option key={c.callerId} value={c.callerId}&gt;
+                {c.callerId} — {c.participantName} ({c.participantId})
               &lt;/option&gt;
             ))}
           &lt;/select&gt;
@@ -403,6 +421,18 @@ export function ConsumptionFormPage() {
               &lt;/option&gt;
             ))}
           &lt;/select&gt;
+        &lt;/Field&gt;
+        &lt;Field
+          label="Source reference ID"
+          hint="Unique Source Reference Identification from the reporter (e.g. request UUID). Used for idempotent registration."
+        &gt;
+          &lt;input
+            className="mono"
+            value={sourceRefId}
+<span class="fstat-no" title="function not covered" >            onChange={(e</span>) =&gt; <span class="cstat-no" title="statement not covered" >setSourceRefId(e.target.value)}</span>
+            placeholder="e.g. request UUID"
+            maxLength={255}
+          /&gt;
         &lt;/Field&gt;
         &lt;Field label="Event time (optional)" hint="Defaults to now if empty."&gt;
           &lt;input type="datetime-local" value={consumedAt} onChange={(e) =&gt; setConsumedAt(e.target.value)} /&gt;
@@ -430,7 +460,7 @@ export function ConsumptionFormPage() {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-07-19T12:15:11.913Z
+                at 2026-07-20T20:54:52.981Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

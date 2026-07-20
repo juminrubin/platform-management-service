@@ -25,7 +25,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>6/6</span>
+                <span class='fraction'>9/9</span>
             </div>
         
             
@@ -39,14 +39,14 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>3/3</span>
+                <span class='fraction'>4/4</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>6/6</span>
+                <span class='fraction'>9/9</span>
             </div>
         
             
@@ -113,7 +113,19 @@
 <a name='L48'></a><a href='#L48'>48</a>
 <a name='L49'></a><a href='#L49'>49</a>
 <a name='L50'></a><a href='#L50'>50</a>
-<a name='L51'></a><a href='#L51'>51</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L51'></a><a href='#L51'>51</a>
+<a name='L52'></a><a href='#L52'>52</a>
+<a name='L53'></a><a href='#L53'>53</a>
+<a name='L54'></a><a href='#L54'>54</a>
+<a name='L55'></a><a href='#L55'>55</a>
+<a name='L56'></a><a href='#L56'>56</a>
+<a name='L57'></a><a href='#L57'>57</a>
+<a name='L58'></a><a href='#L58'>58</a>
+<a name='L59'></a><a href='#L59'>59</a>
+<a name='L60'></a><a href='#L60'>60</a>
+<a name='L61'></a><a href='#L61'>61</a>
+<a name='L62'></a><a href='#L62'>62</a>
+<a name='L63'></a><a href='#L63'>63</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -126,20 +138,32 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -165,31 +189,43 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { useIsAuthenticated, useMsal } from '@azure/msal-react'
 import { Link } from 'react-router-dom'
-import { loginRequest } from '../auth/msalConfig'
+import { signInWithPopup } from '../auth/msalConfig'
 &nbsp;
 const modules = [
-  { to: '/participants', title: 'Participants', desc: 'Organizations that consume services' },
-  { to: '/caller-identities', title: 'Caller identities', desc: 'Email / Entra SP / managed identity principals' },
+  { to: '/participants', title: 'Participants', desc: 'Billing groups for caller registrations' },
+  {
+    to: '/caller-registrations',
+    title: 'Caller registrations',
+    desc: 'Unique caller principals (email / Entra SP / MI)',
+  },
   { to: '/service-offerings', title: 'Service offerings', desc: 'Catalog of entitled services' },
   { to: '/entitlements', title: 'Entitlements', desc: 'Participant access rights to offerings' },
   { to: '/consumptions', title: 'Consumptions', desc: 'Token / usage events with rich filters' },
 ]
 &nbsp;
 export function HomePage() {
-  const { instance, accounts } = useMsal()
+  const { accounts } = useMsal()
   const isAuthenticated = useIsAuthenticated()
+&nbsp;
+  async function onSignIn() {
+    try {
+      await signInWithPopup()
+    } catch (err) {
+      console.error('Sign-in failed', err)
+    }
+  }
 &nbsp;
   return (
     &lt;section className="card"&gt;
       &lt;h1&gt;Platform Management Service&lt;/h1&gt;
       &lt;p className="muted"&gt;
-        Manage participants, identities, offerings, entitlements, and consumption. API roles:{' '}
+        Manage participants, caller registrations, offerings, entitlements, and consumption. API roles:{' '}
         &lt;code&gt;System.Maintainer&lt;/code&gt;, &lt;code&gt;System.Reader&lt;/code&gt;, &lt;code&gt;Entitlement.Reader&lt;/code&gt;,{' '}
         &lt;code&gt;Consumption.Registrator&lt;/code&gt;.
       &lt;/p&gt;
 &nbsp;
       {!isAuthenticated ? (
-        &lt;button type="button" className="primary" onClick={() =&gt; instance.loginPopup(loginRequest)}&gt;
+        &lt;button type="button" className="primary" onClick={() =&gt; void onSignIn()}&gt;
           Sign in with Microsoft
         &lt;/button&gt;
       ) : (
@@ -220,7 +256,7 @@ export function HomePage() {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-07-19T12:15:11.913Z
+                at 2026-07-20T20:54:52.981Z
             </div>
         <script src="../prettify.js"></script>
         <script>

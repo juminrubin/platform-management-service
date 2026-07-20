@@ -60,4 +60,24 @@ describe('Layout', () => {
     await user.click(screen.getByRole('button', { name: /sign out/i }))
     expect(signOutWithPopup).toHaveBeenCalled()
   })
+
+  it('logs sign-in failures without crashing', async () => {
+    isAuthenticated = false
+    const user = userEvent.setup()
+    const err = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    signInWithPopup.mockRejectedValueOnce(new Error('popup blocked'))
+    renderLayout()
+    await user.click(screen.getByRole('button', { name: /sign in/i }))
+    expect(err).toHaveBeenCalled()
+  })
+
+  it('logs sign-out failures without crashing', async () => {
+    isAuthenticated = true
+    const user = userEvent.setup()
+    const err = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    signOutWithPopup.mockRejectedValueOnce(new Error('logout failed'))
+    renderLayout()
+    await user.click(screen.getByRole('button', { name: /sign out/i }))
+    expect(err).toHaveBeenCalled()
+  })
 })

@@ -21,10 +21,19 @@ Vitest + React Testing Library (API and MSAL mocked):
 ```bash
 npm test              # single run
 npm run test:watch    # watch mode
-npm run test:coverage # coverage report
+npm run test:coverage # coverage report + industry gate
 ```
 
-Coverage includes list/detail/form pages for all domain modules plus shared UI helpers.
+**Coverage gate** (see `vite.config.ts`, same spirit as backend JaCoCo ≥80% lines):
+
+| Metric | Minimum |
+|--------|---------|
+| Lines / statements / functions | **80%** |
+| Branches | **75%** |
+
+Included: API client, auth/capabilities, authorization UI, layout, and list/detail/form pages.  
+Excluded: `main.tsx`, `App.tsx` (wiring), pure types, and test helpers.  
+CI runs `npm run test:coverage` so PRs fail if coverage drops below the gate.
 
 ## Entra SPA registration
 

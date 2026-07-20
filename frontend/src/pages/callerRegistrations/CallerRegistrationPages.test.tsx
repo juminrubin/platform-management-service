@@ -107,4 +107,78 @@ describe('Caller registration pages', () => {
       )
     })
   })
+
+  it('filters client-side search and supports reset', async () => {
+    const user = userEvent.setup()
+    renderWithRouter(<CallerRegistrationListPage />)
+    await screen.findByText('alice@acme.example')
+    await user.type(screen.getByLabelText(/Search caller/), 'zzz-missing')
+    expect(screen.queryByText('alice@acme.example')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /reset/i }))
+    expect(await screen.findByText('alice@acme.example')).toBeInTheDocument()
+  })
+
+  it('deletes from list after confirm', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    vi.mocked(api.deleteCallerRegistration).mockResolvedValue(undefined)
+    renderWithRouter(<CallerRegistrationListPage />)
+    await screen.findByText('alice@acme.example')
+    await user.click(screen.getByRole('button', { name: /delete/i }))
+    await waitFor(() => {
+      expect(api.deleteCallerRegistration).toHaveBeenCalledWith(callerRegistrationActive.callerId)
+    })
+  })
+
+  it('hides write actions for System.Reader', async () => {
+    renderWithRouter(<CallerRegistrationListPage />, {
+      auth: {
+        canMaintain: false,
+        canRead: true,
+        canCheckEntitlement: true,
+        canRegisterConsumption: false,
+        roles: ['System.Reader'],
+      },
+    })
+    await screen.findByText('alice@acme.example')
+    expect(screen.queryByRole('link', { name: /register caller/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /delete/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /^view$/i })).toBeInTheDocument()
+  })
+
+  it('deletes from detail after confirm', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    vi.mocked(api.deleteCallerRegistration).mockResolvedValue(undefined)
+    renderWithRouter(
+      <Routes>
+        <Route path="/caller-registrations/:callerId" element={<CallerRegistrationDetailPage />} />
+        <Route path="/caller-registrations" element={<div>list page</div>} />
+      </Routes>,
+      { route: `/caller-registrations/${encodeURIComponent(callerRegistrationActive.callerId)}` },
+    )
+    await screen.findByText('alice@acme.example')
+    await user.click(screen.getByRole('button', { name: /delete/i }))
+    await waitFor(() => {
+      expect(api.deleteCallerRegistration).toHaveBeenCalledWith(callerRegistrationActive.callerId)
+    })
+    expect(await screen.findByText('list page')).toBeInTheDocument()
+  })
+
+  it('shows detail load error', async () => {
+    vi.mocked(api.getCallerRegistration).mockRejectedValue(new Error('404 missing'))
+    renderWithRouter(
+      <Routes>
+        <Route path="/caller-registrations/:callerId" element={<CallerRegistrationDetailPage />} />
+      </Routes>,
+      { route: `/caller-registrations/${encodeURIComponent(callerRegistrationActive.callerId)}` },
+    )
+    expect(await screen.findByText(/404 missing/)).toBeInTheDocument()
+  })
+
+  it('shows list load error', async () => {
+    vi.mocked(api.listCallerRegistrations).mockRejectedValue(new Error('list failed'))
+    renderWithRouter(<CallerRegistrationListPage />)
+    expect(await screen.findByText(/list failed/)).toBeInTheDocument()
+  })
 })

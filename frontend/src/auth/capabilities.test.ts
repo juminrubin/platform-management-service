@@ -34,4 +34,17 @@ describe('capabilities', () => {
     expect(caps.canMaintain).toBe(false)
     expect(caps.canRead).toBe(false)
   })
+
+  it('ignores blank role strings', () => {
+    const set = collectRoles(['', '  ', AppRoles.SYSTEM_READER], ['ROLE_', ' ROLE_System.Reader '])
+    expect(set.has('')).toBe(false)
+    expect(set.has(AppRoles.SYSTEM_READER)).toBe(true)
+  })
+
+  it('entitlement reader can check but not maintain or read lists', () => {
+    const caps = deriveCapabilities(new Set([AppRoles.ENTITLEMENT_READER]))
+    expect(caps.canCheckEntitlement).toBe(true)
+    expect(caps.canMaintain).toBe(false)
+    expect(caps.canRead).toBe(false)
+  })
 })

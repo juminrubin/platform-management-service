@@ -54,5 +54,26 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.ts'],
     css: true,
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'text-summary', 'html', 'lcov'],
+      // App source only — entrypoints / pure types / test helpers excluded
+      include: ['src/**/*.{ts,tsx}'],
+      exclude: [
+        'src/**/*.{test,spec}.{ts,tsx}',
+        'src/test/**',
+        'src/main.tsx',
+        'src/App.tsx',
+        'src/api/types.ts',
+        'src/**/*.d.ts',
+      ],
+      // Industry-common gate (aligns with backend JaCoCo ≥80% lines)
+      thresholds: {
+        lines: 80,
+        statements: 80,
+        functions: 80,
+        branches: 75,
+      },
+    },
   },
 })
