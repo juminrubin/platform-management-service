@@ -1,9 +1,9 @@
 package com.example.platformmanagement.service
 
-import com.example.platformmanagement.domain.CallerIdentityStatus
+import com.example.platformmanagement.domain.CallerRegistrationStatus
 import com.example.platformmanagement.domain.EntitlementStatus
 import com.example.platformmanagement.domain.Participant
-import com.example.platformmanagement.domain.ParticipantCallerIdentity
+import com.example.platformmanagement.domain.ParticipantCallerRegistration
 import com.example.platformmanagement.domain.ParticipantServiceEntitlement
 import com.example.platformmanagement.domain.ParticipantStatus
 import com.example.platformmanagement.domain.ServiceOffering
@@ -12,7 +12,7 @@ import com.example.platformmanagement.dto.UpdateEntitlementRequest
 import com.example.platformmanagement.exception.BadRequestException
 import com.example.platformmanagement.exception.ConflictException
 import com.example.platformmanagement.exception.ResourceNotFoundException
-import com.example.platformmanagement.repository.ParticipantCallerIdentityRepository
+import com.example.platformmanagement.repository.ParticipantCallerRegistrationRepository
 import com.example.platformmanagement.repository.ParticipantServiceEntitlementRepository
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
@@ -35,7 +35,7 @@ class EntitlementServiceTest {
     private lateinit var entitlementRepository: ParticipantServiceEntitlementRepository
 
     @Mock
-    private lateinit var callerIdentityRepository: ParticipantCallerIdentityRepository
+    private lateinit var callerRegistrationRepository: ParticipantCallerRegistrationRepository
 
     @Mock
     private lateinit var participantService: ParticipantService
@@ -103,43 +103,37 @@ class EntitlementServiceTest {
     @Test
     fun `check requires service offering id`() {
         assertThatThrownBy {
-            entitlementService.checkByCallerAndService(null, null, "  ", null)
+            entitlementService.checkByCallerAndService("a@x.com", "  ", null)
         }.isInstanceOf(BadRequestException::class.java)
     }
 
     @Test
-    fun `check requires exactly one caller key`() {
+    fun `check requires caller id`() {
         assertThatThrownBy {
-            entitlementService.checkByCallerAndService(null, null, "gpt", LocalDate.of(2024, 6, 1))
-        }.isInstanceOf(BadRequestException::class.java)
-
-        whenever(serviceOfferingService.getEntity("gpt")).thenReturn(offering("gpt"))
-        assertThatThrownBy {
-            entitlementService.checkByCallerAndService("a@x.com", UUID.randomUUID(), "gpt", null)
+            entitlementService.checkByCallerAndService("  ", "gpt", LocalDate.of(2024, 6, 1))
         }.isInstanceOf(BadRequestException::class.java)
     }
 
     @Test
     fun `check returns CALLER_NOT_FOUND`() {
         whenever(serviceOfferingService.getEntity("gpt")).thenReturn(offering("gpt"))
-        whenever(callerIdentityRepository.findByCallerIdentity("missing@x.com")).thenReturn(emptyList())
-        val result = entitlementService.checkByCallerAndService("missing@x.com", null, "gpt", LocalDate.of(2024, 6, 1))
+        whenever(callerRegistrationRepository.findByCallerIdWithParticipant("missing@x.com")).thenReturn(null)
+        val result = entitlementService.checkByCallerAndService("missing@x.com", "gpt", LocalDate.of(2024, 6, 1))
         assertThat(result.allowed).isFalse()
         assertThat(result.reason).isEqualTo("CALLER_NOT_FOUND")
+        assertThat(result.callerId).isEqualTo("missing@x.com")
     }
 
     @Test
     fun `check returns CALLER_NOT_ACTIVE`() {
-        val callerId = UUID.randomUUID()
-        val caller = ParticipantCallerIdentity(
-            id = callerId,
+        val caller = ParticipantCallerRegistration(
+            callerId = "a@x.com",
             participant = participant("p1"),
-            callerIdentity = "a@x.com",
-            status = CallerIdentityStatus.INACTIVE
+            status = CallerRegistrationStatus.INACTIVE
         )
         whenever(serviceOfferingService.getEntity("gpt")).thenReturn(offering("gpt"))
-        whenever(callerIdentityRepository.findByIdWithParticipant(callerId)).thenReturn(caller)
-        val result = entitlementService.checkByCallerAndService(null, callerId, "gpt", LocalDate.of(2024, 6, 1))
+        whenever(callerRegistrationRepository.findByCallerIdWithParticipant("a@x.com")).thenReturn(caller)
+        val result = entitlementService.checkByCallerAndService("a@x.com", "gpt", LocalDate.of(2024, 6, 1))
         assertThat(result.allowed).isFalse()
         assertThat(result.reason).isEqualTo("CALLER_NOT_ACTIVE")
     }
@@ -148,9 +142,9 @@ class EntitlementServiceTest {
     fun `check returns NO_ENTITLEMENT`() {
         val caller = activeCaller()
         whenever(serviceOfferingService.getEntity("gpt")).thenReturn(offering("gpt"))
-        whenever(callerIdentityRepository.findByCallerIdentity("a@x.com")).thenReturn(listOf(caller))
+        whenever(callerRegistrationRepository.findByCallerIdWithParticipant("a@x.com")).thenReturn(caller)
         whenever(entitlementRepository.findByParticipantId("p1")).thenReturn(emptyList())
-        val result = entitlementService.checkByCallerAndService("a@x.com", null, "gpt", LocalDate.of(2024, 6, 1))
+        val result = entitlementService.checkByCallerAndService("a@x.com", "gpt", LocalDate.of(2024, 6, 1))
         assertThat(result.allowed).isFalse()
         assertThat(result.reason).isEqualTo("NO_ENTITLEMENT")
     }
@@ -159,13 +153,13 @@ class EntitlementServiceTest {
     fun `check returns date and status reasons`() {
         val caller = activeCaller()
         whenever(serviceOfferingService.getEntity("gpt")).thenReturn(offering("gpt"))
-        whenever(callerIdentityRepository.findByCallerIdentity("a@x.com")).thenReturn(listOf(caller))
+        whenever(callerRegistrationRepository.findByCallerIdWithParticipant("a@x.com")).thenReturn(caller)
 
         whenever(entitlementRepository.findByParticipantId("p1")).thenReturn(
             listOf(entitlement(status = EntitlementStatus.PENDING))
         )
         assertThat(
-            entitlementService.checkByCallerAndService("a@x.com", null, "gpt", LocalDate.of(2025, 6, 1)).reason
+            entitlementService.checkByCallerAndService("a@x.com", "gpt", LocalDate.of(2025, 6, 1)).reason
         ).isEqualTo("ENTITLEMENT_NOT_ACTIVE")
 
         whenever(entitlementRepository.findByParticipantId("p1")).thenReturn(
@@ -178,21 +172,20 @@ class EntitlementServiceTest {
             )
         )
         assertThat(
-            entitlementService.checkByCallerAndService("a@x.com", null, "gpt", LocalDate.of(2024, 6, 1)).reason
+            entitlementService.checkByCallerAndService("a@x.com", "gpt", LocalDate.of(2024, 6, 1)).reason
         ).isEqualTo("ENTITLEMENT_NOT_YET_VALID")
         assertThat(
-            entitlementService.checkByCallerAndService("a@x.com", null, "gpt", LocalDate.of(2026, 1, 1)).reason
+            entitlementService.checkByCallerAndService("a@x.com", "gpt", LocalDate.of(2026, 1, 1)).reason
         ).isEqualTo("ENTITLEMENT_EXPIRED")
         assertThat(
-            entitlementService.checkByCallerAndService("a@x.com", null, "gpt", LocalDate.of(2025, 6, 1)).reason
+            entitlementService.checkByCallerAndService("a@x.com", "gpt", LocalDate.of(2025, 6, 1)).reason
         ).isEqualTo("ALLOWED")
     }
 
-    private fun activeCaller() = ParticipantCallerIdentity(
-        id = UUID.randomUUID(),
+    private fun activeCaller() = ParticipantCallerRegistration(
+        callerId = "a@x.com",
         participant = participant("p1"),
-        callerIdentity = "a@x.com",
-        status = CallerIdentityStatus.ACTIVE
+        status = CallerRegistrationStatus.ACTIVE
     )
 
     @Test

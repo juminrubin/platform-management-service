@@ -20,9 +20,10 @@ class ParticipantCallConsumption(
     @field:Column(nullable = false, updatable = false)
     var id: UUID = UUID.randomUUID(),
 
+    /** FK to [ParticipantCallerRegistration.callerId]. */
     @field:ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @field:JoinColumn(name = "participant_caller_id", nullable = false)
-    var participantCallerIdentity: ParticipantCallerIdentity,
+    @field:JoinColumn(name = "caller_id", nullable = false, referencedColumnName = "caller_id")
+    var callerRegistration: ParticipantCallerRegistration,
 
     @field:ManyToOne(fetch = FetchType.LAZY, optional = false)
     @field:JoinColumn(name = "service_offering_id", nullable = false)

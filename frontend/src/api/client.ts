@@ -6,9 +6,9 @@ import {
 import { getAccount, msalInstance, setActiveAccountFromResult, tokenRequest } from '../auth/msalConfig'
 import type {
   AuthenticatedUser,
-  CallerIdentity,
+  CallerRegistration,
   Consumption,
-  CreateCallerIdentity,
+  CreateCallerRegistration,
   CreateConsumption,
   CreateEntitlement,
   CreateParticipant,
@@ -16,7 +16,7 @@ import type {
   Entitlement,
   Participant,
   ServiceOffering,
-  UpdateCallerIdentity,
+  UpdateCallerRegistration,
   UpdateEntitlement,
   UpdateParticipant,
   UpdateServiceOffering,
@@ -123,35 +123,37 @@ export const updateParticipant = (id: string, body: UpdateParticipant) =>
 export const deleteParticipant = (id: string) =>
   apiFetch<void>(`/api/v1/participants/${encodeURIComponent(id)}`, { method: 'DELETE' })
 
-// —— Caller identities ——
-export const listCallerIdentities = (filters?: {
+// —— Caller registrations ——
+export const listCallerRegistrations = (filters?: {
   participantId?: string
   status?: string
 }) =>
-  apiFetch<CallerIdentity[]>(
-    `/api/v1/caller-identities${toQuery({
+  apiFetch<CallerRegistration[]>(
+    `/api/v1/caller-registrations${toQuery({
       participantId: filters?.participantId,
       status: filters?.status,
     })}`,
   )
 
-export const getCallerIdentity = (id: string) =>
-  apiFetch<CallerIdentity>(`/api/v1/caller-identities/${encodeURIComponent(id)}`)
+export const getCallerRegistration = (callerId: string) =>
+  apiFetch<CallerRegistration>(`/api/v1/caller-registrations/${encodeURIComponent(callerId)}`)
 
-export const createCallerIdentity = (body: CreateCallerIdentity) =>
-  apiFetch<CallerIdentity>('/api/v1/caller-identities', {
+export const createCallerRegistration = (body: CreateCallerRegistration) =>
+  apiFetch<CallerRegistration>('/api/v1/caller-registrations', {
     method: 'POST',
     body: JSON.stringify(body),
   })
 
-export const updateCallerIdentity = (id: string, body: UpdateCallerIdentity) =>
-  apiFetch<CallerIdentity>(`/api/v1/caller-identities/${encodeURIComponent(id)}`, {
+export const updateCallerRegistration = (callerId: string, body: UpdateCallerRegistration) =>
+  apiFetch<CallerRegistration>(`/api/v1/caller-registrations/${encodeURIComponent(callerId)}`, {
     method: 'PUT',
     body: JSON.stringify(body),
   })
 
-export const deleteCallerIdentity = (id: string) =>
-  apiFetch<void>(`/api/v1/caller-identities/${encodeURIComponent(id)}`, { method: 'DELETE' })
+export const deleteCallerRegistration = (callerId: string) =>
+  apiFetch<void>(`/api/v1/caller-registrations/${encodeURIComponent(callerId)}`, {
+    method: 'DELETE',
+  })
 
 // —— Service offerings ——
 export const listServiceOfferings = (filters?: { activeOnly?: boolean; category?: string }) =>
@@ -214,12 +216,12 @@ export const deleteEntitlement = (id: string) =>
 
 // —— Consumptions ——
 export const listConsumptions = (filters?: {
-  participantCallerIdentityId?: string
+  callerId?: string
   serviceOfferingId?: string
 }) =>
   apiFetch<Consumption[]>(
     `/api/v1/consumptions${toQuery({
-      participantCallerIdentityId: filters?.participantCallerIdentityId,
+      callerId: filters?.callerId,
       serviceOfferingId: filters?.serviceOfferingId,
     })}`,
   )

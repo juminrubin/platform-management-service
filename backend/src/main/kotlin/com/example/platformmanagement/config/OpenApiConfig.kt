@@ -31,7 +31,7 @@ class OpenApiConfig {
                     .title("Platform Management Service API")
                     .description(
                         """
-                        REST API for participants, caller identities, service offerings,
+                        REST API for participants, caller registrations, service offerings,
                         entitlements, and call consumption.
 
                         ### Using Swagger UI
@@ -70,8 +70,8 @@ class OpenApiConfig {
             .tags(
                 listOf(
                     Tag().name("Auth").description("Authenticated principal / token claims"),
-                    Tag().name("Participants").description("Organizations that consume platform services"),
-                    Tag().name("Caller identities").description("Email / Entra client id / managed identity principals"),
+                    Tag().name("Participants").description("Billing groups for one or more caller registrations"),
+                    Tag().name("Caller registrations").description("Unique caller principals (email / Entra client id / MI) registered under a participant"),
                     Tag().name("Service offerings").description("Catalog of entitled services"),
                     Tag().name("Entitlements").description("Participant access rights and entitlement checks"),
                     Tag().name("Consumptions").description("Token / usage event records"),

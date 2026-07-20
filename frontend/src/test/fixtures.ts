@@ -1,5 +1,5 @@
 import type {
-  CallerIdentity,
+  CallerRegistration,
   Consumption,
   Entitlement,
   Participant,
@@ -24,11 +24,10 @@ export const participantInactive: Participant = {
   updatedAt: '2024-06-01T08:00:00Z',
 }
 
-export const callerIdentityActive: CallerIdentity = {
-  id: 'c1111111-1111-1111-1111-111111111111',
+export const callerRegistrationActive: CallerRegistration = {
+  callerId: 'alice@acme.example',
   participantId: 'acme-corp',
   participantName: 'Acme Corporation',
-  callerIdentity: 'alice@acme.example',
   status: 'ACTIVE',
   createdAt: '2024-01-16T08:00:00Z',
   updatedAt: '2024-01-16T08:00:00Z',
@@ -73,8 +72,7 @@ export const entitlementActive: Entitlement = {
 
 export const consumptionSample: Consumption = {
   id: 'd1111111-1111-1111-1111-111111111111',
-  participantCallerIdentityId: 'c1111111-1111-1111-1111-111111111111',
-  callerIdentity: 'alice@acme.example',
+  callerId: 'alice@acme.example',
   participantId: 'acme-corp',
   participantName: 'Acme Corporation',
   serviceOfferingId: 'gpt-5.1',
@@ -85,8 +83,7 @@ export const consumptionSample: Consumption = {
 
 export const consumptionLater: Consumption = {
   id: 'd2222222-2222-2222-2222-222222222222',
-  participantCallerIdentityId: 'c1111111-1111-1111-1111-111111111111',
-  callerIdentity: 'alice@acme.example',
+  callerId: 'alice@acme.example',
   participantId: 'acme-corp',
   participantName: 'Acme Corporation',
   serviceOfferingId: 'gpt-5.1',

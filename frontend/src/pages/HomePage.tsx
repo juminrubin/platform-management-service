@@ -3,8 +3,12 @@ import { Link } from 'react-router-dom'
 import { signInWithPopup } from '../auth/msalConfig'
 
 const modules = [
-  { to: '/participants', title: 'Participants', desc: 'Organizations that consume services' },
-  { to: '/caller-identities', title: 'Caller identities', desc: 'Email / Entra SP / managed identity principals' },
+  { to: '/participants', title: 'Participants', desc: 'Billing groups for caller registrations' },
+  {
+    to: '/caller-registrations',
+    title: 'Caller registrations',
+    desc: 'Unique caller principals (email / Entra SP / MI)',
+  },
   { to: '/service-offerings', title: 'Service offerings', desc: 'Catalog of entitled services' },
   { to: '/entitlements', title: 'Entitlements', desc: 'Participant access rights to offerings' },
   { to: '/consumptions', title: 'Consumptions', desc: 'Token / usage events with rich filters' },
@@ -26,7 +30,7 @@ export function HomePage() {
     <section className="card">
       <h1>Platform Management Service</h1>
       <p className="muted">
-        Manage participants, identities, offerings, entitlements, and consumption. API roles:{' '}
+        Manage participants, caller registrations, offerings, entitlements, and consumption. API roles:{' '}
         <code>System.Maintainer</code>, <code>System.Reader</code>, <code>Entitlement.Reader</code>,{' '}
         <code>Consumption.Registrator</code>.
       </p>

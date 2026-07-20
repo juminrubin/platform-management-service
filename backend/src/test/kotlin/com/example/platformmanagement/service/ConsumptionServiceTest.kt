@@ -1,9 +1,9 @@
 package com.example.platformmanagement.service
 
-import com.example.platformmanagement.domain.CallerIdentityStatus
+import com.example.platformmanagement.domain.CallerRegistrationStatus
 import com.example.platformmanagement.domain.Participant
 import com.example.platformmanagement.domain.ParticipantCallConsumption
-import com.example.platformmanagement.domain.ParticipantCallerIdentity
+import com.example.platformmanagement.domain.ParticipantCallerRegistration
 import com.example.platformmanagement.domain.ParticipantStatus
 import com.example.platformmanagement.domain.ServiceOffering
 import com.example.platformmanagement.dto.CreateConsumptionRequest
@@ -28,7 +28,7 @@ class ConsumptionServiceTest {
     private lateinit var consumptionRepository: ParticipantCallConsumptionRepository
 
     @Mock
-    private lateinit var callerIdentityService: CallerIdentityService
+    private lateinit var callerRegistrationService: CallerRegistrationService
 
     @Mock
     private lateinit var serviceOfferingService: ServiceOfferingService
@@ -37,11 +37,10 @@ class ConsumptionServiceTest {
     private lateinit var consumptionService: ConsumptionService
 
     @Test
-    fun `findAll by caller identity id`() {
-        val id = UUID.randomUUID()
-        whenever(consumptionRepository.findByParticipantCallerIdentityId(id)).thenReturn(emptyList())
-        assertThat(consumptionService.findAll(id, null)).isEmpty()
-        verify(consumptionRepository).findByParticipantCallerIdentityId(id)
+    fun `findAll by caller id`() {
+        whenever(consumptionRepository.findByCallerId("u@x.com")).thenReturn(emptyList())
+        assertThat(consumptionService.findAll("u@x.com", null)).isEmpty()
+        verify(consumptionRepository).findByCallerId("u@x.com")
     }
 
     @Test
@@ -68,18 +67,16 @@ class ConsumptionServiceTest {
 
     @Test
     fun `create records consumption`() {
-        val callerRecordId = UUID.randomUUID()
         val savedId = UUID.randomUUID()
         val participant = Participant(id = "acme", name = "Acme", status = ParticipantStatus.ACTIVE)
-        val callerIdentity = ParticipantCallerIdentity(
-            id = callerRecordId,
+        val callerRegistration = ParticipantCallerRegistration(
+            callerId = "u@x.com",
             participant = participant,
-            callerIdentity = "u@x.com",
-            status = CallerIdentityStatus.ACTIVE
+            status = CallerRegistrationStatus.ACTIVE
         )
         val offering = ServiceOffering(id = "gpt-5.1", name = "GPT", category = "LLM", active = true)
 
-        whenever(callerIdentityService.getEntity(callerRecordId)).thenReturn(callerIdentity)
+        whenever(callerRegistrationService.getEntity("u@x.com")).thenReturn(callerRegistration)
         whenever(serviceOfferingService.getEntity("gpt-5.1")).thenReturn(offering)
         whenever(consumptionRepository.save(any(ParticipantCallConsumption::class.java))).thenAnswer { inv ->
             inv.getArgument<ParticipantCallConsumption>(0).also { it.id = savedId }
@@ -87,7 +84,7 @@ class ConsumptionServiceTest {
         whenever(consumptionRepository.findByIdWithRelations(savedId)).thenReturn(
             ParticipantCallConsumption(
                 id = savedId,
-                participantCallerIdentity = callerIdentity,
+                callerRegistration = callerRegistration,
                 serviceOffering = offering,
                 consumptionData = """{"input_token":1}"""
             )
@@ -95,14 +92,14 @@ class ConsumptionServiceTest {
 
         val result = consumptionService.create(
             CreateConsumptionRequest(
-                participantCallerIdentityId = callerRecordId,
+                callerId = "u@x.com",
                 serviceOfferingId = "gpt-5.1",
                 consumptionData = """{"input_token":1}"""
             )
         )
         assertThat(result.id).isEqualTo(savedId)
         assertThat(result.serviceOfferingId).isEqualTo("gpt-5.1")
-        assertThat(result.callerIdentity).isEqualTo("u@x.com")
+        assertThat(result.callerId).isEqualTo("u@x.com")
     }
 
     @Test

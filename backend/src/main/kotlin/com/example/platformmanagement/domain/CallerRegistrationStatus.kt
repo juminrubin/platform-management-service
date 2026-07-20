@@ -1,6 +1,6 @@
 package com.example.platformmanagement.domain
 
-enum class CallerIdentityStatus {
+enum class CallerRegistrationStatus {
     ACTIVE,
     INACTIVE,
     REVOKED

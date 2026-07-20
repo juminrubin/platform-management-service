@@ -1,6 +1,6 @@
 package com.example.platformmanagement.service
 
-import com.example.platformmanagement.domain.CallerIdentityStatus
+import com.example.platformmanagement.domain.CallerRegistrationStatus
 import com.example.platformmanagement.domain.EntitlementStatus
 import com.example.platformmanagement.domain.ParticipantServiceEntitlement
 import com.example.platformmanagement.dto.CreateEntitlementRequest
@@ -11,7 +11,7 @@ import com.example.platformmanagement.exception.BadRequestException
 import com.example.platformmanagement.exception.ConflictException
 import com.example.platformmanagement.exception.ResourceNotFoundException
 import com.example.platformmanagement.logging.logger
-import com.example.platformmanagement.repository.ParticipantCallerIdentityRepository
+import com.example.platformmanagement.repository.ParticipantCallerRegistrationRepository
 import com.example.platformmanagement.repository.ParticipantServiceEntitlementRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -22,7 +22,7 @@ import java.util.UUID
 @Service
 class EntitlementService(
     private val entitlementRepository: ParticipantServiceEntitlementRepository,
-    private val callerIdentityRepository: ParticipantCallerIdentityRepository,
+    private val callerRegistrationRepository: ParticipantCallerRegistrationRepository,
     private val participantService: ParticipantService,
     private val serviceOfferingService: ServiceOfferingService
 ) {
@@ -137,18 +137,14 @@ class EntitlementService(
     }
 
     /**
-     * Check whether a caller identity is entitled to use a service offering.
+     * Check whether a registered caller is entitled to use a service offering.
      *
-     * Lookup keys (exactly one of [callerIdentity] or [participantCallerIdentityId] required):
-     * - [callerIdentity]: principal string (email, Entra client id, managed identity object id, …)
-     * - [participantCallerIdentityId]: internal UUID of the caller-identity row
-     *
+     * [callerId] is the unique principal key of the [ParticipantCallerRegistration].
      * Validity is evaluated on [asOf] (UTC calendar date; defaults to today UTC).
      */
     @Transactional(readOnly = true)
     fun checkByCallerAndService(
-        callerIdentity: String?,
-        participantCallerIdentityId: UUID?,
+        callerId: String?,
         serviceOfferingId: String,
         asOf: LocalDate?
     ): EntitlementCheckResponse {
@@ -156,34 +152,36 @@ class EntitlementService(
         if (offeringId.isEmpty()) {
             throw BadRequestException("serviceOfferingId is required")
         }
+        val resolvedCallerId = callerId?.trim().orEmpty()
+        if (resolvedCallerId.isEmpty()) {
+            throw BadRequestException("callerId is required")
+        }
         val evaluationDate = asOf ?: LocalDate.now(ZoneOffset.UTC)
 
         // Ensure service offering exists (stable 404 for typos)
         serviceOfferingService.getEntity(offeringId)
 
-        val caller = resolveCaller(callerIdentity, participantCallerIdentityId)
+        val caller = callerRegistrationRepository.findByCallerIdWithParticipant(resolvedCallerId)
             ?: return EntitlementCheckResponse(
                 allowed = false,
                 reason = "CALLER_NOT_FOUND",
-                callerIdentity = callerIdentity?.trim()?.ifEmpty { null },
-                participantCallerIdentityId = participantCallerIdentityId,
+                callerId = resolvedCallerId,
                 participantId = null,
                 serviceOfferingId = offeringId,
                 asOf = evaluationDate,
                 entitlement = null
             )
 
-        if (caller.status != CallerIdentityStatus.ACTIVE) {
+        if (caller.status != CallerRegistrationStatus.ACTIVE) {
             log.debug(
-                "Entitlement check denied: caller inactive id={} status={}",
-                caller.id,
+                "Entitlement check denied: caller inactive callerId={} status={}",
+                caller.callerId,
                 caller.status
             )
             return EntitlementCheckResponse(
                 allowed = false,
                 reason = "CALLER_NOT_ACTIVE",
-                callerIdentity = caller.callerIdentity,
-                participantCallerIdentityId = caller.id,
+                callerId = caller.callerId,
                 participantId = caller.participant.id,
                 serviceOfferingId = offeringId,
                 asOf = evaluationDate,
@@ -199,8 +197,7 @@ class EntitlementService(
             return EntitlementCheckResponse(
                 allowed = false,
                 reason = "NO_ENTITLEMENT",
-                callerIdentity = caller.callerIdentity,
-                participantCallerIdentityId = caller.id,
+                callerId = caller.callerId,
                 participantId = caller.participant.id,
                 serviceOfferingId = offeringId,
                 asOf = evaluationDate,
@@ -219,8 +216,8 @@ class EntitlementService(
         val allowed = reason == "ALLOWED"
 
         log.debug(
-            "Entitlement check caller={} service={} allowed={} reason={}",
-            caller.callerIdentity,
+            "Entitlement check callerId={} service={} allowed={} reason={}",
+            caller.callerId,
             offeringId,
             allowed,
             reason
@@ -229,33 +226,11 @@ class EntitlementService(
         return EntitlementCheckResponse(
             allowed = allowed,
             reason = reason,
-            callerIdentity = caller.callerIdentity,
-            participantCallerIdentityId = caller.id,
+            callerId = caller.callerId,
             participantId = caller.participant.id,
             serviceOfferingId = offeringId,
             asOf = evaluationDate,
             entitlement = response
-        )
-    }
-
-    private fun resolveCaller(
-        callerIdentity: String?,
-        participantCallerIdentityId: UUID?
-    ) = when {
-        participantCallerIdentityId != null && !callerIdentity.isNullOrBlank() ->
-            throw BadRequestException(
-                "Provide either callerIdentity or participantCallerIdentityId, not both"
-            )
-        participantCallerIdentityId != null ->
-            callerIdentityRepository.findByIdWithParticipant(participantCallerIdentityId)
-        !callerIdentity.isNullOrBlank() -> {
-            val matches = callerIdentityRepository.findByCallerIdentity(callerIdentity.trim())
-            // Prefer ACTIVE rows when multiple participants share the same principal string
-            matches.firstOrNull { it.status == CallerIdentityStatus.ACTIVE }
-                ?: matches.firstOrNull()
-        }
-        else -> throw BadRequestException(
-            "Either callerIdentity or participantCallerIdentityId is required"
         )
     }
 

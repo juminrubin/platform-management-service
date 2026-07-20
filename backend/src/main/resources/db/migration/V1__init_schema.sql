@@ -1,4 +1,4 @@
--- Participants: organizations or individuals that can consume services
+-- Participants: billing groups for one or more caller registrations
 CREATE TABLE participant (
     id              VARCHAR(40)     NOT NULL PRIMARY KEY,
     name            VARCHAR(255)    NOT NULL,
@@ -52,37 +52,36 @@ CREATE INDEX idx_entitlement_participant ON participant_service_entitlement (par
 CREATE INDEX idx_entitlement_service ON participant_service_entitlement (service_offering_id);
 CREATE INDEX idx_entitlement_status ON participant_service_entitlement (status);
 
--- Caller identity linked to a participant (email, SP client id, SAMI/UAMI, etc.)
-CREATE TABLE participant_caller_id (
-    id              UUID            NOT NULL PRIMARY KEY,
+-- Caller registration: principal (email, SP client id, SAMI/UAMI, …) under a participant.
+-- caller_id is the unique key; each principal maps to exactly one participant (billing group).
+CREATE TABLE participant_caller_registration (
+    caller_id       VARCHAR(255)    NOT NULL PRIMARY KEY,
     participant_id  VARCHAR(40)     NOT NULL,
-    caller_id       VARCHAR(255)    NOT NULL,
     status          VARCHAR(32)     NOT NULL,
     created_at      TIMESTAMP WITH TIME ZONE NOT NULL,
     updated_at      TIMESTAMP WITH TIME ZONE NOT NULL,
-    CONSTRAINT fk_caller_id_participant
-        FOREIGN KEY (participant_id) REFERENCES participant (id),
-    CONSTRAINT uq_participant_caller_id UNIQUE (participant_id, caller_id)
+    CONSTRAINT fk_caller_registration_participant
+        FOREIGN KEY (participant_id) REFERENCES participant (id)
 );
 
-CREATE INDEX idx_participant_caller_id ON participant_caller_id (caller_id);
-CREATE INDEX idx_participant_caller_id_status ON participant_caller_id (status);
+CREATE INDEX idx_caller_registration_participant ON participant_caller_registration (participant_id);
+CREATE INDEX idx_caller_registration_status ON participant_caller_registration (status);
 
--- Consumption records per caller identity and service offering
+-- Consumption records per caller registration and service offering
 CREATE TABLE participant_call_consumption (
     id                      UUID            NOT NULL PRIMARY KEY,
-    participant_caller_id   UUID            NOT NULL,
+    caller_id               VARCHAR(255)    NOT NULL,
     service_offering_id     VARCHAR(100)    NOT NULL,
     -- JSON: endpoint_url, input_token, output_token, cache_token, ...
     consumption_data        TEXT            NOT NULL,
     created_at              TIMESTAMP WITH TIME ZONE NOT NULL,
-    CONSTRAINT fk_consumption_participant_caller_id
-        FOREIGN KEY (participant_caller_id) REFERENCES participant_caller_id (id),
+    CONSTRAINT fk_consumption_caller_id
+        FOREIGN KEY (caller_id) REFERENCES participant_caller_registration (caller_id),
     CONSTRAINT fk_consumption_service_offering
         FOREIGN KEY (service_offering_id) REFERENCES service_offering (id),
-    CONSTRAINT uq_consumption_caller_service_ts UNIQUE (participant_caller_id, service_offering_id, created_at)
+    CONSTRAINT uq_consumption_caller_service_ts UNIQUE (caller_id, service_offering_id, created_at)
 );
 
-CREATE INDEX idx_consumption_caller ON participant_call_consumption (participant_caller_id);
+CREATE INDEX idx_consumption_caller ON participant_call_consumption (caller_id);
 CREATE INDEX idx_consumption_service ON participant_call_consumption (service_offering_id);
 CREATE INDEX idx_consumption_ts ON participant_call_consumption (created_at);

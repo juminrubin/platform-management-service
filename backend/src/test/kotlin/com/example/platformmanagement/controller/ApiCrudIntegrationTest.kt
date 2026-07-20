@@ -82,7 +82,7 @@ class ApiCrudIntegrationTest {
     }
 
     @Test
-    fun `service offerings caller identities entitlements and consumptions CRUD`() {
+    fun `service offerings caller registrations entitlements and consumptions CRUD`() {
         val suffix = UUID.randomUUID().toString().take(8)
         val participantId = "api-co-$suffix"
         val offeringId = "api-so-$suffix"
@@ -139,30 +139,30 @@ class ApiCrudIntegrationTest {
             param("category", "SPEECH")
         }.andExpect { status { isOk() } }
 
-        val callerBody = mockMvc.post("/api/v1/caller-identities") {
+        val callerId = "user-$suffix@example.com"
+        mockMvc.post("/api/v1/caller-registrations") {
             contentType = MediaType.APPLICATION_JSON
             content = """
                 {
                   "participantId":"$participantId",
-                  "callerIdentity":"user-$suffix@example.com",
+                  "callerId":"$callerId",
                   "status":"ACTIVE"
                 }
             """.trimIndent()
         }.andExpect {
             status { isCreated() }
             jsonPath("$.participantId") { value(participantId) }
-        }.andReturn().response.contentAsString
+            jsonPath("$.callerId") { value(callerId) }
+        }
 
-        val callerId = Regex(""""id"\s*:\s*"([^"]+)"""").find(callerBody)!!.groupValues[1]
-
-        mockMvc.get("/api/v1/caller-identities/$callerId") {
+        mockMvc.get("/api/v1/caller-registrations/$callerId") {
             accept = MediaType.APPLICATION_JSON
         }.andExpect {
             status { isOk() }
-            jsonPath("$.callerIdentity") { value("user-$suffix@example.com") }
+            jsonPath("$.callerId") { value(callerId) }
         }
 
-        mockMvc.put("/api/v1/caller-identities/$callerId") {
+        mockMvc.put("/api/v1/caller-registrations/$callerId") {
             contentType = MediaType.APPLICATION_JSON
             content = """{"status":"INACTIVE"}"""
         }.andExpect {
@@ -171,12 +171,12 @@ class ApiCrudIntegrationTest {
         }
 
         // Reactivate for entitlement/consumption checks
-        mockMvc.put("/api/v1/caller-identities/$callerId") {
+        mockMvc.put("/api/v1/caller-registrations/$callerId") {
             contentType = MediaType.APPLICATION_JSON
             content = """{"status":"ACTIVE"}"""
         }.andExpect { status { isOk() } }
 
-        mockMvc.get("/api/v1/caller-identities") {
+        mockMvc.get("/api/v1/caller-registrations") {
             accept = MediaType.APPLICATION_JSON
             param("participantId", participantId)
             param("status", "ACTIVE")
@@ -238,7 +238,7 @@ class ApiCrudIntegrationTest {
             contentType = MediaType.APPLICATION_JSON
             content = """
                 {
-                  "participantCallerIdentityId":"$callerId",
+                  "callerId":"$callerId",
                   "serviceOfferingId":"$offeringId",
                   "consumptionData":"{\"input_token\":3}",
                   "consumedAt":"2024-08-01T12:00:00Z"
@@ -247,6 +247,7 @@ class ApiCrudIntegrationTest {
         }.andExpect {
             status { isCreated() }
             jsonPath("$.serviceOfferingId") { value(offeringId) }
+            jsonPath("$.callerId") { value(callerId) }
         }.andReturn().response.contentAsString
 
         val consumptionId = Regex(""""id"\s*:\s*"([^"]+)"""").find(consumptionBody)!!.groupValues[1]
@@ -260,13 +261,13 @@ class ApiCrudIntegrationTest {
 
         mockMvc.get("/api/v1/consumptions") {
             accept = MediaType.APPLICATION_JSON
-            param("participantCallerIdentityId", callerId)
+            param("callerId", callerId)
             param("serviceOfferingId", offeringId)
         }.andExpect { status { isOk() } }
 
         mockMvc.delete("/api/v1/consumptions/$consumptionId").andExpect { status { isNoContent() } }
         mockMvc.delete("/api/v1/entitlements/$entitlementId").andExpect { status { isNoContent() } }
-        mockMvc.delete("/api/v1/caller-identities/$callerId").andExpect { status { isNoContent() } }
+        mockMvc.delete("/api/v1/caller-registrations/$callerId").andExpect { status { isNoContent() } }
         mockMvc.delete("/api/v1/service-offerings/$offeringId").andExpect { status { isNoContent() } }
         mockMvc.delete("/api/v1/participants/$participantId").andExpect { status { isNoContent() } }
     }

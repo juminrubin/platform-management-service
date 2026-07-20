@@ -1,9 +1,9 @@
 package com.example.platformmanagement.repository
 
-import com.example.platformmanagement.domain.CallerIdentityStatus
+import com.example.platformmanagement.domain.CallerRegistrationStatus
 import com.example.platformmanagement.domain.Participant
 import com.example.platformmanagement.domain.ParticipantCallConsumption
-import com.example.platformmanagement.domain.ParticipantCallerIdentity
+import com.example.platformmanagement.domain.ParticipantCallerRegistration
 import com.example.platformmanagement.domain.ParticipantStatus
 import com.example.platformmanagement.domain.ServiceOffering
 import org.assertj.core.api.Assertions.assertThat
@@ -18,12 +18,12 @@ import java.util.UUID
 @ActiveProfiles("test")
 class ParticipantCallConsumptionRepositoryTest @Autowired constructor(
     private val consumptionRepository: ParticipantCallConsumptionRepository,
-    private val callerIdentityRepository: ParticipantCallerIdentityRepository,
+    private val callerRegistrationRepository: ParticipantCallerRegistrationRepository,
     private val participantRepository: ParticipantRepository,
     private val serviceOfferingRepository: ServiceOfferingRepository
 ) {
 
-    private lateinit var callerIdentity: ParticipantCallerIdentity
+    private lateinit var callerRegistration: ParticipantCallerRegistration
     private lateinit var offering: ServiceOffering
 
     @BeforeEach
@@ -32,11 +32,11 @@ class ParticipantCallConsumptionRepositoryTest @Autowired constructor(
         val participant = participantRepository.save(
             Participant(id = "p-$suffix", name = "Cons P $suffix", status = ParticipantStatus.ACTIVE)
         )
-        callerIdentity = callerIdentityRepository.save(
-            ParticipantCallerIdentity(
+        callerRegistration = callerRegistrationRepository.save(
+            ParticipantCallerRegistration(
+                callerId = "caller-$suffix",
                 participant = participant,
-                callerIdentity = "caller-$suffix",
-                status = CallerIdentityStatus.ACTIVE
+                status = CallerRegistrationStatus.ACTIVE
             )
         )
         offering = serviceOfferingRepository.save(
@@ -48,29 +48,29 @@ class ParticipantCallConsumptionRepositoryTest @Autowired constructor(
     fun `save and findByIdWithRelations`() {
         val saved = consumptionRepository.save(
             ParticipantCallConsumption(
-                participantCallerIdentity = callerIdentity,
+                callerRegistration = callerRegistration,
                 serviceOffering = offering,
                 consumptionData = """{"input_token":10,"output_token":5}"""
             )
         )
         val found = consumptionRepository.findByIdWithRelations(saved.id)
         assertThat(found).isNotNull
-        assertThat(found!!.participantCallerIdentity.id).isEqualTo(callerIdentity.id)
+        assertThat(found!!.callerRegistration.callerId).isEqualTo(callerRegistration.callerId)
         assertThat(found.serviceOffering.id).isEqualTo(offering.id)
         assertThat(found.consumptionData).contains("input_token")
     }
 
     @Test
-    fun `findByParticipantCallerIdentityId`() {
+    fun `findByCallerId`() {
         consumptionRepository.save(
             ParticipantCallConsumption(
-                participantCallerIdentity = callerIdentity,
+                callerRegistration = callerRegistration,
                 serviceOffering = offering,
                 consumptionData = "{}"
             )
         )
-        val result = consumptionRepository.findByParticipantCallerIdentityId(callerIdentity.id)
+        val result = consumptionRepository.findByCallerId(callerRegistration.callerId)
         assertThat(result).isNotEmpty
-        assertThat(result).allMatch { it.participantCallerIdentity.id == callerIdentity.id }
+        assertThat(result).allMatch { it.callerRegistration.callerId == callerRegistration.callerId }
     }
 }

@@ -11,7 +11,7 @@ interface ParticipantCallConsumptionRepository : JpaRepository<ParticipantCallCo
     @Query(
         """
         SELECT c FROM ParticipantCallConsumption c
-        JOIN FETCH c.participantCallerIdentity caller
+        JOIN FETCH c.callerRegistration caller
         JOIN FETCH caller.participant
         JOIN FETCH c.serviceOffering
         WHERE c.id = :id
@@ -22,7 +22,7 @@ interface ParticipantCallConsumptionRepository : JpaRepository<ParticipantCallCo
     @Query(
         """
         SELECT c FROM ParticipantCallConsumption c
-        JOIN FETCH c.participantCallerIdentity caller
+        JOIN FETCH c.callerRegistration caller
         JOIN FETCH caller.participant
         JOIN FETCH c.serviceOffering
         """
@@ -32,20 +32,20 @@ interface ParticipantCallConsumptionRepository : JpaRepository<ParticipantCallCo
     @Query(
         """
         SELECT c FROM ParticipantCallConsumption c
-        JOIN FETCH c.participantCallerIdentity caller
+        JOIN FETCH c.callerRegistration caller
         JOIN FETCH caller.participant
         JOIN FETCH c.serviceOffering
-        WHERE caller.id = :participantCallerIdentityId
+        WHERE caller.callerId = :callerId
         """
     )
-    fun findByParticipantCallerIdentityId(
-        @Param("participantCallerIdentityId") participantCallerIdentityId: UUID
+    fun findByCallerId(
+        @Param("callerId") callerId: String
     ): List<ParticipantCallConsumption>
 
     @Query(
         """
         SELECT c FROM ParticipantCallConsumption c
-        JOIN FETCH c.participantCallerIdentity caller
+        JOIN FETCH c.callerRegistration caller
         JOIN FETCH caller.participant
         JOIN FETCH c.serviceOffering
         WHERE c.serviceOffering.id = :serviceOfferingId

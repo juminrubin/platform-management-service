@@ -7,7 +7,7 @@ import { ConsumptionDetailPage } from './ConsumptionDetailPage'
 import { ConsumptionFormPage } from './ConsumptionFormPage'
 import { renderWithRouter } from '../../test/render'
 import {
-  callerIdentityActive,
+  callerRegistrationActive,
   consumptionLater,
   consumptionSample,
   serviceOfferingGpt,
@@ -19,7 +19,7 @@ vi.mock('../../api/client', () => ({
   getConsumption: vi.fn(),
   createConsumption: vi.fn(),
   deleteConsumption: vi.fn(),
-  listCallerIdentities: vi.fn(),
+  listCallerRegistrations: vi.fn(),
   listServiceOfferings: vi.fn(),
 }))
 
@@ -27,7 +27,7 @@ describe('Consumption pages', () => {
   beforeEach(() => {
     vi.mocked(api.listConsumptions).mockResolvedValue([consumptionSample, consumptionLater])
     vi.mocked(api.getConsumption).mockResolvedValue(consumptionSample)
-    vi.mocked(api.listCallerIdentities).mockResolvedValue([callerIdentityActive])
+    vi.mocked(api.listCallerRegistrations).mockResolvedValue([callerRegistrationActive])
     vi.mocked(api.listServiceOfferings).mockResolvedValue([serviceOfferingGpt])
     vi.mocked(api.createConsumption).mockResolvedValue(consumptionSample)
     vi.mocked(api.deleteConsumption).mockResolvedValue(undefined)
@@ -101,17 +101,14 @@ describe('Consumption pages', () => {
     )
 
     await screen.findByRole('option', { name: /alice@acme.example/ })
-    await user.selectOptions(
-      screen.getByLabelText(/^Caller identity/),
-      callerIdentityActive.id,
-    )
+    await user.selectOptions(screen.getByLabelText(/^Caller ID/), callerRegistrationActive.callerId)
     await user.selectOptions(screen.getByLabelText(/^Service offering/), 'gpt-5.1')
     await user.click(screen.getByRole('button', { name: /^Create$/i }))
 
     await waitFor(() => {
       expect(api.createConsumption).toHaveBeenCalledWith(
         expect.objectContaining({
-          participantCallerIdentityId: callerIdentityActive.id,
+          callerId: callerRegistrationActive.callerId,
           serviceOfferingId: 'gpt-5.1',
         }),
       )
@@ -127,7 +124,7 @@ describe('Consumption pages', () => {
       { route: '/consumptions/new' },
     )
     await screen.findByRole('option', { name: /alice@acme.example/ })
-    await user.selectOptions(screen.getByLabelText(/^Caller identity/), callerIdentityActive.id)
+    await user.selectOptions(screen.getByLabelText(/^Caller ID/), callerRegistrationActive.callerId)
     await user.selectOptions(screen.getByLabelText(/^Service offering/), 'gpt-5.1')
     const data = screen.getByLabelText(/Consumption data/i)
     await user.clear(data)
@@ -146,7 +143,7 @@ describe('Consumption pages', () => {
       { route: '/consumptions/new' },
     )
     await screen.findByRole('option', { name: /alice@acme.example/ })
-    await user.selectOptions(screen.getByLabelText(/^Caller identity/), callerIdentityActive.id)
+    await user.selectOptions(screen.getByLabelText(/^Caller ID/), callerRegistrationActive.callerId)
     await user.selectOptions(screen.getByLabelText(/^Service offering/), 'gpt-5.1')
     // datetime-local typing is flaky in jsdom — set value via change event
     fireEvent.change(screen.getByLabelText(/Event time/i), {
@@ -156,7 +153,7 @@ describe('Consumption pages', () => {
     await waitFor(() => {
       expect(api.createConsumption).toHaveBeenCalledWith(
         expect.objectContaining({
-          participantCallerIdentityId: callerIdentityActive.id,
+          callerId: callerRegistrationActive.callerId,
           consumedAt: expect.stringMatching(/2024-08-01/),
         }),
       )
@@ -225,7 +222,7 @@ describe('Consumption pages', () => {
   })
 
   it('shows form options load error', async () => {
-    vi.mocked(api.listCallerIdentities).mockRejectedValue(new Error('options failed'))
+    vi.mocked(api.listCallerRegistrations).mockRejectedValue(new Error('options failed'))
     renderWithRouter(
       <Routes>
         <Route path="/consumptions/new" element={<ConsumptionFormPage />} />
@@ -245,7 +242,7 @@ describe('Consumption pages', () => {
       { route: '/consumptions/new' },
     )
     await screen.findByRole('option', { name: /alice@acme.example/ })
-    await user.selectOptions(screen.getByLabelText(/^Caller identity/), callerIdentityActive.id)
+    await user.selectOptions(screen.getByLabelText(/^Caller ID/), callerRegistrationActive.callerId)
     await user.selectOptions(screen.getByLabelText(/^Service offering/), 'gpt-5.1')
     await user.click(screen.getByRole('button', { name: /^Create$/i }))
     expect(await screen.findByText(/create failed/)).toBeInTheDocument()

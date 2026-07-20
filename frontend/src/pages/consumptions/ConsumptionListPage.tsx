@@ -1,8 +1,13 @@
 import type { FormEvent } from 'react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { deleteConsumption, listCallerIdentities, listConsumptions, listServiceOfferings } from '../../api/client'
-import type { CallerIdentity, Consumption, ServiceOffering } from '../../api/types'
+import {
+  deleteConsumption,
+  listCallerRegistrations,
+  listConsumptions,
+  listServiceOfferings,
+} from '../../api/client'
+import type { CallerRegistration, Consumption, ServiceOffering } from '../../api/types'
 import { EmptyState, ErrorBox, Field, FilterBar, Loading, PageHeader, formatDateTime } from '../../components/ui'
 
 function previewJson(raw: string): string {
@@ -20,10 +25,10 @@ function previewJson(raw: string): string {
 
 export function ConsumptionListPage() {
   const [items, setItems] = useState<Consumption[]>([])
-  const [callerIdentities, setCallerIdentities] = useState<CallerIdentity[]>([])
+  const [callerRegistrations, setCallerRegistrations] = useState<CallerRegistration[]>([])
   const [offerings, setOfferings] = useState<ServiceOffering[]>([])
 
-  const [participantCallerIdentityId, setParticipantCallerIdentityId] = useState('')
+  const [callerId, setCallerId] = useState('')
   const [serviceOfferingId, setServiceOfferingId] = useState('')
   const [participantId, setParticipantId] = useState('')
   const [callerText, setCallerText] = useState('')
@@ -39,7 +44,7 @@ export function ConsumptionListPage() {
     setError(null)
     try {
       const data = await listConsumptions({
-        participantCallerIdentityId: participantCallerIdentityId || undefined,
+        callerId: callerId || undefined,
         serviceOfferingId: serviceOfferingId || undefined,
       })
       setItems(data)
@@ -48,12 +53,12 @@ export function ConsumptionListPage() {
     } finally {
       setLoading(false)
     }
-  }, [participantCallerIdentityId, serviceOfferingId])
+  }, [callerId, serviceOfferingId])
 
   useEffect(() => {
     void load()
-    listCallerIdentities()
-      .then(setCallerIdentities)
+    listCallerRegistrations()
+      .then(setCallerRegistrations)
       .catch(() => undefined)
     listServiceOfferings()
       .then(setOfferings)
@@ -65,10 +70,7 @@ export function ConsumptionListPage() {
       if (participantId && c.participantId !== participantId) return false
       if (callerText.trim()) {
         const s = callerText.toLowerCase()
-        if (
-          !c.callerIdentity.toLowerCase().includes(s) &&
-          !c.participantCallerIdentityId.toLowerCase().includes(s)
-        ) {
+        if (!c.callerId.toLowerCase().includes(s)) {
           return false
         }
       }
@@ -97,9 +99,9 @@ export function ConsumptionListPage() {
   const participantOptions = useMemo(() => {
     const map = new Map<string, string>()
     items.forEach((c) => map.set(c.participantId, c.participantName))
-    callerIdentities.forEach((c) => map.set(c.participantId, c.participantName))
+    callerRegistrations.forEach((c) => map.set(c.participantId, c.participantName))
     return [...map.entries()].sort((a, b) => a[1].localeCompare(b[1]))
-  }, [items, callerIdentities])
+  }, [items, callerRegistrations])
 
   async function onDelete(rowId: string) {
     if (!confirm('Delete this consumption record?')) return
@@ -115,7 +117,7 @@ export function ConsumptionListPage() {
     <section className="card">
       <PageHeader
         title="Call consumptions"
-        subtitle="Token / usage events for a caller identity against a service offering."
+        subtitle="Token / usage events for a registered caller against a service offering."
         actions={
           <Link className="button primary" to="/consumptions/new">
             Record consumption
@@ -129,7 +131,7 @@ export function ConsumptionListPage() {
           void load()
         }}
         onReset={() => {
-          setParticipantCallerIdentityId('')
+          setCallerId('')
           setServiceOfferingId('')
           setParticipantId('')
           setCallerText('')
@@ -139,15 +141,12 @@ export function ConsumptionListPage() {
           void listConsumptions().then(setItems)
         }}
       >
-        <Field label="Caller identity row (API)" hint="participantCallerIdentityId">
-          <select
-            value={participantCallerIdentityId}
-            onChange={(e) => setParticipantCallerIdentityId(e.target.value)}
-          >
+        <Field label="Caller ID (API)" hint="Unique principal of the registration">
+          <select value={callerId} onChange={(e) => setCallerId(e.target.value)}>
             <option value="">All</option>
-            {callerIdentities.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.callerIdentity} — {c.participantId}
+            {callerRegistrations.map((c) => (
+              <option key={c.callerId} value={c.callerId}>
+                {c.callerId} — {c.participantId}
               </option>
             ))}
           </select>
@@ -207,7 +206,7 @@ export function ConsumptionListPage() {
           <thead>
             <tr>
               <th>When (UTC)</th>
-              <th>Caller</th>
+              <th>Caller ID</th>
               <th>Participant</th>
               <th>Service</th>
               <th>Data preview</th>
@@ -219,7 +218,7 @@ export function ConsumptionListPage() {
               <tr key={c.id}>
                 <td className="nowrap">{formatDateTime(c.createdAt)}</td>
                 <td>
-                  <code>{c.callerIdentity}</code>
+                  <code>{c.callerId}</code>
                 </td>
                 <td>
                   {c.participantName}

@@ -1,15 +1,15 @@
 import type { FormEvent } from 'react'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { createConsumption, listCallerIdentities, listServiceOfferings } from '../../api/client'
-import type { CallerIdentity, ServiceOffering } from '../../api/types'
+import { createConsumption, listCallerRegistrations, listServiceOfferings } from '../../api/client'
+import type { CallerRegistration, ServiceOffering } from '../../api/types'
 import { ErrorBox, Field, Loading, PageHeader } from '../../components/ui'
 
 export function ConsumptionFormPage() {
   const navigate = useNavigate()
-  const [callers, setCallers] = useState<CallerIdentity[]>([])
+  const [callers, setCallers] = useState<CallerRegistration[]>([])
   const [offerings, setOfferings] = useState<ServiceOffering[]>([])
-  const [participantCallerIdentityId, setParticipantCallerIdentityId] = useState('')
+  const [callerId, setCallerId] = useState('')
   const [serviceOfferingId, setServiceOfferingId] = useState('')
   const [consumptionData, setConsumptionData] = useState(
     '{\n  "endpoint_url": "",\n  "input_token": 0,\n  "output_token": 0,\n  "cache_token": 0\n}',
@@ -19,7 +19,7 @@ export function ConsumptionFormPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    Promise.all([listCallerIdentities(), listServiceOfferings()])
+    Promise.all([listCallerRegistrations(), listServiceOfferings()])
       .then(([c, o]) => {
         setCallers(c)
         setOfferings(o)
@@ -43,7 +43,7 @@ export function ConsumptionFormPage() {
         consumedAtIso = new Date(consumedAt).toISOString()
       }
       const created = await createConsumption({
-        participantCallerIdentityId,
+        callerId,
         serviceOfferingId,
         consumptionData: consumptionData.trim() || '{}',
         consumedAt: consumedAtIso,
@@ -75,16 +75,12 @@ export function ConsumptionFormPage() {
       />
       <ErrorBox error={error} />
       <form className="form" onSubmit={(e) => void onSubmit(e)}>
-        <Field label="Caller identity">
-          <select
-            required
-            value={participantCallerIdentityId}
-            onChange={(e) => setParticipantCallerIdentityId(e.target.value)}
-          >
+        <Field label="Caller ID">
+          <select required value={callerId} onChange={(e) => setCallerId(e.target.value)}>
             <option value="">Select…</option>
             {callers.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.callerIdentity} — {c.participantName} ({c.participantId})
+              <option key={c.callerId} value={c.callerId}>
+                {c.callerId} — {c.participantName} ({c.participantId})
               </option>
             ))}
           </select>

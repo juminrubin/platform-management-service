@@ -1,12 +1,12 @@
 import type { FormEvent } from 'react'
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { deleteCallerIdentity, listCallerIdentities } from '../../api/client'
-import type { CallerIdentity } from '../../api/types'
+import { deleteCallerRegistration, listCallerRegistrations } from '../../api/client'
+import type { CallerRegistration } from '../../api/types'
 import { EmptyState, ErrorBox, Field, FilterBar, Loading, PageHeader, formatDateTime } from '../../components/ui'
 
-export function CallerIdentityListPage() {
-  const [items, setItems] = useState<CallerIdentity[]>([])
+export function CallerRegistrationListPage() {
+  const [items, setItems] = useState<CallerRegistration[]>([])
   const [participantId, setParticipantId] = useState('')
   const [status, setStatus] = useState('')
   const [q, setQ] = useState('')
@@ -17,7 +17,7 @@ export function CallerIdentityListPage() {
     setLoading(true)
     setError(null)
     try {
-      const data = await listCallerIdentities({
+      const data = await listCallerRegistrations({
         participantId: participantId || undefined,
         status: status || undefined,
       })
@@ -37,17 +37,16 @@ export function CallerIdentityListPage() {
     if (!q.trim()) return true
     const s = q.toLowerCase()
     return (
-      c.callerIdentity.toLowerCase().includes(s) ||
+      c.callerId.toLowerCase().includes(s) ||
       c.participantId.toLowerCase().includes(s) ||
-      c.participantName.toLowerCase().includes(s) ||
-      c.id.toLowerCase().includes(s)
+      c.participantName.toLowerCase().includes(s)
     )
   })
 
-  async function onDelete(rowId: string) {
-    if (!confirm('Delete this caller identity?')) return
+  async function onDelete(callerId: string) {
+    if (!confirm('Delete this caller registration?')) return
     try {
-      await deleteCallerIdentity(rowId)
+      await deleteCallerRegistration(callerId)
       await load()
     } catch (e) {
       setError((e as Error).message)
@@ -57,11 +56,11 @@ export function CallerIdentityListPage() {
   return (
     <section className="card">
       <PageHeader
-        title="Caller identities"
-        subtitle="Email / Entra client id / managed identity linked to a participant."
+        title="Caller registrations"
+        subtitle="Unique caller principals (email / Entra client id / MI) grouped under a participant for billing."
         actions={
-          <Link className="button primary" to="/caller-identities/new">
-            Register identity
+          <Link className="button primary" to="/caller-registrations/new">
+            Register caller
           </Link>
         }
       />
@@ -88,19 +87,19 @@ export function CallerIdentityListPage() {
             <option value="REVOKED">REVOKED</option>
           </select>
         </Field>
-        <Field label="Search identity / participant">
+        <Field label="Search caller / participant">
           <input value={q} onChange={(e) => setQ(e.target.value)} />
         </Field>
       </FilterBar>
 
       <ErrorBox error={error} />
       {loading && <Loading />}
-      {!loading && filtered.length === 0 && <EmptyState message="No caller identities match." />}
+      {!loading && filtered.length === 0 && <EmptyState message="No caller registrations match." />}
       {!loading && filtered.length > 0 && (
         <table>
           <thead>
             <tr>
-              <th>Caller identity</th>
+              <th>Caller ID</th>
               <th>Participant</th>
               <th>Status</th>
               <th>Updated</th>
@@ -109,10 +108,10 @@ export function CallerIdentityListPage() {
           </thead>
           <tbody>
             {filtered.map((c) => (
-              <tr key={c.id}>
+              <tr key={c.callerId}>
                 <td>
-                  <Link to={`/caller-identities/${c.id}`}>
-                    <code>{c.callerIdentity}</code>
+                  <Link to={`/caller-registrations/${encodeURIComponent(c.callerId)}`}>
+                    <code>{c.callerId}</code>
                   </Link>
                 </td>
                 <td>
@@ -123,13 +122,13 @@ export function CallerIdentityListPage() {
                 </td>
                 <td className="nowrap">{formatDateTime(c.updatedAt)}</td>
                 <td className="row gap">
-                  <Link className="button" to={`/caller-identities/${c.id}`}>
+                  <Link className="button" to={`/caller-registrations/${encodeURIComponent(c.callerId)}`}>
                     View
                   </Link>
-                  <Link className="button" to={`/caller-identities/${c.id}/edit`}>
+                  <Link className="button" to={`/caller-registrations/${encodeURIComponent(c.callerId)}/edit`}>
                     Edit
                   </Link>
-                  <button type="button" onClick={() => void onDelete(c.id)}>
+                  <button type="button" onClick={() => void onDelete(c.callerId)}>
                     Delete
                   </button>
                 </td>

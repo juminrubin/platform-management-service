@@ -31,7 +31,7 @@ object AppRoles {
     const val SYSTEM_READER = "System.Reader"
 
     /**
-     * May check whether a caller identity is entitled to a service offering
+     * May check whether a registered caller is entitled to a service offering
      * (human users via group, or systems performing entitlement lookups).
      * Does **not** grant general read of admin list APIs (use [SYSTEM_READER] for that).
      */
@@ -39,7 +39,7 @@ object AppRoles {
 
     /**
      * Technical account (managed identity / service principal) that registers
-     * token consumption for a caller identity against a service offering.
+     * token consumption for a caller registration against a service offering.
      */
     const val CONSUMPTION_REGISTRATOR = "Consumption.Registrator"
 }

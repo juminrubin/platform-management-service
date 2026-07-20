@@ -93,7 +93,7 @@ class Authz(
         val authentication = SecurityContextHolder.getContext().authentication
             ?: return emptySet()
 
-        val fromGranted = authentication.authorities.mapNotNull { it?.authority }.toMutableSet()
+        val fromGranted = authentication.authorities.mapNotNull { it.authority }.toMutableSet()
 
         // Fallback: if ROLE_* was not mapped into GrantedAuthority, read JWT `roles` claim.
         // /auth/me can show claim roles while method security would otherwise still 403.

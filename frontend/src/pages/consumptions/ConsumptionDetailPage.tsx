@@ -51,10 +51,10 @@ export function ConsumptionDetailPage() {
               { label: 'ID', value: <code>{item.id}</code> },
               { label: 'Event time', value: formatDateTime(item.createdAt) },
               {
-                label: 'Caller identity',
+                label: 'Caller ID',
                 value: (
-                  <Link to={`/caller-identities/${item.participantCallerIdentityId}`}>
-                    <code>{item.callerIdentity}</code>
+                  <Link to={`/caller-registrations/${encodeURIComponent(item.callerId)}`}>
+                    <code>{item.callerId}</code>
                   </Link>
                 ),
               },

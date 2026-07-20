@@ -7,9 +7,9 @@ import { MePage } from './pages/MePage'
 import { ParticipantListPage } from './pages/participants/ParticipantListPage'
 import { ParticipantDetailPage } from './pages/participants/ParticipantDetailPage'
 import { ParticipantFormPage } from './pages/participants/ParticipantFormPage'
-import { CallerIdentityListPage } from './pages/callerIdentities/CallerIdentityListPage'
-import { CallerIdentityDetailPage } from './pages/callerIdentities/CallerIdentityDetailPage'
-import { CallerIdentityFormPage } from './pages/callerIdentities/CallerIdentityFormPage'
+import { CallerRegistrationListPage } from './pages/callerRegistrations/CallerRegistrationListPage'
+import { CallerRegistrationDetailPage } from './pages/callerRegistrations/CallerRegistrationDetailPage'
+import { CallerRegistrationFormPage } from './pages/callerRegistrations/CallerRegistrationFormPage'
 import { ServiceOfferingListPage } from './pages/serviceOfferings/ServiceOfferingListPage'
 import { ServiceOfferingDetailPage } from './pages/serviceOfferings/ServiceOfferingDetailPage'
 import { ServiceOfferingFormPage } from './pages/serviceOfferings/ServiceOfferingFormPage'
@@ -78,34 +78,34 @@ function AppRoutes() {
           />
 
           <Route
-            path="/caller-identities"
+            path="/caller-registrations"
             element={
               <RequireAuth>
-                <CallerIdentityListPage />
+                <CallerRegistrationListPage />
               </RequireAuth>
             }
           />
           <Route
-            path="/caller-identities/new"
+            path="/caller-registrations/new"
             element={
               <RequireAuth>
-                <CallerIdentityFormPage />
+                <CallerRegistrationFormPage />
               </RequireAuth>
             }
           />
           <Route
-            path="/caller-identities/:id"
+            path="/caller-registrations/:callerId"
             element={
               <RequireAuth>
-                <CallerIdentityDetailPage />
+                <CallerRegistrationDetailPage />
               </RequireAuth>
             }
           />
           <Route
-            path="/caller-identities/:id/edit"
+            path="/caller-registrations/:callerId/edit"
             element={
               <RequireAuth>
-                <CallerIdentityFormPage />
+                <CallerRegistrationFormPage />
               </RequireAuth>
             }
           />

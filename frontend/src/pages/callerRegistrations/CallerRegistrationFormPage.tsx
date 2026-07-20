@@ -2,23 +2,23 @@ import type { FormEvent } from 'react'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
-  createCallerIdentity,
-  getCallerIdentity,
+  createCallerRegistration,
+  getCallerRegistration,
   listParticipants,
-  updateCallerIdentity,
+  updateCallerRegistration,
 } from '../../api/client'
-import type { CallerIdentityStatus, Participant } from '../../api/types'
+import type { CallerRegistrationStatus, Participant } from '../../api/types'
 import { ErrorBox, Field, Loading, PageHeader } from '../../components/ui'
 
-export function CallerIdentityFormPage() {
-  const { id } = useParams()
-  const isEdit = Boolean(id)
+export function CallerRegistrationFormPage() {
+  const { callerId } = useParams()
+  const isEdit = Boolean(callerId)
   const navigate = useNavigate()
 
   const [participants, setParticipants] = useState<Participant[]>([])
   const [participantId, setParticipantId] = useState('')
-  const [callerIdentity, setCallerIdentity] = useState('')
-  const [status, setStatus] = useState<CallerIdentityStatus>('ACTIVE')
+  const [callerIdValue, setCallerIdValue] = useState('')
+  const [status, setStatus] = useState<CallerRegistrationStatus>('ACTIVE')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -27,34 +27,34 @@ export function CallerIdentityFormPage() {
       .then(setParticipants)
       .catch((e: Error) => setError(e.message))
 
-    if (!id) {
+    if (!callerId) {
       setLoading(false)
       return
     }
-    getCallerIdentity(id)
+    getCallerRegistration(callerId)
       .then((c) => {
         setParticipantId(c.participantId)
-        setCallerIdentity(c.callerIdentity)
+        setCallerIdValue(c.callerId)
         setStatus(c.status)
       })
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))
-  }, [id])
+  }, [callerId])
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
     try {
-      if (isEdit && id) {
-        await updateCallerIdentity(id, { status })
-        navigate(`/caller-identities/${id}`)
+      if (isEdit && callerId) {
+        await updateCallerRegistration(callerId, { status })
+        navigate(`/caller-registrations/${encodeURIComponent(callerId)}`)
       } else {
-        const created = await createCallerIdentity({
+        const created = await createCallerRegistration({
           participantId: participantId.trim(),
-          callerIdentity: callerIdentity.trim(),
+          callerId: callerIdValue.trim(),
           status,
         })
-        navigate(`/caller-identities/${created.id}`)
+        navigate(`/caller-registrations/${encodeURIComponent(created.callerId)}`)
       }
     } catch (err) {
       setError((err as Error).message)
@@ -72,17 +72,24 @@ export function CallerIdentityFormPage() {
   return (
     <section className="card">
       <PageHeader
-        title={isEdit ? 'Edit caller identity' : 'Register caller identity'}
+        title={isEdit ? 'Edit caller registration' : 'Register caller'}
         subtitle={isEdit ? 'Only status can be updated via the API.' : undefined}
         actions={
-          <Link className="button" to={isEdit && id ? `/caller-identities/${id}` : '/caller-identities'}>
+          <Link
+            className="button"
+            to={
+              isEdit && callerId
+                ? `/caller-registrations/${encodeURIComponent(callerId)}`
+                : '/caller-registrations'
+            }
+          >
             Cancel
           </Link>
         }
       />
       <ErrorBox error={error} />
       <form className="form" onSubmit={(e) => void onSubmit(e)}>
-        <Field label="Participant">
+        <Field label="Participant" hint="Billing group for this caller">
           <select
             required
             disabled={isEdit}
@@ -97,17 +104,17 @@ export function CallerIdentityFormPage() {
             ))}
           </select>
         </Field>
-        <Field label="Caller identity" hint="Email, Entra client id, or managed identity object id">
+        <Field label="Caller ID" hint="Unique principal: email, Entra client id, or managed identity object id">
           <input
             required
             maxLength={255}
             disabled={isEdit}
-            value={callerIdentity}
-            onChange={(e) => setCallerIdentity(e.target.value)}
+            value={callerIdValue}
+            onChange={(e) => setCallerIdValue(e.target.value)}
           />
         </Field>
         <Field label="Status">
-          <select value={status} onChange={(e) => setStatus(e.target.value as CallerIdentityStatus)}>
+          <select value={status} onChange={(e) => setStatus(e.target.value as CallerRegistrationStatus)}>
             <option value="ACTIVE">ACTIVE</option>
             <option value="INACTIVE">INACTIVE</option>
             <option value="REVOKED">REVOKED</option>

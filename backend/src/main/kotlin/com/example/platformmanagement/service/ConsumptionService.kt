@@ -14,24 +14,24 @@ import java.util.UUID
 @Service
 class ConsumptionService(
     private val consumptionRepository: ParticipantCallConsumptionRepository,
-    private val callerIdentityService: CallerIdentityService,
+    private val callerRegistrationService: CallerRegistrationService,
     private val serviceOfferingService: ServiceOfferingService
 ) {
     private val log = logger()
 
     @Transactional(readOnly = true)
     fun findAll(
-        participantCallerIdentityId: UUID?,
+        callerId: String?,
         serviceOfferingId: String?
     ): List<ConsumptionResponse> {
         log.debug(
-            "Listing consumption participantCallerIdentityId={} serviceOfferingId={}",
-            participantCallerIdentityId,
+            "Listing consumption callerId={} serviceOfferingId={}",
+            callerId,
             serviceOfferingId
         )
         val entities = when {
-            participantCallerIdentityId != null ->
-                consumptionRepository.findByParticipantCallerIdentityId(participantCallerIdentityId)
+            callerId != null ->
+                consumptionRepository.findByCallerId(callerId)
             serviceOfferingId != null ->
                 consumptionRepository.findByServiceOfferingId(serviceOfferingId)
             else -> consumptionRepository.findAllWithRelations()
@@ -49,19 +49,20 @@ class ConsumptionService(
 
     @Transactional
     fun create(request: CreateConsumptionRequest): ConsumptionResponse {
+        val callerId = request.callerId.trim()
         log.info(
-            "Recording consumption participantCallerIdentityId={} serviceOfferingId={} consumedAt={}",
-            request.participantCallerIdentityId,
+            "Recording consumption callerId={} serviceOfferingId={} consumedAt={}",
+            callerId,
             request.serviceOfferingId,
             request.consumedAt
         )
-        val callerIdentity = callerIdentityService.getEntity(request.participantCallerIdentityId)
+        val callerRegistration = callerRegistrationService.getEntity(callerId)
         val offering = serviceOfferingService.getEntity(request.serviceOfferingId.trim())
         val eventTime = request.consumedAt ?: UtcTimestamps.now()
 
         val saved = consumptionRepository.save(
             ParticipantCallConsumption(
-                participantCallerIdentity = callerIdentity,
+                callerRegistration = callerRegistration,
                 serviceOffering = offering,
                 consumptionData = request.consumptionData.trim().ifEmpty { "{}" },
                 createdAt = eventTime

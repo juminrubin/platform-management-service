@@ -18,8 +18,8 @@ class EntitlementStatusConverter : AttributeConverter<EntitlementStatus, String>
 }
 
 @Converter(autoApply = true)
-class CallerIdentityStatusConverter : AttributeConverter<CallerIdentityStatus, String> {
-    override fun convertToDatabaseColumn(attribute: CallerIdentityStatus?): String? = attribute?.name
-    override fun convertToEntityAttribute(dbData: String?): CallerIdentityStatus? =
-        dbData?.let { CallerIdentityStatus.valueOf(it) }
+class CallerRegistrationStatusConverter : AttributeConverter<CallerRegistrationStatus, String> {
+    override fun convertToDatabaseColumn(attribute: CallerRegistrationStatus?): String? = attribute?.name
+    override fun convertToEntityAttribute(dbData: String?): CallerRegistrationStatus? =
+        dbData?.let { CallerRegistrationStatus.valueOf(it) }
 }

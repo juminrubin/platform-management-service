@@ -1,4 +1,4 @@
--- Sample participants (business string IDs)
+-- Sample participants (business string IDs) — billing groups for caller registrations
 INSERT INTO participant (id, name, contact, status, created_at, updated_at) VALUES
     ('acme-corp', 'Acme Corporation', 'ops@acme.example', 'ACTIVE',
      TIMESTAMP '2024-01-15 10:00:00+00', TIMESTAMP '2024-01-15 10:00:00+00'),
@@ -69,39 +69,35 @@ VALUES
      'Revoked due to inactivity',
      TIMESTAMP '2024-03-10 14:10:00+00', TIMESTAMP '2024-06-01 08:00:00+00');
 
--- Sample caller identities
-INSERT INTO participant_caller_id
-    (id, participant_id, caller_id, status, created_at, updated_at)
+-- Sample caller registrations (caller_id is the unique key)
+INSERT INTO participant_caller_registration
+    (caller_id, participant_id, status, created_at, updated_at)
 VALUES
-    ('c1111111-1111-1111-1111-111111111111',
-     'acme-corp', 'alice@acme.example', 'ACTIVE',
+    ('alice@acme.example', 'acme-corp', 'ACTIVE',
      TIMESTAMP '2024-01-16 08:00:00+00', TIMESTAMP '2024-01-16 08:00:00+00'),
-    ('c2222222-2222-2222-2222-222222222222',
-     'acme-corp', '11111111-2222-3333-4444-555555555555', 'ACTIVE',
+    ('11111111-2222-3333-4444-555555555555', 'acme-corp', 'ACTIVE',
      TIMESTAMP '2024-01-16 08:05:00+00', TIMESTAMP '2024-01-16 08:05:00+00'),
-    ('c3333333-3333-3333-3333-333333333333',
-     'beta-industries', 'bob@beta.example', 'ACTIVE',
+    ('bob@beta.example', 'beta-industries', 'ACTIVE',
      TIMESTAMP '2024-02-02 10:00:00+00', TIMESTAMP '2024-02-02 10:00:00+00'),
-    ('c4444444-4444-4444-4444-444444444444',
-     'gamma-partners', 'carol@gamma.example', 'INACTIVE',
+    ('carol@gamma.example', 'gamma-partners', 'INACTIVE',
      TIMESTAMP '2024-03-11 09:00:00+00', TIMESTAMP '2024-06-01 08:00:00+00');
 
--- Sample consumption records
+-- Sample consumption records (caller_id correlates to registration caller_id)
 INSERT INTO participant_call_consumption
-    (id, participant_caller_id, service_offering_id, consumption_data, created_at)
+    (id, caller_id, service_offering_id, consumption_data, created_at)
 VALUES
     ('d1111111-1111-1111-1111-111111111111',
-     'c1111111-1111-1111-1111-111111111111',
+     'alice@acme.example',
      'gpt-5.1',
      '{"endpoint_url":"https://aoai.example/gpt-5.1/chat","input_token":1200,"output_token":340,"cache_token":50}',
      TIMESTAMP '2024-06-01 12:00:00+00'),
     ('d2222222-2222-2222-2222-222222222222',
-     'c2222222-2222-2222-2222-222222222222',
+     '11111111-2222-3333-4444-555555555555',
      'gpt-5.1',
      '{"endpoint_url":"https://aoai.example/gpt-5.1/chat","input_token":5000,"output_token":800,"cache_token":0}',
      TIMESTAMP '2024-06-01 12:05:00+00'),
     ('d3333333-3333-3333-3333-333333333333',
-     'c3333333-3333-3333-3333-333333333333',
+     'bob@beta.example',
      'gpt-5.1-mini',
      '{"endpoint_url":"https://aoai.example/gpt-5.1-mini/chat","input_token":900,"output_token":200,"cache_token":10}',
      TIMESTAMP '2024-06-02 09:15:00+00');

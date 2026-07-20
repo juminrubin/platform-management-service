@@ -75,7 +75,7 @@ class AppRoleAuthorizationTest {
             status { isOk() }
         }
 
-        mockMvc.get("/api/v1/caller-identities") {
+        mockMvc.get("/api/v1/caller-registrations") {
             accept = MediaType.APPLICATION_JSON
             with(jwtWithRoles(AppRoles.SYSTEM_READER))
         }.andExpect {
@@ -87,7 +87,7 @@ class AppRoleAuthorizationTest {
     fun `System Reader can check entitlement`() {
         mockMvc.get("/api/v1/entitlements/check") {
             accept = MediaType.APPLICATION_JSON
-            param("callerIdentity", "alice@acme.example")
+            param("callerId", "alice@acme.example")
             param("serviceOfferingId", "gpt-5.1")
             param("asOf", "2024-06-15")
             with(jwtWithRoles(AppRoles.SYSTEM_READER))
@@ -121,7 +121,7 @@ class AppRoleAuthorizationTest {
             contentType = MediaType.APPLICATION_JSON
             content = """
                 {
-                  "participantCallerIdentityId": "c1111111-1111-1111-1111-111111111111",
+                  "callerId": "alice@acme.example",
                   "serviceOfferingId": "gpt-5.1",
                   "consumptionData": "{}"
                 }
@@ -143,11 +143,11 @@ class AppRoleAuthorizationTest {
     }
 
     @Test
-    fun `Entitlement Reader can check entitlement by caller identity`() {
+    fun `Entitlement Reader can check entitlement by caller id`() {
         // Seed entitlement for acme-corp / gpt-5.1 is valid 2024-01-15 .. 2025-12-31
         mockMvc.get("/api/v1/entitlements/check") {
             accept = MediaType.APPLICATION_JSON
-            param("callerIdentity", "alice@acme.example")
+            param("callerId", "alice@acme.example")
             param("serviceOfferingId", "gpt-5.1")
             param("asOf", "2024-06-15")
             with(jwtWithRoles(AppRoles.ENTITLEMENT_READER))
@@ -157,6 +157,7 @@ class AppRoleAuthorizationTest {
             jsonPath("$.reason") { value("ALLOWED") }
             jsonPath("$.participantId") { value("acme-corp") }
             jsonPath("$.serviceOfferingId") { value("gpt-5.1") }
+            jsonPath("$.callerId") { value("alice@acme.example") }
         }
     }
 
@@ -176,7 +177,7 @@ class AppRoleAuthorizationTest {
             contentType = MediaType.APPLICATION_JSON
             content = """
                 {
-                  "participantCallerIdentityId": "c1111111-1111-1111-1111-111111111111",
+                  "callerId": "alice@acme.example",
                   "serviceOfferingId": "gpt-5.1",
                   "consumptionData": "{\"input_token\":10,\"output_token\":5}",
                   "consumedAt": "2024-07-01T12:00:00Z"
@@ -186,6 +187,7 @@ class AppRoleAuthorizationTest {
         }.andExpect {
             status { isCreated() }
             jsonPath("$.serviceOfferingId") { value("gpt-5.1") }
+            jsonPath("$.callerId") { value("alice@acme.example") }
             jsonPath("$.createdAt") { value("2024-07-01T12:00:00Z") }
         }
     }
@@ -204,7 +206,7 @@ class AppRoleAuthorizationTest {
     fun `Consumption Registrator cannot check entitlements`() {
         mockMvc.get("/api/v1/entitlements/check") {
             accept = MediaType.APPLICATION_JSON
-            param("callerIdentity", "alice@acme.example")
+            param("callerId", "alice@acme.example")
             param("serviceOfferingId", "gpt-5.1")
             with(jwtWithRoles(AppRoles.CONSUMPTION_REGISTRATOR))
         }.andExpect {

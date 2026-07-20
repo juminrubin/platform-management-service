@@ -2,14 +2,14 @@ package com.example.platformmanagement.dto
 
 import com.example.platformmanagement.domain.ParticipantCallConsumption
 import jakarta.validation.constraints.NotBlank
-import jakarta.validation.constraints.NotNull
 import jakarta.validation.constraints.Size
 import java.time.Instant
 import java.util.UUID
 
 data class CreateConsumptionRequest(
-    @field:NotNull
-    val participantCallerIdentityId: UUID,
+    @field:NotBlank
+    @field:Size(max = 255)
+    val callerId: String,
 
     @field:NotBlank
     @field:Size(max = 100)
@@ -27,8 +27,7 @@ data class CreateConsumptionRequest(
 
 data class ConsumptionResponse(
     val id: UUID,
-    val participantCallerIdentityId: UUID,
-    val callerIdentity: String,
+    val callerId: String,
     val participantId: String,
     val participantName: String,
     val serviceOfferingId: String,
@@ -39,10 +38,9 @@ data class ConsumptionResponse(
     companion object {
         fun from(entity: ParticipantCallConsumption) = ConsumptionResponse(
             id = entity.id,
-            participantCallerIdentityId = entity.participantCallerIdentity.id,
-            callerIdentity = entity.participantCallerIdentity.callerIdentity,
-            participantId = entity.participantCallerIdentity.participant.id,
-            participantName = entity.participantCallerIdentity.participant.name,
+            callerId = entity.callerRegistration.callerId,
+            participantId = entity.callerRegistration.participant.id,
+            participantName = entity.callerRegistration.participant.name,
             serviceOfferingId = entity.serviceOffering.id,
             serviceOfferingName = entity.serviceOffering.name,
             consumptionData = entity.consumptionData,

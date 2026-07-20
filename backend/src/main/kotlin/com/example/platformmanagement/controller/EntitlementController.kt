@@ -41,28 +41,26 @@ class EntitlementController(
 ) {
 
     /**
-     * Entitlement check for a caller identity against a service offering.
+     * Entitlement check for a registered caller against a service offering.
      * Query params:
-     * - `callerIdentity` **or** `participantCallerIdentityId` (exactly one)
+     * - `callerId` (required) — unique principal of the caller registration
      * - `serviceOfferingId` (required)
      * - `asOf` optional ISO date (UTC calendar day; defaults to today UTC)
      */
     @GetMapping("/check")
     @PreAuthorize("@authz.canCheckEntitlement()")
     @Operation(
-        summary = "Check entitlement for a caller identity",
+        summary = "Check entitlement for a caller registration",
         description = "Requires System.Maintainer, System.Reader, or Entitlement.Reader. " +
-            "Provide either callerIdentity or participantCallerIdentityId (not both)."
+            "Provide callerId (unique principal of the registration)."
     )
     fun check(
-        @RequestParam(required = false) callerIdentity: String?,
-        @RequestParam(required = false) participantCallerIdentityId: UUID?,
+        @RequestParam(required = false) callerId: String?,
         @RequestParam serviceOfferingId: String,
         @RequestParam(required = false) asOf: LocalDate?
     ): EntitlementCheckResponse =
         entitlementService.checkByCallerAndService(
-            callerIdentity = callerIdentity,
-            participantCallerIdentityId = participantCallerIdentityId,
+            callerId = callerId,
             serviceOfferingId = serviceOfferingId,
             asOf = asOf
         )

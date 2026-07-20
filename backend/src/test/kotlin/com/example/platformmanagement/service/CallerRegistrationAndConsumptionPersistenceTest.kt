@@ -1,14 +1,14 @@
 package com.example.platformmanagement.service
 
-import com.example.platformmanagement.domain.CallerIdentityStatus
+import com.example.platformmanagement.domain.CallerRegistrationStatus
 import com.example.platformmanagement.domain.Participant
 import com.example.platformmanagement.domain.ParticipantStatus
 import com.example.platformmanagement.domain.ServiceOffering
-import com.example.platformmanagement.dto.CreateCallerIdentityRequest
+import com.example.platformmanagement.dto.CreateCallerRegistrationRequest
 import com.example.platformmanagement.dto.CreateConsumptionRequest
-import com.example.platformmanagement.dto.UpdateCallerIdentityRequest
+import com.example.platformmanagement.dto.UpdateCallerRegistrationRequest
 import com.example.platformmanagement.repository.ParticipantCallConsumptionRepository
-import com.example.platformmanagement.repository.ParticipantCallerIdentityRepository
+import com.example.platformmanagement.repository.ParticipantCallerRegistrationRepository
 import com.example.platformmanagement.repository.ParticipantRepository
 import com.example.platformmanagement.repository.ServiceOfferingRepository
 import org.assertj.core.api.Assertions.assertThat
@@ -22,18 +22,18 @@ import java.util.UUID
 
 @DataJpaTest
 @Import(
-    CallerIdentityService::class,
+    CallerRegistrationService::class,
     ConsumptionService::class,
     ParticipantService::class,
     ServiceOfferingService::class
 )
 @ActiveProfiles("test")
-class CallerIdentityAndConsumptionPersistenceTest @Autowired constructor(
-    private val callerIdentityService: CallerIdentityService,
+class CallerRegistrationAndConsumptionPersistenceTest @Autowired constructor(
+    private val callerRegistrationService: CallerRegistrationService,
     private val consumptionService: ConsumptionService,
     private val participantRepository: ParticipantRepository,
     private val serviceOfferingRepository: ServiceOfferingRepository,
-    private val callerIdentityRepository: ParticipantCallerIdentityRepository,
+    private val callerRegistrationRepository: ParticipantCallerRegistrationRepository,
     private val consumptionRepository: ParticipantCallConsumptionRepository
 ) {
 
@@ -52,40 +52,41 @@ class CallerIdentityAndConsumptionPersistenceTest @Autowired constructor(
     }
 
     @Test
-    fun `caller identity and consumption end-to-end`() {
-        val callerIdentity = callerIdentityService.create(
-            CreateCallerIdentityRequest(
+    fun `caller registration and consumption end-to-end`() {
+        val registration = callerRegistrationService.create(
+            CreateCallerRegistrationRequest(
                 participantId = participant.id,
-                callerIdentity = "user@example.com",
-                status = CallerIdentityStatus.ACTIVE
+                callerId = "user@example.com",
+                status = CallerRegistrationStatus.ACTIVE
             )
         )
-        assertThat(callerIdentity.participantId).isEqualTo(participant.id)
+        assertThat(registration.participantId).isEqualTo(participant.id)
+        assertThat(registration.callerId).isEqualTo("user@example.com")
 
-        val updated = callerIdentityService.update(
-            callerIdentity.id,
-            UpdateCallerIdentityRequest(status = CallerIdentityStatus.INACTIVE)
+        val updated = callerRegistrationService.update(
+            registration.callerId,
+            UpdateCallerRegistrationRequest(status = CallerRegistrationStatus.INACTIVE)
         )
-        assertThat(updated.status).isEqualTo(CallerIdentityStatus.INACTIVE)
+        assertThat(updated.status).isEqualTo(CallerRegistrationStatus.INACTIVE)
 
-        callerIdentityService.update(
-            callerIdentity.id,
-            UpdateCallerIdentityRequest(status = CallerIdentityStatus.ACTIVE)
+        callerRegistrationService.update(
+            registration.callerId,
+            UpdateCallerRegistrationRequest(status = CallerRegistrationStatus.ACTIVE)
         )
 
         val consumption = consumptionService.create(
             CreateConsumptionRequest(
-                participantCallerIdentityId = callerIdentity.id,
+                callerId = registration.callerId,
                 serviceOfferingId = offering.id,
                 consumptionData = """{"input_token":100,"output_token":20}"""
             )
         )
-        assertThat(consumption.callerIdentity).isEqualTo("user@example.com")
+        assertThat(consumption.callerId).isEqualTo("user@example.com")
         assertThat(consumption.serviceOfferingId).isEqualTo(offering.id)
         assertThat(consumptionRepository.existsById(consumption.id)).isTrue()
 
         consumptionService.delete(consumption.id)
-        callerIdentityService.delete(callerIdentity.id)
-        assertThat(callerIdentityRepository.existsById(callerIdentity.id)).isFalse()
+        callerRegistrationService.delete(registration.callerId)
+        assertThat(callerRegistrationRepository.existsById(registration.callerId)).isFalse()
     }
 }

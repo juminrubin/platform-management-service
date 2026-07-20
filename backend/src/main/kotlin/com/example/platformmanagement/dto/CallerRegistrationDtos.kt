@@ -1,43 +1,40 @@
 package com.example.platformmanagement.dto
 
-import com.example.platformmanagement.domain.CallerIdentityStatus
-import com.example.platformmanagement.domain.ParticipantCallerIdentity
+import com.example.platformmanagement.domain.CallerRegistrationStatus
+import com.example.platformmanagement.domain.ParticipantCallerRegistration
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Size
 import java.time.Instant
-import java.util.UUID
 
-data class CreateCallerIdentityRequest(
+data class CreateCallerRegistrationRequest(
     @field:NotBlank
     @field:Size(max = 40)
     val participantId: String,
 
     @field:NotBlank
     @field:Size(max = 255)
-    val callerIdentity: String,
+    val callerId: String,
 
-    val status: CallerIdentityStatus = CallerIdentityStatus.ACTIVE
+    val status: CallerRegistrationStatus = CallerRegistrationStatus.ACTIVE
 )
 
-data class UpdateCallerIdentityRequest(
-    val status: CallerIdentityStatus
+data class UpdateCallerRegistrationRequest(
+    val status: CallerRegistrationStatus
 )
 
-data class CallerIdentityResponse(
-    val id: UUID,
+data class CallerRegistrationResponse(
+    val callerId: String,
     val participantId: String,
     val participantName: String,
-    val callerIdentity: String,
-    val status: CallerIdentityStatus,
+    val status: CallerRegistrationStatus,
     val createdAt: Instant,
     val updatedAt: Instant
 ) {
     companion object {
-        fun from(entity: ParticipantCallerIdentity) = CallerIdentityResponse(
-            id = entity.id,
+        fun from(entity: ParticipantCallerRegistration) = CallerRegistrationResponse(
+            callerId = entity.callerId,
             participantId = entity.participant.id,
             participantName = entity.participant.name,
-            callerIdentity = entity.callerIdentity,
             status = entity.status,
             createdAt = entity.createdAt,
             updatedAt = entity.updatedAt

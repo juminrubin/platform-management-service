@@ -37,10 +37,10 @@ class ConsumptionController(
     @GetMapping
     @PreAuthorize("@authz.canRead()")
     fun list(
-        @RequestParam(required = false) participantCallerIdentityId: UUID?,
+        @RequestParam(required = false) callerId: String?,
         @RequestParam(required = false) serviceOfferingId: String?
     ): List<ConsumptionResponse> =
-        consumptionService.findAll(participantCallerIdentityId, serviceOfferingId)
+        consumptionService.findAll(callerId, serviceOfferingId)
 
     @GetMapping("/{id}")
     @PreAuthorize("@authz.canRead()")
@@ -48,7 +48,7 @@ class ConsumptionController(
         consumptionService.findById(id)
 
     /**
-     * Register token consumption for a caller identity against a service offering.
+     * Register token consumption for a caller registration against a service offering.
      * Intended for service principals / managed identities with
      * [AppRoles.CONSUMPTION_REGISTRATOR].
      */

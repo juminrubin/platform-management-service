@@ -4,7 +4,7 @@ import { signInWithPopup, signOutWithPopup } from '../auth/msalConfig'
 
 const nav = [
   { to: '/participants', label: 'Participants' },
-  { to: '/caller-identities', label: 'Caller identities' },
+  { to: '/caller-registrations', label: 'Caller registrations' },
   { to: '/service-offerings', label: 'Service offerings' },
   { to: '/entitlements', label: 'Entitlements' },
   { to: '/consumptions', label: 'Consumptions' },

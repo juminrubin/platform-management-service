@@ -1,26 +1,26 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { deleteCallerIdentity, getCallerIdentity } from '../../api/client'
-import type { CallerIdentity } from '../../api/types'
+import { deleteCallerRegistration, getCallerRegistration } from '../../api/client'
+import type { CallerRegistration } from '../../api/types'
 import { DetailGrid, ErrorBox, Loading, PageHeader, formatDateTime } from '../../components/ui'
 
-export function CallerIdentityDetailPage() {
-  const { id = '' } = useParams()
+export function CallerRegistrationDetailPage() {
+  const { callerId = '' } = useParams()
   const navigate = useNavigate()
-  const [item, setItem] = useState<CallerIdentity | null>(null)
+  const [item, setItem] = useState<CallerRegistration | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    getCallerIdentity(id)
+    getCallerRegistration(callerId)
       .then(setItem)
       .catch((e: Error) => setError(e.message))
-  }, [id])
+  }, [callerId])
 
   async function onDelete() {
-    if (!confirm('Delete this caller identity?')) return
+    if (!confirm('Delete this caller registration?')) return
     try {
-      await deleteCallerIdentity(id)
-      navigate('/caller-identities')
+      await deleteCallerRegistration(callerId)
+      navigate('/caller-registrations')
     } catch (e) {
       setError((e as Error).message)
     }
@@ -29,13 +29,16 @@ export function CallerIdentityDetailPage() {
   return (
     <section className="card">
       <PageHeader
-        title="Caller identity"
+        title="Caller registration"
         actions={
           <div className="row gap">
-            <Link className="button" to="/caller-identities">
+            <Link className="button" to="/caller-registrations">
               Back
             </Link>
-            <Link className="button primary" to={`/caller-identities/${id}/edit`}>
+            <Link
+              className="button primary"
+              to={`/caller-registrations/${encodeURIComponent(callerId)}/edit`}
+            >
               Edit status
             </Link>
             <button type="button" onClick={() => void onDelete()}>
@@ -49,8 +52,7 @@ export function CallerIdentityDetailPage() {
       {item && (
         <DetailGrid
           entries={[
-            { label: 'ID', value: <code>{item.id}</code> },
-            { label: 'Caller identity', value: <code>{item.callerIdentity}</code> },
+            { label: 'Caller ID', value: <code>{item.callerId}</code> },
             {
               label: 'Participant',
               value: (

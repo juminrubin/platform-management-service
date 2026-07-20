@@ -2,28 +2,28 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { InteractionRequiredAuthError } from '@azure/msal-browser'
 import {
   apiFetch,
-  createCallerIdentity,
+  createCallerRegistration,
   createConsumption,
   createEntitlement,
   createParticipant,
   createServiceOffering,
-  deleteCallerIdentity,
+  deleteCallerRegistration,
   deleteConsumption,
   deleteEntitlement,
   deleteParticipant,
   deleteServiceOffering,
-  getCallerIdentity,
+  getCallerRegistration,
   getConsumption,
   getEntitlement,
   getMe,
   getParticipant,
   getServiceOffering,
-  listCallerIdentities,
+  listCallerRegistrations,
   listConsumptions,
   listEntitlements,
   listParticipants,
   listServiceOfferings,
-  updateCallerIdentity,
+  updateCallerRegistration,
   updateEntitlement,
   updateParticipant,
   updateServiceOffering,
@@ -154,27 +154,27 @@ describe('api client', () => {
       )
     })
 
-    it('lists caller identities with filters and supports CRUD', async () => {
-      await listCallerIdentities({ participantId: 'acme-corp', status: 'ACTIVE' })
+    it('lists caller registrations with filters and supports CRUD', async () => {
+      await listCallerRegistrations({ participantId: 'acme-corp', status: 'ACTIVE' })
       expect(fetch).toHaveBeenLastCalledWith(
-        '/api/v1/caller-identities?participantId=acme-corp&status=ACTIVE',
+        '/api/v1/caller-registrations?participantId=acme-corp&status=ACTIVE',
         expect.anything(),
       )
-      await listCallerIdentities()
-      expect(fetch).toHaveBeenLastCalledWith('/api/v1/caller-identities', expect.anything())
+      await listCallerRegistrations()
+      expect(fetch).toHaveBeenLastCalledWith('/api/v1/caller-registrations', expect.anything())
 
-      vi.mocked(fetch).mockResolvedValue(mockJsonResponse({ id: 'c1' }) as Response)
-      await getCallerIdentity('c1')
-      await createCallerIdentity({ participantId: 'acme-corp', callerIdentity: 'a@b.com' })
-      await updateCallerIdentity('c1', { status: 'INACTIVE' })
+      vi.mocked(fetch).mockResolvedValue(mockJsonResponse({ callerId: 'a@b.com' }) as Response)
+      await getCallerRegistration('a@b.com')
+      await createCallerRegistration({ participantId: 'acme-corp', callerId: 'a@b.com' })
+      await updateCallerRegistration('a@b.com', { status: 'INACTIVE' })
       vi.mocked(fetch).mockResolvedValue(mockJsonResponse(undefined, { status: 204 }) as Response)
-      await deleteCallerIdentity('c1')
+      await deleteCallerRegistration('a@b.com')
       expect(vi.mocked(fetch).mock.calls.map((c) => [c[0], (c[1] as RequestInit)?.method])).toEqual(
         expect.arrayContaining([
-          ['/api/v1/caller-identities/c1', undefined],
-          ['/api/v1/caller-identities', 'POST'],
-          ['/api/v1/caller-identities/c1', 'PUT'],
-          ['/api/v1/caller-identities/c1', 'DELETE'],
+          ['/api/v1/caller-registrations/a%40b.com', undefined],
+          ['/api/v1/caller-registrations', 'POST'],
+          ['/api/v1/caller-registrations/a%40b.com', 'PUT'],
+          ['/api/v1/caller-registrations/a%40b.com', 'DELETE'],
         ]),
       )
     })
@@ -230,11 +230,11 @@ describe('api client', () => {
 
     it('lists consumptions with filters and supports create/get/delete', async () => {
       await listConsumptions({
-        participantCallerIdentityId: 'c1',
+        callerId: 'alice@acme.example',
         serviceOfferingId: 'gpt-5.1',
       })
       expect(fetch).toHaveBeenLastCalledWith(
-        '/api/v1/consumptions?participantCallerIdentityId=c1&serviceOfferingId=gpt-5.1',
+        '/api/v1/consumptions?callerId=alice%40acme.example&serviceOfferingId=gpt-5.1',
         expect.anything(),
       )
       await listConsumptions()
@@ -243,7 +243,7 @@ describe('api client', () => {
       vi.mocked(fetch).mockResolvedValue(mockJsonResponse({ id: 'd1' }) as Response)
       await getConsumption('d1')
       await createConsumption({
-        participantCallerIdentityId: 'c1',
+        callerId: 'alice@acme.example',
         serviceOfferingId: 'gpt-5.1',
         consumptionData: '{}',
       })

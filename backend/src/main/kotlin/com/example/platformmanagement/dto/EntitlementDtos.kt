@@ -82,15 +82,15 @@ data class EntitlementResponse(
 }
 
 /**
- * Result of checking whether a caller identity may use a service offering.
+ * Result of checking whether a registered caller may use a service offering.
  * Used by [Entitlement.Reader] and [System.Maintainer] roles.
  */
 data class EntitlementCheckResponse(
     /** True when an ACTIVE entitlement covers the service for the caller's participant on [asOf]. */
     val allowed: Boolean,
     val reason: String,
-    val callerIdentity: String?,
-    val participantCallerIdentityId: UUID?,
+    /** Unique principal key of the caller registration. */
+    val callerId: String?,
     val participantId: String?,
     val serviceOfferingId: String,
     val asOf: LocalDate,

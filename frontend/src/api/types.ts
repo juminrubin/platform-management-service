@@ -1,5 +1,5 @@
 export type ParticipantStatus = 'ACTIVE' | 'INACTIVE' | 'SUSPENDED'
-export type CallerIdentityStatus = 'ACTIVE' | 'INACTIVE' | 'REVOKED'
+export type CallerRegistrationStatus = 'ACTIVE' | 'INACTIVE' | 'REVOKED'
 export type EntitlementStatus = 'ACTIVE' | 'EXPIRED' | 'REVOKED' | 'PENDING'
 
 export type Participant = {
@@ -24,24 +24,24 @@ export type UpdateParticipant = {
   status: ParticipantStatus
 }
 
-export type CallerIdentity = {
-  id: string
+/** Participant caller registration; callerId is the unique key. */
+export type CallerRegistration = {
+  callerId: string
   participantId: string
   participantName: string
-  callerIdentity: string
-  status: CallerIdentityStatus
+  status: CallerRegistrationStatus
   createdAt: string
   updatedAt: string
 }
 
-export type CreateCallerIdentity = {
+export type CreateCallerRegistration = {
   participantId: string
-  callerIdentity: string
-  status?: CallerIdentityStatus
+  callerId: string
+  status?: CallerRegistrationStatus
 }
 
-export type UpdateCallerIdentity = {
-  status: CallerIdentityStatus
+export type UpdateCallerRegistration = {
+  status: CallerRegistrationStatus
 }
 
 export type ServiceOffering = {
@@ -107,8 +107,7 @@ export type UpdateEntitlement = {
 
 export type Consumption = {
   id: string
-  participantCallerIdentityId: string
-  callerIdentity: string
+  callerId: string
   participantId: string
   participantName: string
   serviceOfferingId: string
@@ -118,7 +117,7 @@ export type Consumption = {
 }
 
 export type CreateConsumption = {
-  participantCallerIdentityId: string
+  callerId: string
   serviceOfferingId: string
   consumptionData?: string
   consumedAt?: string | null

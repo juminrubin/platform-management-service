@@ -24,10 +24,10 @@ class StatusConvertersTest {
     }
 
     @Test
-    fun `caller identity status converter round-trips and nulls`() {
-        val converter = CallerIdentityStatusConverter()
-        assertThat(converter.convertToDatabaseColumn(CallerIdentityStatus.ACTIVE)).isEqualTo("ACTIVE")
-        assertThat(converter.convertToEntityAttribute("INACTIVE")).isEqualTo(CallerIdentityStatus.INACTIVE)
+    fun `caller registration status converter round-trips and nulls`() {
+        val converter = CallerRegistrationStatusConverter()
+        assertThat(converter.convertToDatabaseColumn(CallerRegistrationStatus.ACTIVE)).isEqualTo("ACTIVE")
+        assertThat(converter.convertToEntityAttribute("INACTIVE")).isEqualTo(CallerRegistrationStatus.INACTIVE)
         assertThat(converter.convertToDatabaseColumn(null)).isNull()
         assertThat(converter.convertToEntityAttribute(null)).isNull()
     }

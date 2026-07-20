@@ -149,21 +149,21 @@ curl -s -X POST http://localhost:8080/api/v1/entitlements \
   }' | jq
 ```
 
-### Caller identities
+### Caller registrations
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/v1/caller-identities` | List (`?participantId=&status=`) |
-| `GET` | `/api/v1/caller-identities/{id}` | Get by id |
-| `POST` | `/api/v1/caller-identities` | Register identity (email / SP client id / UAMI) |
-| `PUT` | `/api/v1/caller-identities/{id}` | Update status |
-| `DELETE` | `/api/v1/caller-identities/{id}` | Delete |
+| `GET` | `/api/v1/caller-registrations` | List (`?participantId=&status=`) |
+| `GET` | `/api/v1/caller-registrations/{callerId}` | Get by unique caller ID |
+| `POST` | `/api/v1/caller-registrations` | Register caller (email / SP client id / UAMI) under a participant |
+| `PUT` | `/api/v1/caller-registrations/{callerId}` | Update status |
+| `DELETE` | `/api/v1/caller-registrations/{callerId}` | Delete |
 
 ### Consumptions
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/v1/consumptions` | List (`?participantCallerIdentityId=&serviceOfferingId=`) |
+| `GET` | `/api/v1/consumptions` | List (`?callerId=&serviceOfferingId=`) |
 | `GET` | `/api/v1/consumptions/{id}` | Get by id |
 | `POST` | `/api/v1/consumptions` | Record usage JSON |
 | `DELETE` | `/api/v1/consumptions/{id}` | Delete |
@@ -172,15 +172,11 @@ curl -s -X POST http://localhost:8080/api/v1/entitlements \
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/v1/entitlements/check` | Check entitlement by caller identity + service offering |
+| `GET` | `/api/v1/entitlements/check` | Check entitlement by caller ID + service offering |
 
 ```bash
-# By principal string (email / Entra client id / managed identity id)
-curl -s 'http://localhost:8080/api/v1/entitlements/check?callerIdentity=alice@acme.example&serviceOfferingId=gpt-5.1' \
-  -H "Authorization: Bearer $TOKEN" | jq
-
-# Or by internal caller-identity row id
-curl -s 'http://localhost:8080/api/v1/entitlements/check?participantCallerIdentityId=c1111111-1111-1111-1111-111111111111&serviceOfferingId=gpt-5.1' \
+# By unique caller ID (email / Entra client id / managed identity id)
+curl -s 'http://localhost:8080/api/v1/entitlements/check?callerId=alice@acme.example&serviceOfferingId=gpt-5.1' \
   -H "Authorization: Bearer $TOKEN" | jq
 ```
 
@@ -199,16 +195,17 @@ Seed data (from Flyway `V2__seed_data.sql`) is loaded on startup so list endpoin
 ```
 Participant 1──* ParticipantServiceEntitlement *──1 ServiceOffering
      │
-     └──* ParticipantCallerIdentity 1──* ParticipantCallConsumption *──1 ServiceOffering
+     └──* ParticipantCallerRegistration 1──* ParticipantCallConsumption *──1 ServiceOffering
+           (callerId = unique key)
 ```
 
 | Entity | Key fields |
 |--------|------------|
-| **Participant** | `id` (VARCHAR), `name`, `contact`, `status` |
+| **Participant** | `id` (VARCHAR), `name`, `contact`, `status` — billing group for callers |
 | **ServiceOffering** | `id` (business key, e.g. `gpt-5.1`), `name`, `category`, `config` (JSON), `active` |
 | **ParticipantServiceEntitlement** | participant ↔ offering, validity, `config` (JSON limits), status |
-| **ParticipantCallerIdentity** | participant ↔ `callerIdentity` (email / Entra client id) |
-| **ParticipantCallConsumption** | caller identity ↔ offering, `consumptionData` (JSON tokens) |
+| **ParticipantCallerRegistration** | `callerId` (PK, unique principal), `participantId`, `status` |
+| **ParticipantCallConsumption** | `callerId` ↔ offering, `consumptionData` (JSON tokens) |
 
 Schema is owned by **Flyway** (`ddl-auto: validate`). Hibernate never mutates the schema.
 
@@ -315,8 +312,8 @@ Use **one mechanism for both humans and technical accounts: Entra app roles** em
 | Participants write | ✓ | | | |
 | Service offerings GET | ✓ | ✓ | | |
 | Service offerings write | ✓ | | | |
-| Caller identities GET | ✓ | ✓ | | |
-| Caller identities write | ✓ | | | |
+| Caller registrations GET | ✓ | ✓ | | |
+| Caller registrations write | ✓ | | | |
 | Entitlements GET list/id | ✓ | ✓ | | |
 | Entitlements write | ✓ | | | |
 | `GET /entitlements/check` | ✓ | ✓ | ✓ | |
@@ -505,9 +502,10 @@ curl -s http://localhost:8080/api/v1/auth/me \
 curl -s http://localhost:8080/api/v1/participants \
   -H "Authorization: Bearer $TOKEN" | jq
 
-curl -s "http://localhost:8080/api/v1/entitlements/check?callerIdentity=alice@acme.example&serviceOfferingId=gpt-5.1" \
+curl -s "http://localhost:8080/api/v1/entitlements/check?callerId=alice@acme.example&serviceOfferingId=gpt-5.1" \
   -H "Authorization: Bearer $TOKEN" | jq
 ```
+
 
 ---
 
@@ -572,7 +570,7 @@ curl -s -X POST http://localhost:8080/api/v1/consumptions \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "participantCallerIdentityId": "c1111111-1111-1111-1111-111111111111",
+    "callerId": "alice@acme.example",
     "serviceOfferingId": "gpt-5.1",
     "consumptionData": "{\"input_token\":120,\"output_token\":40}",
     "consumedAt": "2024-07-01T12:00:00Z"
