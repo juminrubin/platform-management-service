@@ -59,8 +59,8 @@
     </appender>
 
     <!-- Shared logger hierarchy -->
-    <logger name="com.example.platformmanagement" level="DEBUG"/>
-    <logger name="com.example.platformmanagement.service" level="DEBUG"/>
+    <logger name="org.jrtech.platformmanagement" level="DEBUG"/>
+    <logger name="org.jrtech.platformmanagement.service" level="DEBUG"/>
     <logger name="org.springframework.security" level="INFO"/>
     <logger name="org.flywaydb" level="INFO"/>
     <logger name="org.hibernate.SQL" level="WARN"/>
@@ -78,7 +78,7 @@
 
     <!-- Containers / AKS: compact console only -->
     <springProfile name="k8s">
-        <logger name="com.example.platformmanagement" level="INFO"/>
+        <logger name="org.jrtech.platformmanagement" level="INFO"/>
         <logger name="org.springframework.security" level="WARN"/>
         <root level="INFO">
             <appender-ref ref="ASYNC_CONSOLE_K8S"/>
@@ -87,7 +87,7 @@
 
     <!-- Automated tests -->
     <springProfile name="test">
-        <logger name="com.example.platformmanagement" level="DEBUG"/>
+        <logger name="org.jrtech.platformmanagement" level="DEBUG"/>
         <logger name="org.springframework" level="WARN"/>
         <logger name="org.hibernate" level="WARN"/>
         <logger name="org.flywaydb" level="WARN"/>

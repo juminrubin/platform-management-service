@@ -35,7 +35,7 @@ management:
 logging:
   level:
     root: INFO
-    com.example.platformmanagement: INFO
+    org.jrtech.platformmanagement: INFO
     org.springframework.security: WARN
 
 # Optional: set APP_SWAGGER_ENABLED=false in the deployment secret/config to hide docs in prod.

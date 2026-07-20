@@ -47,4 +47,4 @@ app:
 logging:
   level:
     root: WARN
-    com.example.platformmanagement: DEBUG
+    org.jrtech.platformmanagement: DEBUG

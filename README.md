@@ -114,3 +114,8 @@ Optional UI manifests: `deploy/k8s/ui-deployment.yaml` (build UI image with `VIT
 - One git history, shared Entra docs and compose
 
 Backend stays a pure Spring project; frontend stays a pure Vite app; deploy owns cluster and compose wiring.
+
+## License
+
+This project is licensed under the [Apache License 2.0](LICENSE).
+

@@ -102,7 +102,7 @@ springdoc:
     disable-swagger-default-url: true
   show-actuator: false
   # Scan only our REST controllers (security scheme still applies to these operations)
-  packages-to-scan: com.example.platformmanagement.controller
+  packages-to-scan: org.jrtech.platformmanagement.controller
   paths-to-match: /api/**
 
 # App roles (JWT "roles" claim) drive @PreAuthorize — see security/AppRoles.kt
@@ -122,7 +122,7 @@ logging:
   config: classpath:logback-spring.xml
   level:
     root: INFO
-    com.example.platformmanagement: DEBUG
+    org.jrtech.platformmanagement: DEBUG
     org.springframework.security: INFO
     org.flywaydb: INFO
 

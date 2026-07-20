@@ -19,7 +19,7 @@ Kotlin + Spring Boot REST API (**Platform Management Service**) for **Participan
 ## Project layout
 
 ```
-src/main/kotlin/com/example/platformmanagement/
+src/main/kotlin/org/jrtech/platformmanagement/
   config/          # Security (Microsoft JWT), CORS, app properties
   controller/      # REST endpoints
   domain/          # JPA entities & enums
