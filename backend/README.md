@@ -25,14 +25,17 @@ src/main/kotlin/org/jrtech/platformmanagement/
   domain/          # JPA entities & enums
   dto/             # Request/response models
   exception/       # API errors (RFC 7807 ProblemDetail)
+  ingestion/       # Periodic Avro consumption import from Azure Blob
   repository/      # Spring Data JPA
   service/         # Business logic
 src/main/resources/
   application.yml              # App + Microsoft Entra ID JWT (always on)
   application-k8s.yml          # Container / AKS runtime extras
+  avro/consumption-event.avsc  # Avro schema for blob consumption files
   db/migration/
     V1__init_schema.sql
     V2__seed_data.sql
+    V4__consumption_avro_import_checkpoint.sql
 Dockerfile
 .dockerignore
 k8s/                           # AKS manifests (Kustomize)
@@ -205,9 +208,37 @@ Participant 1──* ParticipantServiceEntitlement *──1 ServiceOffering
 | **ServiceOffering** | `id` (business key, e.g. `gpt-5.1`), `name`, `category`, `config` (JSON), `active` |
 | **ParticipantServiceEntitlement** | participant ↔ offering, validity, `config` (JSON limits), status |
 | **ParticipantCallerRegistration** | `callerId` (PK, unique principal), `participantId`, `status` |
-| **ParticipantCallConsumption** | `callerId` ↔ offering, `consumptionData` (JSON tokens) |
+| **ParticipantCallConsumption** | `callerId` ↔ offering, `sourceRefId` (Source Reference Identification), `consumptionData` (JSON tokens) |
+| **ConsumptionAvroImportCheckpoint** | blob name, etag, import status / counts (idempotent Avro ingest) |
 
 Schema is owned by **Flyway** (`ddl-auto: validate`). Hibernate never mutates the schema.
+
+---
+
+## Background: consumption Avro import from Azure Blob
+
+A scheduled task can periodically list an Azure Blob container, download **Avro Object Container** files, and insert rows into `participant_call_consumption`.
+
+| Setting | Env / property | Default |
+|---------|----------------|---------|
+| Enable job | `APP_CONSUMPTION_IMPORT_ENABLED` / `app.consumption-import.enabled` | `false` |
+| Connection string | `APP_AZURE_STORAGE_CONNECTION_STRING` | _(empty)_ |
+| Account URL (MI) | `APP_AZURE_STORAGE_ACCOUNT_URL` | _(empty)_ |
+| Container | `APP_CONSUMPTION_IMPORT_CONTAINER` | `consumption` |
+| Blob prefix | `APP_CONSUMPTION_IMPORT_PREFIX` | _(none)_ |
+| Poll interval | `APP_CONSUMPTION_IMPORT_POLL_MS` | `300000` (5 min) |
+| Max blobs / cycle | `APP_CONSUMPTION_IMPORT_MAX_BLOBS` | `20` |
+
+**Auth:** connection string **or** account URL + `DefaultAzureCredential` (managed identity / `az login`).
+
+**Avro schema:** `src/main/resources/avro/consumption-event.avsc`  
+Fields: `id` (optional UUID primary key), `caller_id`, `service_offering_id`, `source_ref_id` (optional Source Reference Identification), `consumption_data` (JSON string), `consumed_at` (optional epoch ms UTC).
+
+**Idempotency:**
+- Blob-level: successful imports are stored in `consumption_avro_import_checkpoint` and not reprocessed (`FAILED` is retried).
+- Record-level: when `id` already exists as PK, or when `source_ref_id` already exists, the row is skipped.
+
+**Code:** `ingestion/ConsumptionAvroImportScheduler` → `ConsumptionAvroImportService` → `ConsumptionAvroReader` + `ConsumptionService.createFromImport`.
 
 ---
 
@@ -572,6 +603,7 @@ curl -s -X POST http://localhost:8080/api/v1/consumptions \
   -d '{
     "callerId": "alice@acme.example",
     "serviceOfferingId": "gpt-5.1",
+    "sourceRefId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
     "consumptionData": "{\"input_token\":120,\"output_token\":40}",
     "consumedAt": "2024-07-01T12:00:00Z"
   }' | jq

@@ -6,6 +6,7 @@ import { ParticipantDetailPage } from './ParticipantDetailPage'
 import { renderWithRouter } from '../../test/render'
 import { participantActive } from '../../test/fixtures'
 import * as api from '../../api/client'
+import { readerCapabilities } from '../../auth/capabilities'
 
 vi.mock('../../api/client', () => ({
   getParticipant: vi.fn(),
@@ -33,6 +34,19 @@ describe('ParticipantDetailPage', () => {
     expect(await screen.findByText('Acme Corporation')).toBeInTheDocument()
     expect(screen.getByText('ops@acme.example')).toBeInTheDocument()
     expect(api.getParticipant).toHaveBeenCalledWith('acme-corp')
+  })
+
+  it('hides edit and delete for System.Reader', async () => {
+    renderWithRouter(
+      <Routes>
+        <Route path="/participants/:id" element={<ParticipantDetailPage />} />
+      </Routes>,
+      { route: '/participants/acme-corp', auth: { ...readerCapabilities, roles: ['System.Reader'] } },
+    )
+    expect(await screen.findByText('Acme Corporation')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /^edit$/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /delete/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /back to list/i })).toBeInTheDocument()
   })
 
   it('shows API error', async () => {

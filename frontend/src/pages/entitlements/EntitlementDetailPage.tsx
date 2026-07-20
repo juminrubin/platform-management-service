@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { deleteEntitlement, getEntitlement } from '../../api/client'
 import type { Entitlement } from '../../api/types'
+import { useAuthorization } from '../../auth/AuthorizationContext'
 import { CodeBlock, DetailGrid, ErrorBox, Loading, PageHeader, formatDateTime } from '../../components/ui'
 
 export function EntitlementDetailPage() {
   const { id = '' } = useParams()
   const navigate = useNavigate()
+  const { canMaintain } = useAuthorization()
   const [item, setItem] = useState<Entitlement | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -35,12 +37,16 @@ export function EntitlementDetailPage() {
             <Link className="button" to="/entitlements">
               Back
             </Link>
-            <Link className="button primary" to={`/entitlements/${id}/edit`}>
-              Edit
-            </Link>
-            <button type="button" onClick={() => void onDelete()}>
-              Delete
-            </button>
+            {canMaintain && (
+              <>
+                <Link className="button primary" to={`/entitlements/${id}/edit`}>
+                  Edit
+                </Link>
+                <button type="button" onClick={() => void onDelete()}>
+                  Delete
+                </button>
+              </>
+            )}
           </div>
         }
       />

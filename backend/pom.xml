@@ -45,6 +45,10 @@
         <h2.version>2.4.240</h2.version>
         <!-- springdoc 3.x is required for Spring Boot 4.x (2.x targets Boot 3 only) -->
         <springdoc.version>3.0.3</springdoc.version>
+        <!-- Avro consumption import from Azure Blob Storage -->
+        <avro.version>1.12.0</avro.version>
+        <azure-storage-blob.version>12.30.0</azure-storage-blob.version>
+        <azure-identity.version>1.15.4</azure-identity.version>
     </properties>
 
     <dependencies>
@@ -104,6 +108,23 @@
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
             <version>${springdoc.version}</version>
+        </dependency>
+
+        <!-- Periodic consumption import: Avro files from Azure Blob Storage -->
+        <dependency>
+            <groupId>org.apache.avro</groupId>
+            <artifactId>avro</artifactId>
+            <version>${avro.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.azure</groupId>
+            <artifactId>azure-storage-blob</artifactId>
+            <version>${azure-storage-blob.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.azure</groupId>
+            <artifactId>azure-identity</artifactId>
+            <version>${azure-identity.version}</version>
         </dependency>
 
         <!-- Tests: Boot 4 recommends technology-specific test starters -->
@@ -211,6 +232,9 @@
                         <!-- Boot entrypoint / pure config wiring -->
                         <exclude>org/jrtech/platformmanagement/PlatformManagementServiceApplication*</exclude>
                         <exclude>org/jrtech/platformmanagement/config/UtcTimeConfig*</exclude>
+                        <!-- Thin Azure SDK adapter; integration requires live storage account -->
+                        <exclude>org/jrtech/platformmanagement/ingestion/AzureBlobStorageClientImpl*</exclude>
+                        <exclude>org/jrtech/platformmanagement/ingestion/ConsumptionImportConfig*</exclude>
                     </excludes>
                     <rules>
                         <rule>

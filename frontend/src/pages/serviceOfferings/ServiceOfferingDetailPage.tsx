@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { deleteServiceOffering, getServiceOffering } from '../../api/client'
 import type { ServiceOffering } from '../../api/types'
+import { useAuthorization } from '../../auth/AuthorizationContext'
 import { CodeBlock, DetailGrid, ErrorBox, Loading, PageHeader, formatDateTime } from '../../components/ui'
 
 export function ServiceOfferingDetailPage() {
   const { id = '' } = useParams()
   const navigate = useNavigate()
+  const { canMaintain } = useAuthorization()
   const [item, setItem] = useState<ServiceOffering | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -36,12 +38,16 @@ export function ServiceOfferingDetailPage() {
             <Link className="button" to="/service-offerings">
               Back
             </Link>
-            <Link className="button primary" to={`/service-offerings/${encodeURIComponent(id)}/edit`}>
-              Edit
-            </Link>
-            <button type="button" onClick={() => void onDelete()}>
-              Delete
-            </button>
+            {canMaintain && (
+              <>
+                <Link className="button primary" to={`/service-offerings/${encodeURIComponent(id)}/edit`}>
+                  Edit
+                </Link>
+                <button type="button" onClick={() => void onDelete()}>
+                  Delete
+                </button>
+              </>
+            )}
           </div>
         }
       />

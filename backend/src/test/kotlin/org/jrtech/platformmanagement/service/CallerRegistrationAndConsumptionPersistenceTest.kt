@@ -74,16 +74,20 @@ class CallerRegistrationAndConsumptionPersistenceTest @Autowired constructor(
             UpdateCallerRegistrationRequest(status = CallerRegistrationStatus.ACTIVE)
         )
 
+        val sourceRef = "req-${UUID.randomUUID()}"
         val consumption = consumptionService.create(
             CreateConsumptionRequest(
                 callerId = registration.callerId,
                 serviceOfferingId = offering.id,
+                sourceRefId = sourceRef,
                 consumptionData = """{"input_token":100,"output_token":20}"""
             )
         )
         assertThat(consumption.callerId).isEqualTo("user@example.com")
         assertThat(consumption.serviceOfferingId).isEqualTo(offering.id)
+        assertThat(consumption.sourceRefId).isEqualTo(sourceRef)
         assertThat(consumptionRepository.existsById(consumption.id)).isTrue()
+        assertThat(consumptionRepository.existsBySourceRefId(sourceRef)).isTrue()
 
         consumptionService.delete(consumption.id)
         callerRegistrationService.delete(registration.callerId)

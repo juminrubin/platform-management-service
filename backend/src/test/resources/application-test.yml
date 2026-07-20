@@ -43,6 +43,9 @@ app:
     # Unit / @DataJpaTest slices: no JWT required.
     # Role-based security tests set permit-all=false via @TestPropertySource.
     permit-all: true
+  consumption-import:
+    # Keep Azure blob polling off in tests (unit tests exercise the service with mocks).
+    enabled: false
 
 logging:
   level:

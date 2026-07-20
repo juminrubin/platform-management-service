@@ -49,12 +49,46 @@ class ConsumptionService(
 
     @Transactional
     fun create(request: CreateConsumptionRequest): ConsumptionResponse {
+        return createFromImport(request, externalId = null).response
+    }
+
+    /**
+     * Creates a consumption row, optionally with a stable [externalId] for idempotent Avro import.
+     * Idempotent when:
+     * - [externalId] already exists as the primary key, or
+     * - [CreateConsumptionRequest.sourceRefId] already exists (Source Reference Identification).
+     */
+    @Transactional
+    fun createFromImport(
+        request: CreateConsumptionRequest,
+        externalId: UUID?
+    ): ImportCreateResult {
         val callerId = request.callerId.trim()
+        val sourceRefId = request.sourceRefId?.trim()?.takeIf { it.isNotEmpty() }
+
+        if (externalId != null && consumptionRepository.existsById(externalId)) {
+            log.debug("Skipping import; consumption id={} already exists", externalId)
+            return ImportCreateResult(created = false, response = findById(externalId))
+        }
+        if (sourceRefId != null) {
+            val existing = consumptionRepository.findBySourceRefIdWithRelations(sourceRefId)
+            if (existing != null) {
+                log.debug(
+                    "Skipping import; sourceRefId={} already exists as consumption id={}",
+                    sourceRefId,
+                    existing.id
+                )
+                return ImportCreateResult(created = false, response = ConsumptionResponse.from(existing))
+            }
+        }
+
         log.info(
-            "Recording consumption callerId={} serviceOfferingId={} consumedAt={}",
+            "Recording consumption callerId={} serviceOfferingId={} sourceRefId={} consumedAt={} externalId={}",
             callerId,
             request.serviceOfferingId,
-            request.consumedAt
+            sourceRefId,
+            request.consumedAt,
+            externalId
         )
         val callerRegistration = callerRegistrationService.getEntity(callerId)
         val offering = serviceOfferingService.getEntity(request.serviceOfferingId.trim())
@@ -62,15 +96,27 @@ class ConsumptionService(
 
         val saved = consumptionRepository.save(
             ParticipantCallConsumption(
+                id = externalId ?: UUID.randomUUID(),
                 callerRegistration = callerRegistration,
                 serviceOffering = offering,
+                sourceRefId = sourceRefId,
                 consumptionData = request.consumptionData.trim().ifEmpty { "{}" },
                 createdAt = eventTime
             )
         )
-        log.info("Created consumption id={} createdAt={}", saved.id, saved.createdAt)
-        return findById(saved.id)
+        log.info(
+            "Created consumption id={} sourceRefId={} createdAt={}",
+            saved.id,
+            saved.sourceRefId,
+            saved.createdAt
+        )
+        return ImportCreateResult(created = true, response = findById(saved.id))
     }
+
+    data class ImportCreateResult(
+        val created: Boolean,
+        val response: ConsumptionResponse
+    )
 
     @Transactional
     fun delete(id: UUID) {

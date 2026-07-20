@@ -15,6 +15,13 @@ data class CreateConsumptionRequest(
     @field:Size(max = 100)
     val serviceOfferingId: String,
 
+    /**
+     * Source Reference Identification from the consumption reporter
+     * (e.g. request UUID). Unique when provided; used for idempotent registration.
+     */
+    @field:Size(max = 255)
+    val sourceRefId: String? = null,
+
     @field:NotBlank
     val consumptionData: String = "{}",
 
@@ -32,6 +39,8 @@ data class ConsumptionResponse(
     val participantName: String,
     val serviceOfferingId: String,
     val serviceOfferingName: String,
+    /** Source Reference Identification supplied by the consumption reporter, if any. */
+    val sourceRefId: String?,
     val consumptionData: String,
     val createdAt: Instant
 ) {
@@ -43,6 +52,7 @@ data class ConsumptionResponse(
             participantName = entity.callerRegistration.participant.name,
             serviceOfferingId = entity.serviceOffering.id,
             serviceOfferingName = entity.serviceOffering.name,
+            sourceRefId = entity.sourceRefId,
             consumptionData = entity.consumptionData,
             createdAt = entity.createdAt
         )

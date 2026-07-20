@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { deleteConsumption, getConsumption } from '../../api/client'
 import type { Consumption } from '../../api/types'
+import { useAuthorization } from '../../auth/AuthorizationContext'
 import { CodeBlock, DetailGrid, ErrorBox, Loading, PageHeader, formatDateTime } from '../../components/ui'
 
 export function ConsumptionDetailPage() {
   const { id = '' } = useParams()
   const navigate = useNavigate()
+  const { canMaintain } = useAuthorization()
   const [item, setItem] = useState<Consumption | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -36,9 +38,11 @@ export function ConsumptionDetailPage() {
             <Link className="button" to="/consumptions">
               Back
             </Link>
-            <button type="button" onClick={() => void onDelete()}>
-              Delete
-            </button>
+            {canMaintain && (
+              <button type="button" onClick={() => void onDelete()}>
+                Delete
+              </button>
+            )}
           </div>
         }
       />
@@ -49,6 +53,10 @@ export function ConsumptionDetailPage() {
           <DetailGrid
             entries={[
               { label: 'ID', value: <code>{item.id}</code> },
+              {
+                label: 'Source reference ID',
+                value: item.sourceRefId ? <code>{item.sourceRefId}</code> : '—',
+              },
               { label: 'Event time', value: formatDateTime(item.createdAt) },
               {
                 label: 'Caller ID',

@@ -24,6 +24,31 @@ describe('ParticipantListPage', () => {
     expect(api.listParticipants).toHaveBeenCalled()
   })
 
+  it('hides create/edit/delete actions for System.Reader', async () => {
+    renderWithRouter(<ParticipantListPage />, {
+      auth: {
+        canMaintain: false,
+        canRead: true,
+        canCheckEntitlement: true,
+        canRegisterConsumption: false,
+        roles: ['System.Reader'],
+      },
+    })
+    expect(await screen.findByText('Acme Corporation')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /new participant/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /^edit$/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /delete/i })).not.toBeInTheDocument()
+    expect(screen.getAllByRole('link', { name: /^view$/i }).length).toBeGreaterThan(0)
+  })
+
+  it('shows create/edit/delete for System.Maintainer', async () => {
+    renderWithRouter(<ParticipantListPage />)
+    expect(await screen.findByText('Acme Corporation')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /new participant/i })).toBeInTheDocument()
+    expect(screen.getAllByRole('link', { name: /^edit$/i }).length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('button', { name: /delete/i }).length).toBeGreaterThan(0)
+  })
+
   it('filters client-side by search text', async () => {
     const user = userEvent.setup()
     renderWithRouter(<ParticipantListPage />)

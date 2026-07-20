@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { deleteCallerRegistration, getCallerRegistration } from '../../api/client'
 import type { CallerRegistration } from '../../api/types'
+import { useAuthorization } from '../../auth/AuthorizationContext'
 import { DetailGrid, ErrorBox, Loading, PageHeader, formatDateTime } from '../../components/ui'
 
 export function CallerRegistrationDetailPage() {
   const { callerId = '' } = useParams()
   const navigate = useNavigate()
+  const { canMaintain } = useAuthorization()
   const [item, setItem] = useState<CallerRegistration | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -35,15 +37,19 @@ export function CallerRegistrationDetailPage() {
             <Link className="button" to="/caller-registrations">
               Back
             </Link>
-            <Link
-              className="button primary"
-              to={`/caller-registrations/${encodeURIComponent(callerId)}/edit`}
-            >
-              Edit status
-            </Link>
-            <button type="button" onClick={() => void onDelete()}>
-              Delete
-            </button>
+            {canMaintain && (
+              <>
+                <Link
+                  className="button primary"
+                  to={`/caller-registrations/${encodeURIComponent(callerId)}/edit`}
+                >
+                  Edit status
+                </Link>
+                <button type="button" onClick={() => void onDelete()}>
+                  Delete
+                </button>
+              </>
+            )}
           </div>
         }
       />

@@ -1,6 +1,8 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { MsalProvider, useIsAuthenticated } from '@azure/msal-react'
 import { msalInstance } from './auth/msalConfig'
+import { AuthorizationProvider } from './auth/AuthorizationContext'
+import { RequireCapability } from './auth/RequireCapability'
 import { Layout } from './components/Layout'
 import { HomePage } from './pages/HomePage'
 import { MePage } from './pages/MePage'
@@ -29,6 +31,26 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
+function RequireMaintain({ children, fallback }: { children: React.ReactNode; fallback: string }) {
+  return (
+    <RequireAuth>
+      <RequireCapability capability="canMaintain" fallback={fallback}>
+        {children}
+      </RequireCapability>
+    </RequireAuth>
+  )
+}
+
+function RequireRegisterConsumption({ children }: { children: React.ReactNode }) {
+  return (
+    <RequireAuth>
+      <RequireCapability capability="canRegisterConsumption" fallback="/consumptions">
+        {children}
+      </RequireCapability>
+    </RequireAuth>
+  )
+}
+
 function AppRoutes() {
   return (
     <BrowserRouter>
@@ -55,9 +77,9 @@ function AppRoutes() {
           <Route
             path="/participants/new"
             element={
-              <RequireAuth>
+              <RequireMaintain fallback="/participants">
                 <ParticipantFormPage />
-              </RequireAuth>
+              </RequireMaintain>
             }
           />
           <Route
@@ -71,9 +93,9 @@ function AppRoutes() {
           <Route
             path="/participants/:id/edit"
             element={
-              <RequireAuth>
+              <RequireMaintain fallback="/participants">
                 <ParticipantFormPage />
-              </RequireAuth>
+              </RequireMaintain>
             }
           />
 
@@ -88,9 +110,9 @@ function AppRoutes() {
           <Route
             path="/caller-registrations/new"
             element={
-              <RequireAuth>
+              <RequireMaintain fallback="/caller-registrations">
                 <CallerRegistrationFormPage />
-              </RequireAuth>
+              </RequireMaintain>
             }
           />
           <Route
@@ -104,9 +126,9 @@ function AppRoutes() {
           <Route
             path="/caller-registrations/:callerId/edit"
             element={
-              <RequireAuth>
+              <RequireMaintain fallback="/caller-registrations">
                 <CallerRegistrationFormPage />
-              </RequireAuth>
+              </RequireMaintain>
             }
           />
 
@@ -121,9 +143,9 @@ function AppRoutes() {
           <Route
             path="/service-offerings/new"
             element={
-              <RequireAuth>
+              <RequireMaintain fallback="/service-offerings">
                 <ServiceOfferingFormPage />
-              </RequireAuth>
+              </RequireMaintain>
             }
           />
           <Route
@@ -137,9 +159,9 @@ function AppRoutes() {
           <Route
             path="/service-offerings/:id/edit"
             element={
-              <RequireAuth>
+              <RequireMaintain fallback="/service-offerings">
                 <ServiceOfferingFormPage />
-              </RequireAuth>
+              </RequireMaintain>
             }
           />
 
@@ -154,9 +176,9 @@ function AppRoutes() {
           <Route
             path="/entitlements/new"
             element={
-              <RequireAuth>
+              <RequireMaintain fallback="/entitlements">
                 <EntitlementFormPage />
-              </RequireAuth>
+              </RequireMaintain>
             }
           />
           <Route
@@ -170,9 +192,9 @@ function AppRoutes() {
           <Route
             path="/entitlements/:id/edit"
             element={
-              <RequireAuth>
+              <RequireMaintain fallback="/entitlements">
                 <EntitlementFormPage />
-              </RequireAuth>
+              </RequireMaintain>
             }
           />
 
@@ -187,9 +209,9 @@ function AppRoutes() {
           <Route
             path="/consumptions/new"
             element={
-              <RequireAuth>
+              <RequireRegisterConsumption>
                 <ConsumptionFormPage />
-              </RequireAuth>
+              </RequireRegisterConsumption>
             }
           />
           <Route
@@ -209,7 +231,9 @@ function AppRoutes() {
 export default function App() {
   return (
     <MsalProvider instance={msalInstance}>
-      <AppRoutes />
+      <AuthorizationProvider>
+        <AppRoutes />
+      </AuthorizationProvider>
     </MsalProvider>
   )
 }

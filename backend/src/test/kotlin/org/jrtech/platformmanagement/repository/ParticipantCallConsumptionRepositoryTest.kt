@@ -45,11 +45,13 @@ class ParticipantCallConsumptionRepositoryTest @Autowired constructor(
     }
 
     @Test
-    fun `save and findByIdWithRelations`() {
+    fun `save and findByIdWithRelations and sourceRefId`() {
+        val sourceRef = "req-${UUID.randomUUID()}"
         val saved = consumptionRepository.save(
             ParticipantCallConsumption(
                 callerRegistration = callerRegistration,
                 serviceOffering = offering,
+                sourceRefId = sourceRef,
                 consumptionData = """{"input_token":10,"output_token":5}"""
             )
         )
@@ -57,7 +59,13 @@ class ParticipantCallConsumptionRepositoryTest @Autowired constructor(
         assertThat(found).isNotNull
         assertThat(found!!.callerRegistration.callerId).isEqualTo(callerRegistration.callerId)
         assertThat(found.serviceOffering.id).isEqualTo(offering.id)
+        assertThat(found.sourceRefId).isEqualTo(sourceRef)
         assertThat(found.consumptionData).contains("input_token")
+
+        val byRef = consumptionRepository.findBySourceRefIdWithRelations(sourceRef)
+        assertThat(byRef).isNotNull
+        assertThat(byRef!!.id).isEqualTo(saved.id)
+        assertThat(consumptionRepository.existsBySourceRefId(sourceRef)).isTrue()
     }
 
     @Test
@@ -66,6 +74,7 @@ class ParticipantCallConsumptionRepositoryTest @Autowired constructor(
             ParticipantCallConsumption(
                 callerRegistration = callerRegistration,
                 serviceOffering = offering,
+                sourceRefId = "req-caller-${UUID.randomUUID()}",
                 consumptionData = "{}"
             )
         )

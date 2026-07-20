@@ -29,6 +29,13 @@ class ParticipantCallConsumption(
     @field:JoinColumn(name = "service_offering_id", nullable = false)
     var serviceOffering: ServiceOffering,
 
+    /**
+     * Source Reference Identification — unique key from the consumption reporter
+     * (e.g. UUID of the original request to the service). Optional; unique when set.
+     */
+    @field:Column(name = "source_ref_id", length = 255, unique = true, updatable = false)
+    var sourceRefId: String? = null,
+
     /** JSON usage payload (endpoint_url, input_token, output_token, cache_token, …) — TEXT NOT NULL */
     @field:Column(name = "consumption_data", nullable = false, columnDefinition = "TEXT")
     var consumptionData: String = "{}",

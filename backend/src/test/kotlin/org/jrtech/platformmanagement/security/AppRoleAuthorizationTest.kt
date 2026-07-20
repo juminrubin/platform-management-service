@@ -173,12 +173,14 @@ class AppRoleAuthorizationTest {
 
     @Test
     fun `Consumption Registrator can POST consumption`() {
+        val sourceRefId = "req-authz-${java.util.UUID.randomUUID()}"
         mockMvc.post("/api/v1/consumptions") {
             contentType = MediaType.APPLICATION_JSON
             content = """
                 {
                   "callerId": "alice@acme.example",
                   "serviceOfferingId": "gpt-5.1",
+                  "sourceRefId": "$sourceRefId",
                   "consumptionData": "{\"input_token\":10,\"output_token\":5}",
                   "consumedAt": "2024-07-01T12:00:00Z"
                 }
@@ -188,6 +190,7 @@ class AppRoleAuthorizationTest {
             status { isCreated() }
             jsonPath("$.serviceOfferingId") { value("gpt-5.1") }
             jsonPath("$.callerId") { value("alice@acme.example") }
+            jsonPath("$.sourceRefId") { value(sourceRefId) }
             jsonPath("$.createdAt") { value("2024-07-01T12:00:00Z") }
         }
     }

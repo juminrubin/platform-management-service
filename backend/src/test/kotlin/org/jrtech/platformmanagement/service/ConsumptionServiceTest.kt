@@ -67,7 +67,6 @@ class ConsumptionServiceTest {
 
     @Test
     fun `create records consumption`() {
-        val savedId = UUID.randomUUID()
         val participant = Participant(id = "acme", name = "Acme", status = ParticipantStatus.ACTIVE)
         val callerRegistration = ParticipantCallerRegistration(
             callerId = "u@x.com",
@@ -78,28 +77,102 @@ class ConsumptionServiceTest {
 
         whenever(callerRegistrationService.getEntity("u@x.com")).thenReturn(callerRegistration)
         whenever(serviceOfferingService.getEntity("gpt-5.1")).thenReturn(offering)
+        whenever(consumptionRepository.findBySourceRefIdWithRelations("req-abc")).thenReturn(null)
         whenever(consumptionRepository.save(any(ParticipantCallConsumption::class.java))).thenAnswer { inv ->
-            inv.getArgument<ParticipantCallConsumption>(0).also { it.id = savedId }
+            inv.getArgument<ParticipantCallConsumption>(0)
         }
-        whenever(consumptionRepository.findByIdWithRelations(savedId)).thenReturn(
+        whenever(consumptionRepository.findByIdWithRelations(org.mockito.kotlin.any())).thenAnswer { inv ->
+            val id = inv.getArgument<UUID>(0)
             ParticipantCallConsumption(
-                id = savedId,
+                id = id,
                 callerRegistration = callerRegistration,
                 serviceOffering = offering,
+                sourceRefId = "req-abc",
                 consumptionData = """{"input_token":1}"""
             )
-        )
+        }
 
         val result = consumptionService.create(
             CreateConsumptionRequest(
                 callerId = "u@x.com",
                 serviceOfferingId = "gpt-5.1",
+                sourceRefId = "req-abc",
                 consumptionData = """{"input_token":1}"""
             )
         )
-        assertThat(result.id).isEqualTo(savedId)
         assertThat(result.serviceOfferingId).isEqualTo("gpt-5.1")
         assertThat(result.callerId).isEqualTo("u@x.com")
+        assertThat(result.sourceRefId).isEqualTo("req-abc")
+        assertThat(result.id).isNotNull()
+    }
+
+    @Test
+    fun `createFromImport is idempotent when external id exists`() {
+        val existingId = UUID.randomUUID()
+        val participant = Participant(id = "acme", name = "Acme", status = ParticipantStatus.ACTIVE)
+        val callerRegistration = ParticipantCallerRegistration(
+            callerId = "u@x.com",
+            participant = participant,
+            status = CallerRegistrationStatus.ACTIVE
+        )
+        val offering = ServiceOffering(id = "gpt-5.1", name = "GPT", category = "LLM", active = true)
+        whenever(consumptionRepository.existsById(existingId)).thenReturn(true)
+        whenever(consumptionRepository.findByIdWithRelations(existingId)).thenReturn(
+            ParticipantCallConsumption(
+                id = existingId,
+                callerRegistration = callerRegistration,
+                serviceOffering = offering,
+                sourceRefId = "req-1",
+                consumptionData = "{}"
+            )
+        )
+
+        val result = consumptionService.createFromImport(
+            CreateConsumptionRequest(
+                callerId = "u@x.com",
+                serviceOfferingId = "gpt-5.1",
+                consumptionData = "{}"
+            ),
+            externalId = existingId
+        )
+        assertThat(result.created).isFalse()
+        assertThat(result.response.id).isEqualTo(existingId)
+        verify(consumptionRepository, org.mockito.kotlin.never()).save(any())
+    }
+
+    @Test
+    fun `createFromImport is idempotent when sourceRefId exists`() {
+        val existingId = UUID.randomUUID()
+        val participant = Participant(id = "acme", name = "Acme", status = ParticipantStatus.ACTIVE)
+        val callerRegistration = ParticipantCallerRegistration(
+            callerId = "u@x.com",
+            participant = participant,
+            status = CallerRegistrationStatus.ACTIVE
+        )
+        val offering = ServiceOffering(id = "gpt-5.1", name = "GPT", category = "LLM", active = true)
+        whenever(consumptionRepository.findBySourceRefIdWithRelations("req-dup")).thenReturn(
+            ParticipantCallConsumption(
+                id = existingId,
+                callerRegistration = callerRegistration,
+                serviceOffering = offering,
+                sourceRefId = "req-dup",
+                consumptionData = "{}"
+            )
+        )
+
+        val result = consumptionService.createFromImport(
+            CreateConsumptionRequest(
+                callerId = "u@x.com",
+                serviceOfferingId = "gpt-5.1",
+                sourceRefId = "req-dup",
+                consumptionData = """{"input_token":99}"""
+            ),
+            externalId = null
+        )
+        assertThat(result.created).isFalse()
+        assertThat(result.response.id).isEqualTo(existingId)
+        assertThat(result.response.sourceRefId).isEqualTo("req-dup")
+        verify(consumptionRepository, org.mockito.kotlin.never()).save(any())
     }
 
     @Test

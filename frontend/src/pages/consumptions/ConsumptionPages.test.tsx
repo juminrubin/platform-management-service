@@ -110,6 +110,7 @@ describe('Consumption pages', () => {
         expect.objectContaining({
           callerId: callerRegistrationActive.callerId,
           serviceOfferingId: 'gpt-5.1',
+          sourceRefId: expect.any(String),
         }),
       )
     })

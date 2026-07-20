@@ -8,6 +8,21 @@ import java.util.UUID
 
 interface ParticipantCallConsumptionRepository : JpaRepository<ParticipantCallConsumption, UUID> {
 
+    fun existsBySourceRefId(sourceRefId: String): Boolean
+
+    @Query(
+        """
+        SELECT c FROM ParticipantCallConsumption c
+        JOIN FETCH c.callerRegistration caller
+        JOIN FETCH caller.participant
+        JOIN FETCH c.serviceOffering
+        WHERE c.sourceRefId = :sourceRefId
+        """
+    )
+    fun findBySourceRefIdWithRelations(
+        @Param("sourceRefId") sourceRefId: String
+    ): ParticipantCallConsumption?
+
     @Query(
         """
         SELECT c FROM ParticipantCallConsumption c

@@ -116,6 +116,19 @@ app:
     required-scope: ${APP_AZURE_REQUIRED_SCOPE:}
     cors-allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:3000}
 
+  # Background import of consumption Avro files from Azure Blob Storage.
+  # Schema: classpath:avro/consumption-event.avsc
+  # Auth: set APP_AZURE_STORAGE_CONNECTION_STRING or APP_AZURE_STORAGE_ACCOUNT_URL (+ MI).
+  consumption-import:
+    enabled: ${APP_CONSUMPTION_IMPORT_ENABLED:false}
+    connection-string: ${APP_AZURE_STORAGE_CONNECTION_STRING:}
+    account-url: ${APP_AZURE_STORAGE_ACCOUNT_URL:}
+    container-name: ${APP_CONSUMPTION_IMPORT_CONTAINER:consumption}
+    blob-prefix: ${APP_CONSUMPTION_IMPORT_PREFIX:}
+    poll-interval-ms: ${APP_CONSUMPTION_IMPORT_POLL_MS:300000}
+    max-blobs-per-run: ${APP_CONSUMPTION_IMPORT_MAX_BLOBS:20}
+    require-avro-extension: true
+
 # Logging is configured in logback-spring.xml (Logback).
 # Levels here still work as overrides via Spring Boot's LoggingSystem.
 logging:

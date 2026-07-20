@@ -3,9 +3,11 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { deleteServiceOffering, listServiceOfferings } from '../../api/client'
 import type { ServiceOffering } from '../../api/types'
+import { useAuthorization } from '../../auth/AuthorizationContext'
 import { EmptyState, ErrorBox, Field, FilterBar, Loading, PageHeader, formatDateTime } from '../../components/ui'
 
 export function ServiceOfferingListPage() {
+  const { canMaintain } = useAuthorization()
   const [items, setItems] = useState<ServiceOffering[]>([])
   const [activeOnly, setActiveOnly] = useState(false)
   const [category, setCategory] = useState('')
@@ -60,9 +62,11 @@ export function ServiceOfferingListPage() {
         title="Service offerings"
         subtitle="Catalog of services that can be entitled to participants."
         actions={
-          <Link className="button primary" to="/service-offerings/new">
-            New offering
-          </Link>
+          canMaintain ? (
+            <Link className="button primary" to="/service-offerings/new">
+              New offering
+            </Link>
+          ) : undefined
         }
       />
 
@@ -125,12 +129,16 @@ export function ServiceOfferingListPage() {
                   <Link className="button" to={`/service-offerings/${encodeURIComponent(o.id)}`}>
                     View
                   </Link>
-                  <Link className="button" to={`/service-offerings/${encodeURIComponent(o.id)}/edit`}>
-                    Edit
-                  </Link>
-                  <button type="button" onClick={() => void onDelete(o.id)}>
-                    Delete
-                  </button>
+                  {canMaintain && (
+                    <>
+                      <Link className="button" to={`/service-offerings/${encodeURIComponent(o.id)}/edit`}>
+                        Edit
+                      </Link>
+                      <button type="button" onClick={() => void onDelete(o.id)}>
+                        Delete
+                      </button>
+                    </>
+                  )}
                 </td>
               </tr>
             ))}

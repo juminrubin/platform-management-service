@@ -234,12 +234,14 @@ class ApiCrudIntegrationTest {
             param("status", "ACTIVE")
         }.andExpect { status { isOk() } }
 
+        val sourceRefId = "req-${UUID.randomUUID()}"
         val consumptionBody = mockMvc.post("/api/v1/consumptions") {
             contentType = MediaType.APPLICATION_JSON
             content = """
                 {
                   "callerId":"$callerId",
                   "serviceOfferingId":"$offeringId",
+                  "sourceRefId":"$sourceRefId",
                   "consumptionData":"{\"input_token\":3}",
                   "consumedAt":"2024-08-01T12:00:00Z"
                 }
@@ -248,6 +250,7 @@ class ApiCrudIntegrationTest {
             status { isCreated() }
             jsonPath("$.serviceOfferingId") { value(offeringId) }
             jsonPath("$.callerId") { value(callerId) }
+            jsonPath("$.sourceRefId") { value(sourceRefId) }
         }.andReturn().response.contentAsString
 
         val consumptionId = Regex(""""id"\s*:\s*"([^"]+)"""").find(consumptionBody)!!.groupValues[1]
@@ -257,6 +260,7 @@ class ApiCrudIntegrationTest {
         }.andExpect {
             status { isOk() }
             jsonPath("$.createdAt") { value("2024-08-01T12:00:00Z") }
+            jsonPath("$.sourceRefId") { value(sourceRefId) }
         }
 
         mockMvc.get("/api/v1/consumptions") {

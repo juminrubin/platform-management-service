@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { deleteParticipant, getParticipant } from '../../api/client'
 import type { Participant } from '../../api/types'
+import { useAuthorization } from '../../auth/AuthorizationContext'
 import { DetailGrid, ErrorBox, Loading, PageHeader, formatDateTime } from '../../components/ui'
 
 export function ParticipantDetailPage() {
   const { id = '' } = useParams()
   const navigate = useNavigate()
+  const { canMaintain } = useAuthorization()
   const [item, setItem] = useState<Participant | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -36,12 +38,16 @@ export function ParticipantDetailPage() {
             <Link className="button" to="/participants">
               Back to list
             </Link>
-            <Link className="button primary" to={`/participants/${encodeURIComponent(id)}/edit`}>
-              Edit
-            </Link>
-            <button type="button" onClick={() => void onDelete()}>
-              Delete
-            </button>
+            {canMaintain && (
+              <>
+                <Link className="button primary" to={`/participants/${encodeURIComponent(id)}/edit`}>
+                  Edit
+                </Link>
+                <button type="button" onClick={() => void onDelete()}>
+                  Delete
+                </button>
+              </>
+            )}
           </div>
         }
       />

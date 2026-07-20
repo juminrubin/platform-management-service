@@ -8,6 +8,7 @@ import {
   listServiceOfferings,
 } from '../../api/client'
 import type { CallerRegistration, Consumption, ServiceOffering } from '../../api/types'
+import { useAuthorization } from '../../auth/AuthorizationContext'
 import { EmptyState, ErrorBox, Field, FilterBar, Loading, PageHeader, formatDateTime } from '../../components/ui'
 
 function previewJson(raw: string): string {
@@ -24,6 +25,7 @@ function previewJson(raw: string): string {
 }
 
 export function ConsumptionListPage() {
+  const { canMaintain, canRegisterConsumption } = useAuthorization()
   const [items, setItems] = useState<Consumption[]>([])
   const [callerRegistrations, setCallerRegistrations] = useState<CallerRegistration[]>([])
   const [offerings, setOfferings] = useState<ServiceOffering[]>([])
@@ -87,7 +89,8 @@ export function ConsumptionListPage() {
         if (
           !c.consumptionData.toLowerCase().includes(s) &&
           !c.serviceOfferingId.toLowerCase().includes(s) &&
-          !c.participantName.toLowerCase().includes(s)
+          !c.participantName.toLowerCase().includes(s) &&
+          !(c.sourceRefId?.toLowerCase().includes(s) ?? false)
         ) {
           return false
         }
@@ -119,9 +122,11 @@ export function ConsumptionListPage() {
         title="Call consumptions"
         subtitle="Token / usage events for a registered caller against a service offering."
         actions={
-          <Link className="button primary" to="/consumptions/new">
-            Record consumption
-          </Link>
+          canRegisterConsumption ? (
+            <Link className="button primary" to="/consumptions/new">
+              Record consumption
+            </Link>
+          ) : undefined
         }
       />
 
@@ -206,6 +211,7 @@ export function ConsumptionListPage() {
           <thead>
             <tr>
               <th>When (UTC)</th>
+              <th>Source ref</th>
               <th>Caller ID</th>
               <th>Participant</th>
               <th>Service</th>
@@ -217,6 +223,9 @@ export function ConsumptionListPage() {
             {filtered.map((c) => (
               <tr key={c.id}>
                 <td className="nowrap">{formatDateTime(c.createdAt)}</td>
+                <td>
+                  <code>{c.sourceRefId ?? '—'}</code>
+                </td>
                 <td>
                   <code>{c.callerId}</code>
                 </td>
@@ -233,9 +242,11 @@ export function ConsumptionListPage() {
                   <Link className="button" to={`/consumptions/${c.id}`}>
                     View
                   </Link>
-                  <button type="button" onClick={() => void onDelete(c.id)}>
-                    Delete
-                  </button>
+                  {canMaintain && (
+                    <button type="button" onClick={() => void onDelete(c.id)}>
+                      Delete
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}

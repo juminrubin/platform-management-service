@@ -77,6 +77,7 @@ export const consumptionSample: Consumption = {
   participantName: 'Acme Corporation',
   serviceOfferingId: 'gpt-5.1',
   serviceOfferingName: 'GPT 5.1',
+  sourceRefId: 'req-d1111111-1111-1111-1111-111111111111',
   consumptionData: '{"input_token":1200,"output_token":340}',
   createdAt: '2024-06-01T12:00:00Z',
 }
@@ -88,6 +89,7 @@ export const consumptionLater: Consumption = {
   participantName: 'Acme Corporation',
   serviceOfferingId: 'gpt-5.1',
   serviceOfferingName: 'GPT 5.1',
+  sourceRefId: 'req-d2222222-2222-2222-2222-222222222222',
   consumptionData: '{"input_token":50,"output_token":10}',
   createdAt: '2024-07-15T09:30:00Z',
 }

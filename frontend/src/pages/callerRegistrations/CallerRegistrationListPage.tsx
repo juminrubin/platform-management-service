@@ -3,9 +3,11 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { deleteCallerRegistration, listCallerRegistrations } from '../../api/client'
 import type { CallerRegistration } from '../../api/types'
+import { useAuthorization } from '../../auth/AuthorizationContext'
 import { EmptyState, ErrorBox, Field, FilterBar, Loading, PageHeader, formatDateTime } from '../../components/ui'
 
 export function CallerRegistrationListPage() {
+  const { canMaintain } = useAuthorization()
   const [items, setItems] = useState<CallerRegistration[]>([])
   const [participantId, setParticipantId] = useState('')
   const [status, setStatus] = useState('')
@@ -59,9 +61,11 @@ export function CallerRegistrationListPage() {
         title="Caller registrations"
         subtitle="Unique caller principals (email / Entra client id / MI) grouped under a participant for billing."
         actions={
-          <Link className="button primary" to="/caller-registrations/new">
-            Register caller
-          </Link>
+          canMaintain ? (
+            <Link className="button primary" to="/caller-registrations/new">
+              Register caller
+            </Link>
+          ) : undefined
         }
       />
 
@@ -125,12 +129,16 @@ export function CallerRegistrationListPage() {
                   <Link className="button" to={`/caller-registrations/${encodeURIComponent(c.callerId)}`}>
                     View
                   </Link>
-                  <Link className="button" to={`/caller-registrations/${encodeURIComponent(c.callerId)}/edit`}>
-                    Edit
-                  </Link>
-                  <button type="button" onClick={() => void onDelete(c.callerId)}>
-                    Delete
-                  </button>
+                  {canMaintain && (
+                    <>
+                      <Link className="button" to={`/caller-registrations/${encodeURIComponent(c.callerId)}/edit`}>
+                        Edit
+                      </Link>
+                      <button type="button" onClick={() => void onDelete(c.callerId)}>
+                        Delete
+                      </button>
+                    </>
+                  )}
                 </td>
               </tr>
             ))}

@@ -11,6 +11,7 @@ export function ConsumptionFormPage() {
   const [offerings, setOfferings] = useState<ServiceOffering[]>([])
   const [callerId, setCallerId] = useState('')
   const [serviceOfferingId, setServiceOfferingId] = useState('')
+  const [sourceRefId, setSourceRefId] = useState(() => crypto.randomUUID())
   const [consumptionData, setConsumptionData] = useState(
     '{\n  "endpoint_url": "",\n  "input_token": 0,\n  "output_token": 0,\n  "cache_token": 0\n}',
   )
@@ -45,6 +46,7 @@ export function ConsumptionFormPage() {
       const created = await createConsumption({
         callerId,
         serviceOfferingId,
+        sourceRefId: sourceRefId.trim() || null,
         consumptionData: consumptionData.trim() || '{}',
         consumedAt: consumedAtIso,
       })
@@ -94,6 +96,18 @@ export function ConsumptionFormPage() {
               </option>
             ))}
           </select>
+        </Field>
+        <Field
+          label="Source reference ID"
+          hint="Unique Source Reference Identification from the reporter (e.g. request UUID). Used for idempotent registration."
+        >
+          <input
+            className="mono"
+            value={sourceRefId}
+            onChange={(e) => setSourceRefId(e.target.value)}
+            placeholder="e.g. request UUID"
+            maxLength={255}
+          />
         </Field>
         <Field label="Event time (optional)" hint="Defaults to now if empty.">
           <input type="datetime-local" value={consumedAt} onChange={(e) => setConsumedAt(e.target.value)} />

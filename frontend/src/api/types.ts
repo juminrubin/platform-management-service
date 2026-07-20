@@ -112,6 +112,8 @@ export type Consumption = {
   participantName: string
   serviceOfferingId: string
   serviceOfferingName: string
+  /** Source Reference Identification from the consumption reporter (e.g. request UUID). */
+  sourceRefId: string | null
   consumptionData: string
   createdAt: string
 }
@@ -119,6 +121,8 @@ export type Consumption = {
 export type CreateConsumption = {
   callerId: string
   serviceOfferingId: string
+  /** Optional unique Source Reference Identification (e.g. request UUID). */
+  sourceRefId?: string | null
   consumptionData?: string
   consumedAt?: string | null
 }

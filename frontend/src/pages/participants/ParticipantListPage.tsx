@@ -3,9 +3,11 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { deleteParticipant, listParticipants } from '../../api/client'
 import type { Participant, ParticipantStatus } from '../../api/types'
+import { useAuthorization } from '../../auth/AuthorizationContext'
 import { EmptyState, ErrorBox, FilterBar, Field, Loading, PageHeader, formatDateTime } from '../../components/ui'
 
 export function ParticipantListPage() {
+  const { canMaintain } = useAuthorization()
   const [items, setItems] = useState<Participant[]>([])
   const [status, setStatus] = useState('')
   const [q, setQ] = useState('')
@@ -60,9 +62,11 @@ export function ParticipantListPage() {
         title="Participants"
         subtitle="Organizations that consume platform services."
         actions={
-          <Link className="button primary" to="/participants/new">
-            New participant
-          </Link>
+          canMaintain ? (
+            <Link className="button primary" to="/participants/new">
+              New participant
+            </Link>
+          ) : undefined
         }
       />
 
@@ -120,12 +124,16 @@ export function ParticipantListPage() {
                   <Link className="button" to={`/participants/${encodeURIComponent(p.id)}`}>
                     View
                   </Link>
-                  <Link className="button" to={`/participants/${encodeURIComponent(p.id)}/edit`}>
-                    Edit
-                  </Link>
-                  <button type="button" onClick={() => void onDelete(p.id)}>
-                    Delete
-                  </button>
+                  {canMaintain && (
+                    <>
+                      <Link className="button" to={`/participants/${encodeURIComponent(p.id)}/edit`}>
+                        Edit
+                      </Link>
+                      <button type="button" onClick={() => void onDelete(p.id)}>
+                        Delete
+                      </button>
+                    </>
+                  )}
                 </td>
               </tr>
             ))}
