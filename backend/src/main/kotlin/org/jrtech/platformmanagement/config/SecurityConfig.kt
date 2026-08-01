@@ -1,9 +1,12 @@
 package org.jrtech.platformmanagement.config
 
 import org.jrtech.platformmanagement.domain.UtcTimestamps
+import org.jrtech.platformmanagement.security.EntraHumanAuthorizationService
+import org.jrtech.platformmanagement.security.JwtAuthorityMapper
 import com.fasterxml.jackson.databind.ObjectMapper
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
+import org.springframework.beans.factory.ObjectProvider
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -12,14 +15,12 @@ import org.springframework.core.convert.converter.Converter
 import org.springframework.http.HttpMethod
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
-import org.jrtech.platformmanagement.security.JwtAuthorityMapper
 import org.springframework.security.authentication.AbstractAuthenticationToken
 import org.springframework.security.authorization.AuthorizationDecision
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity
 import org.springframework.security.config.http.SessionCreationPolicy
-import org.springframework.security.core.GrantedAuthority
 import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter
 import org.springframework.security.web.AuthenticationEntryPoint
@@ -50,7 +51,8 @@ import java.net.InetAddress
 @EnableMethodSecurity
 @EnableConfigurationProperties(AppSecurityProperties::class)
 class SecurityConfig(
-    private val securityProperties: AppSecurityProperties
+    private val securityProperties: AppSecurityProperties,
+    private val humanAuthorization: ObjectProvider<EntraHumanAuthorizationService>
 ) {
 
     private val problemMapper = ObjectMapper()
@@ -183,7 +185,16 @@ class SecurityConfig(
     @Bean
     fun microsoftJwtAuthenticationConverter(): Converter<Jwt, out AbstractAuthenticationToken> {
         val converter = JwtAuthenticationConverter()
-        converter.setJwtGrantedAuthoritiesConverter { jwt -> JwtAuthorityMapper.extractAuthorities(jwt) }
+        converter.setJwtGrantedAuthoritiesConverter { jwt ->
+            // Prefer human Platform-System-* membership → ROLE_* mapping when available;
+            // otherwise fall back to pure JWT claim mapping (technical users / tests).
+            val human = humanAuthorization.getIfAvailable()
+            if (human != null) {
+                human.extractAuthorities(jwt)
+            } else {
+                JwtAuthorityMapper.extractAuthorities(jwt, securityProperties)
+            }
+        }
         return converter
     }
 

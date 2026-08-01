@@ -7,6 +7,7 @@ import org.jrtech.platformmanagement.dto.CreateConsumptionRequest
 import org.jrtech.platformmanagement.exception.ResourceNotFoundException
 import org.jrtech.platformmanagement.logging.logger
 import org.jrtech.platformmanagement.repository.ParticipantCallConsumptionRepository
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
@@ -53,10 +54,15 @@ class ConsumptionService(
     }
 
     /**
-     * Creates a consumption row, optionally with a stable [externalId] for idempotent Avro import.
+     * Creates a consumption row, optionally with a stable [externalId] for idempotent import.
+     *
      * Idempotent when:
      * - [externalId] already exists as the primary key, or
      * - [CreateConsumptionRequest.sourceRefId] already exists (Source Reference Identification).
+     *
+     * Race-safe: concurrent inserts that hit unique constraints (PK / source_ref_id /
+     * caller+offering+captured_at) re-read the existing row and return [ImportCreateResult.created]=false
+     * instead of failing the caller.
      */
     @Transactional
     fun createFromImport(
@@ -66,51 +72,78 @@ class ConsumptionService(
         val callerId = request.callerId.trim()
         val sourceRefId = request.sourceRefId?.trim()?.takeIf { it.isNotEmpty() }
 
-        if (externalId != null && consumptionRepository.existsById(externalId)) {
-            log.debug("Skipping import; consumption id={} already exists", externalId)
-            return ImportCreateResult(created = false, response = findById(externalId))
-        }
-        if (sourceRefId != null) {
-            val existing = consumptionRepository.findBySourceRefIdWithRelations(sourceRefId)
-            if (existing != null) {
-                log.debug(
-                    "Skipping import; sourceRefId={} already exists as consumption id={}",
-                    sourceRefId,
-                    existing.id
-                )
-                return ImportCreateResult(created = false, response = ConsumptionResponse.from(existing))
-            }
-        }
+        findExistingDuplicate(externalId, sourceRefId)?.let { return it }
 
         log.info(
-            "Recording consumption callerId={} serviceOfferingId={} sourceRefId={} consumedAt={} externalId={}",
+            "Recording consumption callerId={} serviceOfferingId={} sourceRefId={} capturedAt={} externalId={}",
             callerId,
             request.serviceOfferingId,
             sourceRefId,
-            request.consumedAt,
+            request.capturedAt,
             externalId
         )
         val callerRegistration = callerRegistrationService.getEntity(callerId)
         val offering = serviceOfferingService.getEntity(request.serviceOfferingId.trim())
-        val eventTime = request.consumedAt ?: UtcTimestamps.now()
+        val now = UtcTimestamps.now()
+        val capturedAt = request.capturedAt ?: now
+        val id = externalId ?: UUID.randomUUID()
 
-        val saved = consumptionRepository.save(
-            ParticipantCallConsumption(
-                id = externalId ?: UUID.randomUUID(),
-                callerRegistration = callerRegistration,
-                serviceOffering = offering,
-                sourceRefId = sourceRefId,
-                consumptionData = request.consumptionData.trim().ifEmpty { "{}" },
-                createdAt = eventTime
+        return try {
+            val saved = consumptionRepository.saveAndFlush(
+                ParticipantCallConsumption(
+                    id = id,
+                    callerRegistration = callerRegistration,
+                    serviceOffering = offering,
+                    sourceRefId = sourceRefId,
+                    consumptionData = request.consumptionData.trim().ifEmpty { "{}" },
+                    capturedAt = capturedAt,
+                    createdAt = now
+                )
             )
-        )
-        log.info(
-            "Created consumption id={} sourceRefId={} createdAt={}",
-            saved.id,
-            saved.sourceRefId,
-            saved.createdAt
-        )
-        return ImportCreateResult(created = true, response = findById(saved.id))
+            log.info(
+                "Created consumption id={} sourceRefId={} capturedAt={} createdAt={}",
+                saved.id,
+                saved.sourceRefId,
+                saved.capturedAt,
+                saved.createdAt
+            )
+            ImportCreateResult(created = true, response = findById(saved.id))
+        } catch (ex: DataIntegrityViolationException) {
+            log.info(
+                "Consumption insert raced on unique constraint; treating as duplicate " +
+                    "sourceRefId={} externalId={} cause={}",
+                sourceRefId,
+                externalId,
+                ex.mostSpecificCause.message
+            )
+            findExistingDuplicate(externalId, sourceRefId)
+                ?: throw ex
+        }
+    }
+
+    private fun findExistingDuplicate(
+        externalId: UUID?,
+        sourceRefId: String?
+    ): ImportCreateResult? {
+        if (externalId != null) {
+            val byId = consumptionRepository.findByIdWithRelations(externalId)
+            if (byId != null) {
+                log.debug("Skipping import; consumption id={} already exists", externalId)
+                return ImportCreateResult(created = false, response = ConsumptionResponse.from(byId))
+            }
+        }
+        if (sourceRefId != null) {
+            val byRef = consumptionRepository.findBySourceRefIdWithRelations(sourceRefId)
+            if (byRef != null) {
+                log.debug(
+                    "Skipping import; sourceRefId={} already exists as consumption id={}",
+                    sourceRefId,
+                    byRef.id
+                )
+                return ImportCreateResult(created = false, response = ConsumptionResponse.from(byRef))
+            }
+        }
+        return null
     }
 
     data class ImportCreateResult(

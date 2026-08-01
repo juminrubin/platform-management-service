@@ -13,6 +13,7 @@ export function ServiceOfferingFormPage() {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [category, setCategory] = useState('LLM')
+  const [provider, setProvider] = useState('SYSTEM')
   const [config, setConfig] = useState('{}')
   const [active, setActive] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -26,6 +27,7 @@ export function ServiceOfferingFormPage() {
         setName(o.name)
         setDescription(o.description ?? '')
         setCategory(o.category)
+        setProvider(o.provider)
         setConfig(o.config)
         setActive(o.active)
       })
@@ -43,11 +45,13 @@ export function ServiceOfferingFormPage() {
       return
     }
     try {
+      const resolvedProvider = provider.trim() || 'SYSTEM'
       if (isEdit && id) {
         await updateServiceOffering(id, {
           name: name.trim(),
           description: description.trim() || null,
           category: category.trim(),
+          provider: resolvedProvider,
           config: config.trim() || '{}',
           active,
         })
@@ -58,6 +62,7 @@ export function ServiceOfferingFormPage() {
           name: name.trim(),
           description: description.trim() || null,
           category: category.trim(),
+          provider: resolvedProvider,
           config: config.trim() || '{}',
           active,
         })
@@ -107,7 +112,10 @@ export function ServiceOfferingFormPage() {
           <textarea rows={3} maxLength={1000} value={description} onChange={(e) => setDescription(e.target.value)} />
         </Field>
         <Field label="Category">
-          <input required maxLength={64} value={category} onChange={(e) => setCategory(e.target.value)} />
+          <input required maxLength={100} value={category} onChange={(e) => setCategory(e.target.value)} />
+        </Field>
+        <Field label="Provider" hint="Defaults to SYSTEM">
+          <input maxLength={100} value={provider} onChange={(e) => setProvider(e.target.value)} placeholder="SYSTEM" />
         </Field>
         <Field label="Config (JSON)">
           <textarea

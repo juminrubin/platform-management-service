@@ -57,7 +57,8 @@ export function ConsumptionDetailPage() {
                 label: 'Source reference ID',
                 value: item.sourceRefId ? <code>{item.sourceRefId}</code> : '—',
               },
-              { label: 'Event time', value: formatDateTime(item.createdAt) },
+              { label: 'Captured at', value: formatDateTime(item.capturedAt) },
+              { label: 'Recorded at', value: formatDateTime(item.createdAt) },
               {
                 label: 'Caller ID',
                 value: (

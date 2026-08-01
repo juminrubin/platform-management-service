@@ -78,7 +78,12 @@ describe('Service offering pages', () => {
 
     await waitFor(() => {
       expect(api.createServiceOffering).toHaveBeenCalledWith(
-        expect.objectContaining({ id: 'new-model', name: 'New Model', category: 'LLM' }),
+        expect.objectContaining({
+          id: 'new-model',
+          name: 'New Model',
+          category: 'LLM',
+          provider: 'SYSTEM',
+        }),
       )
     })
   })
@@ -100,7 +105,7 @@ describe('Service offering pages', () => {
     await waitFor(() => {
       expect(api.updateServiceOffering).toHaveBeenCalledWith(
         'gpt-5.1',
-        expect.objectContaining({ name: 'GPT Renamed' }),
+        expect.objectContaining({ name: 'GPT Renamed', provider: 'SYSTEM' }),
       )
     })
   })

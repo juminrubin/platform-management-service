@@ -1,6 +1,7 @@
 package org.jrtech.platformmanagement.dto
 
 import org.jrtech.platformmanagement.domain.ParticipantCallConsumption
+import com.fasterxml.jackson.annotation.JsonAlias
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Size
 import java.time.Instant
@@ -26,10 +27,13 @@ data class CreateConsumptionRequest(
     val consumptionData: String = "{}",
 
     /**
-     * Optional event time of the consumption (UTC).
-     * Defaults to "now" when omitted. Stored as [ConsumptionResponse.createdAt].
+     * When the consumption was captured at runtime (UTC).
+     * Defaults to "now" when omitted. Stored as [ConsumptionResponse.capturedAt].
+     *
+     * Alias [consumedAt] is accepted for backward compatibility.
      */
-    val consumedAt: Instant? = null
+    @param:JsonAlias("consumedAt")
+    val capturedAt: Instant? = null
 )
 
 data class ConsumptionResponse(
@@ -42,6 +46,9 @@ data class ConsumptionResponse(
     /** Source Reference Identification supplied by the consumption reporter, if any. */
     val sourceRefId: String?,
     val consumptionData: String,
+    /** When the consumption was captured at runtime (UTC business event time). */
+    val capturedAt: Instant,
+    /** When this row was stored in the platform (UTC audit time). */
     val createdAt: Instant
 ) {
     companion object {
@@ -54,6 +61,7 @@ data class ConsumptionResponse(
             serviceOfferingName = entity.serviceOffering.name,
             sourceRefId = entity.sourceRefId,
             consumptionData = entity.consumptionData,
+            capturedAt = entity.capturedAt,
             createdAt = entity.createdAt
         )
     }

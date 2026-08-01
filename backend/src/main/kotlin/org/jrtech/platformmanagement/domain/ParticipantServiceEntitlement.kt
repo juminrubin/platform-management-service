@@ -20,10 +20,6 @@ import java.util.UUID
 @Table(name = "participant_service_entitlement")
 class ParticipantServiceEntitlement(
 
-    @field:Id
-    @field:Column(nullable = false, updatable = false)
-    var id: UUID = UUID.randomUUID(),
-
     @field:ManyToOne(fetch = FetchType.LAZY, optional = false)
     @field:JoinColumn(name = "participant_id", nullable = false)
     var participant: Participant,
@@ -32,13 +28,30 @@ class ParticipantServiceEntitlement(
     @field:JoinColumn(name = "service_offering_id", nullable = false)
     var serviceOffering: ServiceOffering,
 
-    @field:Convert(converter = EntitlementStatusConverter::class)
-    @field:Column(nullable = false, length = 32)
-    var status: EntitlementStatus = EntitlementStatus.PENDING,
-
     /** Calendar date (no time-of-day / zone). */
     @field:Column(name = "valid_from", nullable = false)
     var validFrom: LocalDate,
+
+    /**
+     * Actor that created the row. Set only by business logic (services);
+     * no entity or schema default.
+     */
+    @field:Column(name = "created_by", nullable = false, updatable = false, length = 255)
+    var createdBy: String,
+
+    /**
+     * Actor that last updated the row. Set only by business logic on every write.
+     */
+    @field:Column(name = "updated_by", nullable = false, length = 255)
+    var updatedBy: String,
+
+    @field:Id
+    @field:Column(nullable = false, updatable = false)
+    var id: UUID = UUID.randomUUID(),
+
+    @field:Convert(converter = EntitlementStatusConverter::class)
+    @field:Column(nullable = false, length = 32)
+    var status: EntitlementStatus = EntitlementStatus.PENDING,
 
     @field:Column(name = "valid_to")
     var validTo: LocalDate? = null,

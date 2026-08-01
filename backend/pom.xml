@@ -26,9 +26,9 @@
     </licenses>
 
     <properties>
-        <!-- Spring Boot 4.x: Java 17+; Kotlin 2.3.x (Boot 4.1 BOM manages 2.3.21) -->
-        <java.version>17</java.version>
-        <kotlin.version>2.3.21</kotlin.version>
+        <!-- Spring Boot 4.x: Java 21+; Kotlin 2.3.x (Boot 4.1 BOM manages 2.3.21) -->
+        <java.version>21</java.version>
+        <kotlin.version>2.3.0</kotlin.version>
         <jacoco.version>0.8.13</jacoco.version>
         <!-- Industry common gate: ≥80% line coverage on production code -->
         <jacoco.line.coverage.minimum>0.80</jacoco.line.coverage.minimum>
@@ -42,13 +42,15 @@
             Used with MODE=PostgreSQL + TIME ZONE=UTC (see application.yml).
         -->
         <flyway.version>12.11.0</flyway.version>
-        <h2.version>2.4.240</h2.version>
+        <h2.version>2.3.232</h2.version>
         <!-- springdoc 3.x is required for Spring Boot 4.x (2.x targets Boot 3 only) -->
         <springdoc.version>3.0.3</springdoc.version>
         <!-- Avro consumption import from Azure Blob Storage -->
         <avro.version>1.12.0</avro.version>
         <azure-storage-blob.version>12.30.0</azure-storage-blob.version>
         <azure-identity.version>1.15.4</azure-identity.version>
+        <azure-messaging-eventhubs.version>5.21.5</azure-messaging-eventhubs.version>
+        <azure-messaging-eventhubs-checkpointstore-blob.version>1.21.7</azure-messaging-eventhubs-checkpointstore-blob.version>
     </properties>
 
     <dependencies>
@@ -125,6 +127,17 @@
             <groupId>com.azure</groupId>
             <artifactId>azure-identity</artifactId>
             <version>${azure-identity.version}</version>
+        </dependency>
+        <!-- Continuous consumption ingest from Azure Event Hubs (MI + blob checkpoint store) -->
+        <dependency>
+            <groupId>com.azure</groupId>
+            <artifactId>azure-messaging-eventhubs</artifactId>
+            <version>${azure-messaging-eventhubs.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.azure</groupId>
+            <artifactId>azure-messaging-eventhubs-checkpointstore-blob</artifactId>
+            <version>${azure-messaging-eventhubs-checkpointstore-blob.version}</version>
         </dependency>
 
         <!-- Tests: Boot 4 recommends technology-specific test starters -->
@@ -232,9 +245,12 @@
                         <!-- Boot entrypoint / pure config wiring -->
                         <exclude>org/jrtech/platformmanagement/PlatformManagementServiceApplication*</exclude>
                         <exclude>org/jrtech/platformmanagement/config/UtcTimeConfig*</exclude>
-                        <!-- Thin Azure SDK adapter; integration requires live storage account -->
+                                        <!-- Thin Azure SDK adapter; integration requires live storage account -->
                         <exclude>org/jrtech/platformmanagement/ingestion/AzureBlobStorageClientImpl*</exclude>
                         <exclude>org/jrtech/platformmanagement/ingestion/ConsumptionImportConfig*</exclude>
+                        <!-- Live Microsoft Graph / credential wiring -->
+                        <exclude>org/jrtech/platformmanagement/entra/MicrosoftGraphClientImpl*</exclude>
+                        <exclude>org/jrtech/platformmanagement/entra/EntraDirectoryConfig*</exclude>
                     </excludes>
                     <rules>
                         <rule>

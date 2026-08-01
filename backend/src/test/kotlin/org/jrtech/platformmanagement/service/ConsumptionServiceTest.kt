@@ -19,7 +19,9 @@ import org.mockito.Mock
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
+import org.springframework.dao.DataIntegrityViolationException
 import java.util.UUID
+import org.jrtech.platformmanagement.TestAudit
 
 @ExtendWith(MockitoExtension::class)
 class ConsumptionServiceTest {
@@ -67,18 +69,23 @@ class ConsumptionServiceTest {
 
     @Test
     fun `create records consumption`() {
-        val participant = Participant(id = "acme", name = "Acme", status = ParticipantStatus.ACTIVE)
+        val participant = Participant(id = "acme", name = "Acme", status = ParticipantStatus.ACTIVE,
+            createdBy = TestAudit.BY,
+            updatedBy = TestAudit.BY)
         val callerRegistration = ParticipantCallerRegistration(
             callerId = "u@x.com",
             participant = participant,
-            status = CallerRegistrationStatus.ACTIVE
-        )
-        val offering = ServiceOffering(id = "gpt-5.1", name = "GPT", category = "LLM", active = true)
+            status = CallerRegistrationStatus.ACTIVE,
+            createdBy = TestAudit.BY,
+            updatedBy = TestAudit.BY)
+        val offering = ServiceOffering(id = "gpt-5.1", name = "GPT", category = "LLM", active = true,
+            createdBy = TestAudit.BY,
+            updatedBy = TestAudit.BY)
 
         whenever(callerRegistrationService.getEntity("u@x.com")).thenReturn(callerRegistration)
         whenever(serviceOfferingService.getEntity("gpt-5.1")).thenReturn(offering)
         whenever(consumptionRepository.findBySourceRefIdWithRelations("req-abc")).thenReturn(null)
-        whenever(consumptionRepository.save(any(ParticipantCallConsumption::class.java))).thenAnswer { inv ->
+        whenever(consumptionRepository.saveAndFlush(any(ParticipantCallConsumption::class.java))).thenAnswer { inv ->
             inv.getArgument<ParticipantCallConsumption>(0)
         }
         whenever(consumptionRepository.findByIdWithRelations(org.mockito.kotlin.any())).thenAnswer { inv ->
@@ -107,16 +114,83 @@ class ConsumptionServiceTest {
     }
 
     @Test
-    fun `createFromImport is idempotent when external id exists`() {
-        val existingId = UUID.randomUUID()
-        val participant = Participant(id = "acme", name = "Acme", status = ParticipantStatus.ACTIVE)
+    fun `createFromImport treats unique constraint race as duplicate`() {
+        val participant = Participant(
+            id = "acme",
+            name = "Acme",
+            status = ParticipantStatus.ACTIVE,
+            createdBy = TestAudit.BY,
+            updatedBy = TestAudit.BY
+        )
         val callerRegistration = ParticipantCallerRegistration(
             callerId = "u@x.com",
             participant = participant,
-            status = CallerRegistrationStatus.ACTIVE
+            status = CallerRegistrationStatus.ACTIVE,
+            createdBy = TestAudit.BY,
+            updatedBy = TestAudit.BY
         )
-        val offering = ServiceOffering(id = "gpt-5.1", name = "GPT", category = "LLM", active = true)
-        whenever(consumptionRepository.existsById(existingId)).thenReturn(true)
+        val offering = ServiceOffering(
+            id = "gpt-5.1",
+            name = "GPT",
+            category = "LLM",
+            active = true,
+            createdBy = TestAudit.BY,
+            updatedBy = TestAudit.BY
+        )
+        val existingId = UUID.randomUUID()
+        val existing = ParticipantCallConsumption(
+            id = existingId,
+            callerRegistration = callerRegistration,
+            serviceOffering = offering,
+            sourceRefId = "req-race",
+            consumptionData = "{}"
+        )
+
+        whenever(callerRegistrationService.getEntity("u@x.com")).thenReturn(callerRegistration)
+        whenever(serviceOfferingService.getEntity("gpt-5.1")).thenReturn(offering)
+        whenever(consumptionRepository.findBySourceRefIdWithRelations("req-race"))
+            .thenReturn(null)
+            .thenReturn(existing)
+        whenever(consumptionRepository.saveAndFlush(any(ParticipantCallConsumption::class.java)))
+            .thenThrow(DataIntegrityViolationException("unique"))
+
+        val result = consumptionService.createFromImport(
+            CreateConsumptionRequest(
+                callerId = "u@x.com",
+                serviceOfferingId = "gpt-5.1",
+                sourceRefId = "req-race",
+                consumptionData = "{}"
+            ),
+            externalId = null
+        )
+        assertThat(result.created).isFalse()
+        assertThat(result.response.id).isEqualTo(existingId)
+        assertThat(result.response.sourceRefId).isEqualTo("req-race")
+    }
+
+    @Test
+    fun `createFromImport is idempotent when external id exists`() {
+        val existingId = UUID.randomUUID()
+        val participant = Participant(
+            id = "acme",
+            name = "Acme",
+            status = ParticipantStatus.ACTIVE,
+            createdBy = TestAudit.BY,
+            updatedBy = TestAudit.BY)
+        val callerRegistration = ParticipantCallerRegistration(
+            callerId = "u@x.com",
+            participant = participant,
+            status = CallerRegistrationStatus.ACTIVE,
+            createdBy = TestAudit.BY,
+            updatedBy = TestAudit.BY)
+        val offering = ServiceOffering(
+            id = "gpt-5.1",
+            name = "GPT",
+            category = "LLM",
+            active = true,
+            createdBy = TestAudit.BY,
+            updatedBy = TestAudit.BY
+        )
         whenever(consumptionRepository.findByIdWithRelations(existingId)).thenReturn(
             ParticipantCallConsumption(
                 id = existingId,
@@ -143,13 +217,18 @@ class ConsumptionServiceTest {
     @Test
     fun `createFromImport is idempotent when sourceRefId exists`() {
         val existingId = UUID.randomUUID()
-        val participant = Participant(id = "acme", name = "Acme", status = ParticipantStatus.ACTIVE)
+        val participant = Participant(id = "acme", name = "Acme", status = ParticipantStatus.ACTIVE,
+            createdBy = TestAudit.BY,
+            updatedBy = TestAudit.BY)
         val callerRegistration = ParticipantCallerRegistration(
             callerId = "u@x.com",
             participant = participant,
-            status = CallerRegistrationStatus.ACTIVE
-        )
-        val offering = ServiceOffering(id = "gpt-5.1", name = "GPT", category = "LLM", active = true)
+            status = CallerRegistrationStatus.ACTIVE,
+            createdBy = TestAudit.BY,
+            updatedBy = TestAudit.BY)
+        val offering = ServiceOffering(id = "gpt-5.1", name = "GPT", category = "LLM", active = true,
+            createdBy = TestAudit.BY,
+            updatedBy = TestAudit.BY)
         whenever(consumptionRepository.findBySourceRefIdWithRelations("req-dup")).thenReturn(
             ParticipantCallConsumption(
                 id = existingId,

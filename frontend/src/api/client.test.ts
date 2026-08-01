@@ -214,6 +214,7 @@ describe('api client', () => {
       await updateServiceOffering('m', {
         name: 'M',
         category: 'LLM',
+        provider: 'SYSTEM',
         config: '{}',
         active: true,
       })

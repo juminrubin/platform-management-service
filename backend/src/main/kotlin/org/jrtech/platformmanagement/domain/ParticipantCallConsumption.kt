@@ -41,8 +41,17 @@ class ParticipantCallConsumption(
     var consumptionData: String = "{}",
 
     /**
-     * Event time of the consumption (UTC). May be supplied by the registrator;
-     * defaults to insert time when not provided. Not overwritten on persist.
+     * When the consumption was captured at runtime (UTC business event time).
+     * Supplied by the registrator / import; defaults to insert time when omitted.
+     * Distinct from [createdAt] (when this platform row was stored).
+     */
+    @field:JdbcTypeCode(SqlTypes.TIMESTAMP_UTC)
+    @field:Column(name = "captured_at", nullable = false, updatable = false)
+    var capturedAt: Instant = UtcTimestamps.now(),
+
+    /**
+     * When this consumption row was inserted into the platform (UTC audit time).
+     * Always set at persist; independent of [capturedAt].
      */
     @field:JdbcTypeCode(SqlTypes.TIMESTAMP_UTC)
     @field:Column(name = "created_at", nullable = false, updatable = false)

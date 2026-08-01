@@ -45,24 +45,31 @@ class EntitlementController(
      * Query params:
      * - `callerId` (required) — unique principal of the caller registration
      * - `serviceOfferingId` (required)
-     * - `asOf` optional ISO date (UTC calendar day; defaults to today UTC)
+     * - `fromDate` optional ISO date (UTC calendar day; defaults to today UTC)
+     * - `untilDate` optional ISO date (UTC calendar day; defaults to [fromDate])
+     *
+     * The entitlement must fully cover the closed range [[fromDate], [untilDate]].
      */
     @GetMapping("/check")
     @PreAuthorize("@authz.canCheckEntitlement()")
     @Operation(
         summary = "Check entitlement for a caller registration",
         description = "Requires System.Maintainer, System.Reader, or Entitlement.Reader. " +
-            "Provide callerId (unique principal of the registration)."
+            "Provide callerId (unique principal of the registration). " +
+            "Optional fromDate/untilDate (UTC calendar days) default to today; " +
+            "entitlement must cover the full inclusive range."
     )
     fun check(
-        @RequestParam(required = false) callerId: String?,
+        @RequestParam callerId: String,
         @RequestParam serviceOfferingId: String,
-        @RequestParam(required = false) asOf: LocalDate?
+        @RequestParam(required = false) fromDate: LocalDate?,
+        @RequestParam(required = false) untilDate: LocalDate?
     ): EntitlementCheckResponse =
         entitlementService.checkByCallerAndService(
             callerId = callerId,
             serviceOfferingId = serviceOfferingId,
-            asOf = asOf
+            fromDate = fromDate,
+            untilDate = untilDate
         )
 
     @GetMapping

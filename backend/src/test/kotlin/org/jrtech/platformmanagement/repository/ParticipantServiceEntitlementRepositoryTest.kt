@@ -13,6 +13,7 @@ import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
 import org.springframework.test.context.ActiveProfiles
 import java.time.LocalDate
 import java.util.UUID
+import org.jrtech.platformmanagement.TestAudit
 
 @DataJpaTest
 @ActiveProfiles("test")
@@ -29,10 +30,14 @@ class ParticipantServiceEntitlementRepositoryTest @Autowired constructor(
     fun setUp() {
         val suffix = UUID.randomUUID().toString().take(8)
         participant = participantRepository.save(
-            Participant(id = "p-$suffix", name = "Ent P $suffix", status = ParticipantStatus.ACTIVE)
+            Participant(id = "p-$suffix", name = "Ent P $suffix", status = ParticipantStatus.ACTIVE,
+            createdBy = TestAudit.BY,
+            updatedBy = TestAudit.BY)
         )
         offering = serviceOfferingRepository.save(
-            ServiceOffering(id = "so-$suffix", name = "Offering $suffix", category = "LLM", active = true)
+            ServiceOffering(id = "so-$suffix", name = "Offering $suffix", category = "LLM", active = true,
+            createdBy = TestAudit.BY,
+            updatedBy = TestAudit.BY)
         )
     }
 
@@ -46,8 +51,9 @@ class ParticipantServiceEntitlementRepositoryTest @Autowired constructor(
                 validFrom = LocalDate.of(2025, 1, 1),
                 validTo = LocalDate.of(2025, 12, 31),
                 config = """{"max_tpm":100}""",
-                notes = "repo test"
-            )
+                notes = "repo test",
+            createdBy = TestAudit.BY,
+            updatedBy = TestAudit.BY)
         )
 
         val found = entitlementRepository.findByIdWithRelations(entitlement.id)
@@ -64,8 +70,9 @@ class ParticipantServiceEntitlementRepositoryTest @Autowired constructor(
                 participant = participant,
                 serviceOffering = offering,
                 status = EntitlementStatus.PENDING,
-                validFrom = LocalDate.of(2025, 1, 1)
-            )
+                validFrom = LocalDate.of(2025, 1, 1),
+            createdBy = TestAudit.BY,
+            updatedBy = TestAudit.BY)
         )
         assertThat(entitlementRepository.existsByParticipantIdAndServiceOfferingId(participant.id, offering.id)).isTrue()
     }
@@ -77,8 +84,9 @@ class ParticipantServiceEntitlementRepositoryTest @Autowired constructor(
                 participant = participant,
                 serviceOffering = offering,
                 status = EntitlementStatus.ACTIVE,
-                validFrom = LocalDate.of(2025, 1, 1)
-            )
+                validFrom = LocalDate.of(2025, 1, 1),
+            createdBy = TestAudit.BY,
+            updatedBy = TestAudit.BY)
         )
         val result = entitlementRepository.findByParticipantId(participant.id)
         assertThat(result).isNotEmpty

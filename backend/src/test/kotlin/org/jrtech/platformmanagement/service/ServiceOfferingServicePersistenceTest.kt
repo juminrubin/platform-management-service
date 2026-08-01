@@ -34,14 +34,23 @@ class ServiceOfferingServicePersistenceTest @Autowired constructor(
             )
         )
         assertThat(created.category).isEqualTo("LLM")
+        assertThat(created.provider).isEqualTo("SYSTEM")
         assertThat(serviceOfferingRepository.existsById(id)).isTrue()
 
         val updated = serviceOfferingService.update(
             id,
-            UpdateServiceOfferingRequest(name = "Model 2", description = null, category = "speech", config = "{}", active = false)
+            UpdateServiceOfferingRequest(
+                name = "Model 2",
+                description = null,
+                category = "speech",
+                provider = "azure",
+                config = "{}",
+                active = false
+            )
         )
         assertThat(updated.active).isFalse()
         assertThat(updated.category).isEqualTo("SPEECH")
+        assertThat(updated.provider).isEqualTo("AZURE")
 
         serviceOfferingService.delete(id)
         assertThat(serviceOfferingRepository.findById(id)).isEmpty

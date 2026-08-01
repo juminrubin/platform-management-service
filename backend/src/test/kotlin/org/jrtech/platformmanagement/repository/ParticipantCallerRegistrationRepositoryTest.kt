@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
 import org.springframework.test.context.ActiveProfiles
 import java.util.UUID
+import org.jrtech.platformmanagement.TestAudit
 
 @DataJpaTest
 @ActiveProfiles("test")
@@ -25,7 +26,9 @@ class ParticipantCallerRegistrationRepositoryTest @Autowired constructor(
     fun setUp() {
         val suffix = UUID.randomUUID().toString().take(8)
         participant = participantRepository.save(
-            Participant(id = "p-$suffix", name = "Caller P $suffix", status = ParticipantStatus.ACTIVE)
+            Participant(id = "p-$suffix", name = "Caller P $suffix", status = ParticipantStatus.ACTIVE,
+            createdBy = TestAudit.BY,
+            updatedBy = TestAudit.BY)
         )
     }
 
@@ -35,8 +38,9 @@ class ParticipantCallerRegistrationRepositoryTest @Autowired constructor(
             ParticipantCallerRegistration(
                 callerId = "user@example.com",
                 participant = participant,
-                status = CallerRegistrationStatus.ACTIVE
-            )
+                status = CallerRegistrationStatus.ACTIVE,
+            createdBy = TestAudit.BY,
+            updatedBy = TestAudit.BY)
         )
         val found = callerRegistrationRepository.findByCallerIdWithParticipant(saved.callerId)
         assertThat(found).isNotNull
@@ -50,8 +54,9 @@ class ParticipantCallerRegistrationRepositoryTest @Autowired constructor(
             ParticipantCallerRegistration(
                 callerId = "sp-client-id",
                 participant = participant,
-                status = CallerRegistrationStatus.ACTIVE
-            )
+                status = CallerRegistrationStatus.ACTIVE,
+            createdBy = TestAudit.BY,
+            updatedBy = TestAudit.BY)
         )
         assertThat(callerRegistrationRepository.existsByCallerId("sp-client-id")).isTrue()
         assertThat(callerRegistrationRepository.existsByCallerId("missing")).isFalse()

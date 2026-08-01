@@ -69,7 +69,9 @@ export function CallerRegistrationDetailPage() {
             },
             { label: 'Status', value: <span className={`badge status-${item.status}`}>{item.status}</span> },
             { label: 'Created', value: formatDateTime(item.createdAt) },
+            { label: 'Created by', value: item.createdBy },
             { label: 'Updated', value: formatDateTime(item.updatedAt) },
+            { label: 'Updated by', value: item.updatedBy },
           ]}
         />
       )}

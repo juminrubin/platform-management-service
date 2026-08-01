@@ -12,7 +12,9 @@ export const participantActive: Participant = {
   contact: 'ops@acme.example',
   status: 'ACTIVE',
   createdAt: '2024-01-15T10:00:00Z',
+  createdBy: 'SYSTEM',
   updatedAt: '2024-01-15T10:00:00Z',
+  updatedBy: 'SYSTEM',
 }
 
 export const participantInactive: Participant = {
@@ -21,7 +23,9 @@ export const participantInactive: Participant = {
   contact: 'contact@gamma.example',
   status: 'INACTIVE',
   createdAt: '2024-03-10T14:00:00Z',
+  createdBy: 'SYSTEM',
   updatedAt: '2024-06-01T08:00:00Z',
+  updatedBy: 'SYSTEM',
 }
 
 export const callerRegistrationActive: CallerRegistration = {
@@ -30,7 +34,9 @@ export const callerRegistrationActive: CallerRegistration = {
   participantName: 'Acme Corporation',
   status: 'ACTIVE',
   createdAt: '2024-01-16T08:00:00Z',
+  createdBy: 'SYSTEM',
   updatedAt: '2024-01-16T08:00:00Z',
+  updatedBy: 'SYSTEM',
 }
 
 export const serviceOfferingGpt: ServiceOffering = {
@@ -38,10 +44,13 @@ export const serviceOfferingGpt: ServiceOffering = {
   name: 'GPT 5.1',
   description: 'Flagship chat completion model',
   category: 'LLM',
+  provider: 'SYSTEM',
   config: '{"default_max_tpm":120000}',
   active: true,
   createdAt: '2024-01-01T00:00:00Z',
+  createdBy: 'SYSTEM',
   updatedAt: '2024-01-01T00:00:00Z',
+  updatedBy: 'SYSTEM',
 }
 
 export const serviceOfferingLegacy: ServiceOffering = {
@@ -49,10 +58,13 @@ export const serviceOfferingLegacy: ServiceOffering = {
   name: 'Legacy Batch',
   description: 'Deprecated',
   category: 'PLATFORM',
+  provider: 'SYSTEM',
   config: '{}',
   active: false,
   createdAt: '2023-06-01T00:00:00Z',
+  createdBy: 'SYSTEM',
   updatedAt: '2024-05-01T00:00:00Z',
+  updatedBy: 'SYSTEM',
 }
 
 export const entitlementActive: Entitlement = {
@@ -67,7 +79,9 @@ export const entitlementActive: Entitlement = {
   config: '{"max_tpm":100000}',
   notes: 'Enterprise tier',
   createdAt: '2024-01-15T10:05:00Z',
+  createdBy: 'SYSTEM',
   updatedAt: '2024-01-15T10:05:00Z',
+  updatedBy: 'SYSTEM',
 }
 
 export const consumptionSample: Consumption = {
@@ -79,7 +93,8 @@ export const consumptionSample: Consumption = {
   serviceOfferingName: 'GPT 5.1',
   sourceRefId: 'req-d1111111-1111-1111-1111-111111111111',
   consumptionData: '{"input_token":1200,"output_token":340}',
-  createdAt: '2024-06-01T12:00:00Z',
+  capturedAt: '2024-06-01T12:00:00Z',
+  createdAt: '2024-06-01T12:00:05Z',
 }
 
 export const consumptionLater: Consumption = {
@@ -91,5 +106,6 @@ export const consumptionLater: Consumption = {
   serviceOfferingName: 'GPT 5.1',
   sourceRefId: 'req-d2222222-2222-2222-2222-222222222222',
   consumptionData: '{"input_token":50,"output_token":10}',
-  createdAt: '2024-07-15T09:30:00Z',
+  capturedAt: '2024-07-15T09:30:00Z',
+  createdAt: '2024-07-15T09:30:01Z',
 }

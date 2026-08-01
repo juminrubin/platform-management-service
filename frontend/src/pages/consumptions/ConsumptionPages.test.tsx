@@ -147,7 +147,7 @@ describe('Consumption pages', () => {
     await user.selectOptions(screen.getByLabelText(/^Caller ID/), callerRegistrationActive.callerId)
     await user.selectOptions(screen.getByLabelText(/^Service offering/), 'gpt-5.1')
     // datetime-local typing is flaky in jsdom — set value via change event
-    fireEvent.change(screen.getByLabelText(/Event time/i), {
+    fireEvent.change(screen.getByLabelText(/Captured at/i), {
       target: { value: '2024-08-01T10:30' },
     })
     await user.click(screen.getByRole('button', { name: /^Create$/i }))
@@ -155,7 +155,7 @@ describe('Consumption pages', () => {
       expect(api.createConsumption).toHaveBeenCalledWith(
         expect.objectContaining({
           callerId: callerRegistrationActive.callerId,
-          consumedAt: expect.stringMatching(/2024-08-01/),
+          capturedAt: expect.stringMatching(/2024-08-01/),
         }),
       )
     })

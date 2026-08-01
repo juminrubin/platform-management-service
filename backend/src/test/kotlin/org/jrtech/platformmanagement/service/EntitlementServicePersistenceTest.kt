@@ -21,6 +21,7 @@ import org.springframework.context.annotation.Import
 import org.springframework.test.context.ActiveProfiles
 import java.time.LocalDate
 import java.util.UUID
+import org.jrtech.platformmanagement.TestAudit
 
 @DataJpaTest
 @Import(EntitlementService::class, ParticipantService::class, ServiceOfferingService::class)
@@ -39,10 +40,14 @@ class EntitlementServicePersistenceTest @Autowired constructor(
     fun setUp() {
         val suffix = UUID.randomUUID().toString().take(8)
         participant = participantRepository.save(
-            Participant(id = "p-$suffix", name = "EPS $suffix", status = ParticipantStatus.ACTIVE)
+            Participant(id = "p-$suffix", name = "EPS $suffix", status = ParticipantStatus.ACTIVE,
+            createdBy = TestAudit.BY,
+            updatedBy = TestAudit.BY)
         )
         offering = serviceOfferingRepository.save(
-            ServiceOffering(id = "so-$suffix", name = "Offering $suffix", category = "LLM", active = true)
+            ServiceOffering(id = "so-$suffix", name = "Offering $suffix", category = "LLM", active = true,
+            createdBy = TestAudit.BY,
+            updatedBy = TestAudit.BY)
         )
     }
 

@@ -1,5 +1,6 @@
 package org.jrtech.platformmanagement.service
 
+import org.jrtech.platformmanagement.domain.AuditActors
 import org.jrtech.platformmanagement.domain.CallerRegistrationStatus
 import org.jrtech.platformmanagement.domain.EntitlementStatus
 import org.jrtech.platformmanagement.domain.ParticipantServiceEntitlement
@@ -98,10 +99,12 @@ class EntitlementService(
                 validFrom = request.validFrom,
                 validTo = request.validTo,
                 config = request.config.trim().ifEmpty { "{}" },
-                notes = request.notes?.trim()
+                notes = request.notes?.trim(),
+                createdBy = AuditActors.SYSTEM,
+                updatedBy = AuditActors.SYSTEM
             )
         )
-        log.info("Created entitlement id={} status={}", saved.id, saved.status)
+        log.info("Created entitlement id={} status={} createdBy={}", saved.id, saved.status, saved.createdBy)
         return findById(saved.id)
     }
 
@@ -119,9 +122,10 @@ class EntitlementService(
         entity.validTo = request.validTo
         entity.config = request.config.trim().ifEmpty { "{}" }
         entity.notes = request.notes?.trim()
+        entity.updatedBy = AuditActors.SYSTEM
 
         entitlementRepository.save(entity)
-        log.info("Updated entitlement id={} status={}", id, request.status)
+        log.info("Updated entitlement id={} status={} updatedBy={}", id, request.status, entity.updatedBy)
         return findById(id)
     }
 
@@ -140,36 +144,58 @@ class EntitlementService(
      * Check whether a registered caller is entitled to use a service offering.
      *
      * [callerId] is the unique principal key of the [ParticipantCallerRegistration].
-     * Validity is evaluated on [asOf] (UTC calendar date; defaults to today UTC).
+     * Validity is evaluated over the closed UTC date range [[fromDate], [untilDate]]:
+     * - [fromDate] defaults to today (UTC) when omitted
+     * - [untilDate] defaults to [fromDate] when omitted (point-in-time check)
+     *
+     * The entitlement must fully cover the requested range (inclusive).
      */
     @Transactional(readOnly = true)
     fun checkByCallerAndService(
-        callerId: String?,
+        callerId: String,
         serviceOfferingId: String,
-        asOf: LocalDate?
+        fromDate: LocalDate? = null,
+        untilDate: LocalDate? = null
     ): EntitlementCheckResponse {
         val offeringId = serviceOfferingId.trim()
         if (offeringId.isEmpty()) {
             throw BadRequestException("serviceOfferingId is required")
         }
-        val resolvedCallerId = callerId?.trim().orEmpty()
+        val resolvedCallerId = callerId.trim()
         if (resolvedCallerId.isEmpty()) {
             throw BadRequestException("callerId is required")
         }
-        val evaluationDate = asOf ?: LocalDate.now(ZoneOffset.UTC)
+
+        val resolvedFrom = fromDate ?: LocalDate.now(ZoneOffset.UTC)
+        val resolvedUntil = untilDate ?: resolvedFrom
+        if (resolvedUntil.isBefore(resolvedFrom)) {
+            throw BadRequestException("untilDate must be on or after fromDate")
+        }
 
         // Ensure service offering exists (stable 404 for typos)
         serviceOfferingService.getEntity(offeringId)
 
+        fun deny(
+            reason: String,
+            callerIdValue: String?,
+            participantId: String?,
+            entitlement: EntitlementResponse? = null
+        ) = EntitlementCheckResponse(
+            allowed = false,
+            reason = reason,
+            callerId = callerIdValue,
+            participantId = participantId,
+            serviceOfferingId = offeringId,
+            fromDate = resolvedFrom,
+            untilDate = resolvedUntil,
+            entitlement = entitlement
+        )
+
         val caller = callerRegistrationRepository.findByCallerIdWithParticipant(resolvedCallerId)
-            ?: return EntitlementCheckResponse(
-                allowed = false,
+            ?: return deny(
                 reason = "CALLER_NOT_FOUND",
-                callerId = resolvedCallerId,
-                participantId = null,
-                serviceOfferingId = offeringId,
-                asOf = evaluationDate,
-                entitlement = null
+                callerIdValue = resolvedCallerId,
+                participantId = null
             )
 
         if (caller.status != CallerRegistrationStatus.ACTIVE) {
@@ -178,14 +204,10 @@ class EntitlementService(
                 caller.callerId,
                 caller.status
             )
-            return EntitlementCheckResponse(
-                allowed = false,
+            return deny(
                 reason = "CALLER_NOT_ACTIVE",
-                callerId = caller.callerId,
-                participantId = caller.participant.id,
-                serviceOfferingId = offeringId,
-                asOf = evaluationDate,
-                entitlement = null
+                callerIdValue = caller.callerId,
+                participantId = caller.participant.id
             )
         }
 
@@ -194,31 +216,32 @@ class EntitlementService(
             .firstOrNull { it.serviceOffering.id == offeringId }
 
         if (entitlement == null) {
-            return EntitlementCheckResponse(
-                allowed = false,
+            return deny(
                 reason = "NO_ENTITLEMENT",
-                callerId = caller.callerId,
-                participantId = caller.participant.id,
-                serviceOfferingId = offeringId,
-                asOf = evaluationDate,
-                entitlement = null
+                callerIdValue = caller.callerId,
+                participantId = caller.participant.id
             )
         }
 
         val response = EntitlementResponse.from(entitlement)
+        // Full coverage of [resolvedFrom, resolvedUntil] against entitlement.validFrom/validTo
         val reason = when {
             entitlement.status != EntitlementStatus.ACTIVE -> "ENTITLEMENT_NOT_ACTIVE"
-            evaluationDate.isBefore(entitlement.validFrom) -> "ENTITLEMENT_NOT_YET_VALID"
-            entitlement.validTo != null && evaluationDate.isAfter(entitlement.validTo) ->
+            // Window starts before the entitlement is valid
+            resolvedFrom.isBefore(entitlement.validFrom) -> "ENTITLEMENT_NOT_YET_VALID"
+            // Window ends after the entitlement expires (open-ended validTo = no expiry)
+            entitlement.validTo != null && resolvedUntil.isAfter(entitlement.validTo) ->
                 "ENTITLEMENT_EXPIRED"
             else -> "ALLOWED"
         }
         val allowed = reason == "ALLOWED"
 
         log.debug(
-            "Entitlement check callerId={} service={} allowed={} reason={}",
+            "Entitlement check callerId={} service={} from={} until={} allowed={} reason={}",
             caller.callerId,
             offeringId,
+            resolvedFrom,
+            resolvedUntil,
             allowed,
             reason
         )
@@ -229,7 +252,8 @@ class EntitlementService(
             callerId = caller.callerId,
             participantId = caller.participant.id,
             serviceOfferingId = offeringId,
-            asOf = evaluationDate,
+            fromDate = resolvedFrom,
+            untilDate = resolvedUntil,
             entitlement = response
         )
     }

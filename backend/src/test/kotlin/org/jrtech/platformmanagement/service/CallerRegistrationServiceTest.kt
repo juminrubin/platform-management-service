@@ -20,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
+import org.jrtech.platformmanagement.TestAudit
 
 @ExtendWith(MockitoExtension::class)
 class CallerRegistrationServiceTest {
@@ -37,9 +38,12 @@ class CallerRegistrationServiceTest {
     fun `findAll by participant and status`() {
         val entity = ParticipantCallerRegistration(
             callerId = "a@x.com",
-            participant = Participant(id = "acme", name = "Acme", status = ParticipantStatus.ACTIVE),
-            status = CallerRegistrationStatus.ACTIVE
-        )
+            participant = Participant(id = "acme", name = "Acme", status = ParticipantStatus.ACTIVE,
+            createdBy = TestAudit.BY,
+            updatedBy = TestAudit.BY),
+            status = CallerRegistrationStatus.ACTIVE,
+            createdBy = TestAudit.BY,
+            updatedBy = TestAudit.BY)
         whenever(callerRegistrationRepository.findByParticipantId("acme")).thenReturn(listOf(entity))
         val result = callerRegistrationService.findAll("acme", CallerRegistrationStatus.ACTIVE)
         assertThat(result).hasSize(1)
@@ -48,17 +52,21 @@ class CallerRegistrationServiceTest {
 
     @Test
     fun `findAll without participant loads all and filters status`() {
-        val participant = Participant(id = "acme", name = "Acme", status = ParticipantStatus.ACTIVE)
+        val participant = Participant(id = "acme", name = "Acme", status = ParticipantStatus.ACTIVE,
+            createdBy = TestAudit.BY,
+            updatedBy = TestAudit.BY)
         val active = ParticipantCallerRegistration(
             callerId = "a@x.com",
             participant = participant,
-            status = CallerRegistrationStatus.ACTIVE
-        )
+            status = CallerRegistrationStatus.ACTIVE,
+            createdBy = TestAudit.BY,
+            updatedBy = TestAudit.BY)
         val inactive = ParticipantCallerRegistration(
             callerId = "b@x.com",
             participant = participant,
-            status = CallerRegistrationStatus.INACTIVE
-        )
+            status = CallerRegistrationStatus.INACTIVE,
+            createdBy = TestAudit.BY,
+            updatedBy = TestAudit.BY)
         whenever(callerRegistrationRepository.findAllWithParticipant()).thenReturn(listOf(active, inactive))
         assertThat(callerRegistrationService.findAll(null, CallerRegistrationStatus.INACTIVE)).hasSize(1)
     }
@@ -83,7 +91,9 @@ class CallerRegistrationServiceTest {
 
     @Test
     fun `create succeeds`() {
-        val participant = Participant(id = "acme", name = "Acme", status = ParticipantStatus.ACTIVE)
+        val participant = Participant(id = "acme", name = "Acme", status = ParticipantStatus.ACTIVE,
+            createdBy = TestAudit.BY,
+            updatedBy = TestAudit.BY)
         whenever(participantService.getEntity("acme")).thenReturn(participant)
         whenever(callerRegistrationRepository.existsByCallerId("user@x.com")).thenReturn(false)
         whenever(callerRegistrationRepository.save(any(ParticipantCallerRegistration::class.java))).thenAnswer { inv ->
@@ -93,8 +103,9 @@ class CallerRegistrationServiceTest {
             ParticipantCallerRegistration(
                 callerId = "user@x.com",
                 participant = participant,
-                status = CallerRegistrationStatus.ACTIVE
-            )
+                status = CallerRegistrationStatus.ACTIVE,
+            createdBy = TestAudit.BY,
+            updatedBy = TestAudit.BY)
         )
 
         val result = callerRegistrationService.create(
@@ -107,7 +118,9 @@ class CallerRegistrationServiceTest {
     @Test
     fun `create throws on duplicate`() {
         whenever(participantService.getEntity("acme")).thenReturn(
-            Participant(id = "acme", name = "Acme", status = ParticipantStatus.ACTIVE)
+            Participant(id = "acme", name = "Acme", status = ParticipantStatus.ACTIVE,
+            createdBy = TestAudit.BY,
+            updatedBy = TestAudit.BY)
         )
         whenever(callerRegistrationRepository.existsByCallerId("dup")).thenReturn(true)
 
@@ -123,9 +136,12 @@ class CallerRegistrationServiceTest {
     fun `update status`() {
         val entity = ParticipantCallerRegistration(
             callerId = "c1",
-            participant = Participant(id = "acme", name = "Acme", status = ParticipantStatus.ACTIVE),
-            status = CallerRegistrationStatus.ACTIVE
-        )
+            participant = Participant(id = "acme", name = "Acme", status = ParticipantStatus.ACTIVE,
+            createdBy = TestAudit.BY,
+            updatedBy = TestAudit.BY),
+            status = CallerRegistrationStatus.ACTIVE,
+            createdBy = TestAudit.BY,
+            updatedBy = TestAudit.BY)
         whenever(callerRegistrationRepository.findByCallerIdWithParticipant("c1")).thenReturn(entity)
         whenever(callerRegistrationRepository.save(any(ParticipantCallerRegistration::class.java)))
             .thenAnswer { it.getArgument(0) }

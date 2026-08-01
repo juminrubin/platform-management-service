@@ -42,7 +42,8 @@ export function ServiceOfferingListPage() {
       o.id.toLowerCase().includes(s) ||
       o.name.toLowerCase().includes(s) ||
       (o.description ?? '').toLowerCase().includes(s) ||
-      o.category.toLowerCase().includes(s)
+      o.category.toLowerCase().includes(s) ||
+      o.provider.toLowerCase().includes(s)
     )
   })
 
@@ -93,7 +94,7 @@ export function ServiceOfferingListPage() {
             <option value="true">Yes</option>
           </select>
         </Field>
-        <Field label="Search id / name / description">
+        <Field label="Search id / name / description / provider">
           <input value={q} onChange={(e) => setQ(e.target.value)} />
         </Field>
       </FilterBar>
@@ -108,6 +109,7 @@ export function ServiceOfferingListPage() {
               <th>ID</th>
               <th>Name</th>
               <th>Category</th>
+              <th>Provider</th>
               <th>Active</th>
               <th>Updated</th>
               <th />
@@ -123,6 +125,7 @@ export function ServiceOfferingListPage() {
                 </td>
                 <td>{o.name}</td>
                 <td>{o.category}</td>
+                <td>{o.provider}</td>
                 <td>{o.active ? 'Yes' : 'No'}</td>
                 <td className="nowrap">{formatDateTime(o.updatedAt)}</td>
                 <td className="row gap">

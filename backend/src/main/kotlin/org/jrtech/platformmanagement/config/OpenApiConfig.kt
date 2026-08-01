@@ -75,6 +75,7 @@ class OpenApiConfig {
                     Tag().name("Service offerings").description("Catalog of entitled services"),
                     Tag().name("Entitlements").description("Participant access rights and entitlement checks"),
                     Tag().name("Consumptions").description("Token / usage event records"),
+                    Tag().name("Entra directory").description("Platform-System-* Entra security groups and members (Microsoft Graph)"),
                 )
             )
             .components(

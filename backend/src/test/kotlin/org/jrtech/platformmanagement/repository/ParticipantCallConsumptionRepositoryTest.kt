@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
 import org.springframework.test.context.ActiveProfiles
 import java.util.UUID
+import org.jrtech.platformmanagement.TestAudit
 
 @DataJpaTest
 @ActiveProfiles("test")
@@ -30,17 +31,22 @@ class ParticipantCallConsumptionRepositoryTest @Autowired constructor(
     fun setUp() {
         val suffix = UUID.randomUUID().toString().take(8)
         val participant = participantRepository.save(
-            Participant(id = "p-$suffix", name = "Cons P $suffix", status = ParticipantStatus.ACTIVE)
+            Participant(id = "p-$suffix", name = "Cons P $suffix", status = ParticipantStatus.ACTIVE,
+            createdBy = TestAudit.BY,
+            updatedBy = TestAudit.BY)
         )
         callerRegistration = callerRegistrationRepository.save(
             ParticipantCallerRegistration(
                 callerId = "caller-$suffix",
                 participant = participant,
-                status = CallerRegistrationStatus.ACTIVE
-            )
+                status = CallerRegistrationStatus.ACTIVE,
+            createdBy = TestAudit.BY,
+            updatedBy = TestAudit.BY)
         )
         offering = serviceOfferingRepository.save(
-            ServiceOffering(id = "so-$suffix", name = "Model $suffix", category = "LLM", active = true)
+            ServiceOffering(id = "so-$suffix", name = "Model $suffix", category = "LLM", active = true,
+            createdBy = TestAudit.BY,
+            updatedBy = TestAudit.BY)
         )
     }
 
@@ -61,6 +67,8 @@ class ParticipantCallConsumptionRepositoryTest @Autowired constructor(
         assertThat(found.serviceOffering.id).isEqualTo(offering.id)
         assertThat(found.sourceRefId).isEqualTo(sourceRef)
         assertThat(found.consumptionData).contains("input_token")
+        assertThat(found.capturedAt).isNotNull
+        assertThat(found.createdAt).isNotNull
 
         val byRef = consumptionRepository.findBySourceRefIdWithRelations(sourceRef)
         assertThat(byRef).isNotNull

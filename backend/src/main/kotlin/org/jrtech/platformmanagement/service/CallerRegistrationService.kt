@@ -1,5 +1,6 @@
 package org.jrtech.platformmanagement.service
 
+import org.jrtech.platformmanagement.domain.AuditActors
 import org.jrtech.platformmanagement.domain.CallerRegistrationStatus
 import org.jrtech.platformmanagement.domain.ParticipantCallerRegistration
 import org.jrtech.platformmanagement.dto.CallerRegistrationResponse
@@ -58,10 +59,12 @@ class CallerRegistrationService(
             ParticipantCallerRegistration(
                 callerId = callerId,
                 participant = participant,
-                status = request.status
+                status = request.status,
+                createdBy = AuditActors.SYSTEM,
+                updatedBy = AuditActors.SYSTEM
             )
         )
-        log.info("Created caller registration callerId={}", saved.callerId)
+        log.info("Created caller registration callerId={} createdBy={}", saved.callerId, saved.createdBy)
         return findByCallerId(saved.callerId)
     }
 
@@ -71,6 +74,7 @@ class CallerRegistrationService(
         val entity = callerRegistrationRepository.findByCallerIdWithParticipant(callerId)
             ?: throw ResourceNotFoundException("Caller registration not found: $callerId")
         entity.status = request.status
+        entity.updatedBy = AuditActors.SYSTEM
         callerRegistrationRepository.save(entity)
         return findByCallerId(callerId)
     }

@@ -89,7 +89,8 @@ class AppRoleAuthorizationTest {
             accept = MediaType.APPLICATION_JSON
             param("callerId", "alice@acme.example")
             param("serviceOfferingId", "gpt-5.1")
-            param("asOf", "2024-06-15")
+            param("fromDate", "2024-06-15")
+            param("untilDate", "2024-06-15")
             with(jwtWithRoles(AppRoles.SYSTEM_READER))
         }.andExpect {
             status { isOk() }
@@ -149,7 +150,8 @@ class AppRoleAuthorizationTest {
             accept = MediaType.APPLICATION_JSON
             param("callerId", "alice@acme.example")
             param("serviceOfferingId", "gpt-5.1")
-            param("asOf", "2024-06-15")
+            param("fromDate", "2024-06-15")
+            param("untilDate", "2024-06-15")
             with(jwtWithRoles(AppRoles.ENTITLEMENT_READER))
         }.andExpect {
             status { isOk() }
@@ -182,7 +184,7 @@ class AppRoleAuthorizationTest {
                   "serviceOfferingId": "gpt-5.1",
                   "sourceRefId": "$sourceRefId",
                   "consumptionData": "{\"input_token\":10,\"output_token\":5}",
-                  "consumedAt": "2024-07-01T12:00:00Z"
+                  "capturedAt": "2024-07-01T12:00:00Z"
                 }
             """.trimIndent()
             with(jwtWithRoles(AppRoles.CONSUMPTION_REGISTRATOR))
@@ -191,7 +193,8 @@ class AppRoleAuthorizationTest {
             jsonPath("$.serviceOfferingId") { value("gpt-5.1") }
             jsonPath("$.callerId") { value("alice@acme.example") }
             jsonPath("$.sourceRefId") { value(sourceRefId) }
-            jsonPath("$.createdAt") { value("2024-07-01T12:00:00Z") }
+            jsonPath("$.capturedAt") { value("2024-07-01T12:00:00Z") }
+            jsonPath("$.createdAt") { exists() }
         }
     }
 
@@ -200,6 +203,47 @@ class AppRoleAuthorizationTest {
         mockMvc.get("/api/v1/consumptions") {
             accept = MediaType.APPLICATION_JSON
             with(jwtWithRoles(AppRoles.CONSUMPTION_REGISTRATOR))
+        }.andExpect {
+            status { isForbidden() }
+        }
+    }
+
+    @Test
+    fun `System Maintainer can control Event Hub connector start and stop`() {
+        mockMvc.get("/api/v1/connectors/consumption-eventhub") {
+            accept = MediaType.APPLICATION_JSON
+            with(jwtWithRoles(AppRoles.SYSTEM_MAINTAINER))
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.id") { value("consumption-eventhub") }
+            jsonPath("$.enabled") { value(false) }
+            jsonPath("$.running") { value(false) }
+        }
+
+        // Disabled by default — start returns 400, still authorized as Maintainer
+        mockMvc.post("/api/v1/connectors/consumption-eventhub/start") {
+            accept = MediaType.APPLICATION_JSON
+            with(jwtWithRoles(AppRoles.SYSTEM_MAINTAINER))
+        }.andExpect {
+            status { isBadRequest() }
+        }
+    }
+
+    @Test
+    fun `System Reader cannot start Event Hub connector`() {
+        mockMvc.post("/api/v1/connectors/consumption-eventhub/start") {
+            accept = MediaType.APPLICATION_JSON
+            with(jwtWithRoles(AppRoles.SYSTEM_READER))
+        }.andExpect {
+            status { isForbidden() }
+        }
+    }
+
+    @Test
+    fun `System Reader cannot list connectors`() {
+        mockMvc.get("/api/v1/connectors") {
+            accept = MediaType.APPLICATION_JSON
+            with(jwtWithRoles(AppRoles.SYSTEM_READER))
         }.andExpect {
             status { isForbidden() }
         }

@@ -8,7 +8,9 @@ export type Participant = {
   contact: string | null
   status: ParticipantStatus
   createdAt: string
+  createdBy: string
   updatedAt: string
+  updatedBy: string
 }
 
 export type CreateParticipant = {
@@ -31,7 +33,9 @@ export type CallerRegistration = {
   participantName: string
   status: CallerRegistrationStatus
   createdAt: string
+  createdBy: string
   updatedAt: string
+  updatedBy: string
 }
 
 export type CreateCallerRegistration = {
@@ -49,10 +53,14 @@ export type ServiceOffering = {
   name: string
   description: string | null
   category: string
+  /** Provider of the offering; defaults to SYSTEM. */
+  provider: string
   config: string
   active: boolean
   createdAt: string
+  createdBy: string
   updatedAt: string
+  updatedBy: string
 }
 
 export type CreateServiceOffering = {
@@ -60,6 +68,8 @@ export type CreateServiceOffering = {
   name: string
   description?: string | null
   category: string
+  /** Defaults to SYSTEM when omitted. */
+  provider?: string
   config?: string
   active?: boolean
 }
@@ -68,6 +78,7 @@ export type UpdateServiceOffering = {
   name: string
   description?: string | null
   category: string
+  provider: string
   config: string
   active: boolean
 }
@@ -84,7 +95,9 @@ export type Entitlement = {
   config: string
   notes: string | null
   createdAt: string
+  createdBy: string
   updatedAt: string
+  updatedBy: string
 }
 
 export type CreateEntitlement = {
@@ -115,6 +128,9 @@ export type Consumption = {
   /** Source Reference Identification from the consumption reporter (e.g. request UUID). */
   sourceRefId: string | null
   consumptionData: string
+  /** When the consumption was captured at runtime (UTC business event time). */
+  capturedAt: string
+  /** When this row was stored in the platform (UTC audit time). */
   createdAt: string
 }
 
@@ -124,7 +140,8 @@ export type CreateConsumption = {
   /** Optional unique Source Reference Identification (e.g. request UUID). */
   sourceRefId?: string | null
   consumptionData?: string
-  consumedAt?: string | null
+  /** Optional runtime capture time (UTC ISO-8601). Defaults to now. */
+  capturedAt?: string | null
 }
 
 export type AuthenticatedUser = {
@@ -137,4 +154,12 @@ export type AuthenticatedUser = {
   authorities: string[]
   scopes: string[]
   roles: string[]
+  /** Entra security group object IDs from the JWT `groups` claim. */
+  groups?: string[]
+  /** Platform-System-* group display names resolved for this principal. */
+  platformGroups?: string[]
+  /** OAuth scopes configured for matching Application Registration IDs. */
+  expectedScopes?: string[]
+  /** Configured Application Registration client IDs that matched this token. */
+  matchedApplicationRegistrationIds?: string[]
 }

@@ -9,6 +9,7 @@ import org.springframework.security.authentication.BadCredentialsException
 import org.springframework.validation.BeanPropertyBindingResult
 import org.springframework.validation.FieldError
 import org.springframework.web.bind.MethodArgumentNotValidException
+import org.springframework.web.bind.MissingServletRequestParameterException
 import kotlin.reflect.jvm.javaMethod
 
 class GlobalExceptionHandlerTest {
@@ -29,6 +30,15 @@ class GlobalExceptionHandlerTest {
         val bad = handler.handleBadRequest(BadRequestException("bad"))
         assertThat(bad.status).isEqualTo(HttpStatus.BAD_REQUEST.value())
         assertThat(bad.detail).isEqualTo("bad")
+    }
+
+    @Test
+    fun `maps missing request parameter to bad request`() {
+        val result = handler.handleMissingRequestParam(
+            MissingServletRequestParameterException("callerId", "String")
+        )
+        assertThat(result.status).isEqualTo(HttpStatus.BAD_REQUEST.value())
+        assertThat(result.detail).contains("callerId")
     }
 
     @Test

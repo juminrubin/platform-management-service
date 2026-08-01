@@ -5,7 +5,9 @@ CREATE TABLE participant (
     contact         VARCHAR(255),
     status          VARCHAR(32)     NOT NULL,
     created_at      TIMESTAMP WITH TIME ZONE NOT NULL,
+    created_by      VARCHAR(255)    NOT NULL,
     updated_at      TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_by      VARCHAR(255)    NOT NULL,
     CONSTRAINT uq_participant_name UNIQUE (name)
 );
 
@@ -17,15 +19,20 @@ CREATE TABLE service_offering (
     id              VARCHAR(100)    NOT NULL PRIMARY KEY,
     name            VARCHAR(255)    NOT NULL,
     description     VARCHAR(1000),
-    category        VARCHAR(64)     NOT NULL,
+    category        VARCHAR(100)    NOT NULL,
+    -- Provider of the offering (SYSTEM = platform-managed catalog default)
+    provider        VARCHAR(100)    NOT NULL DEFAULT 'SYSTEM',
     -- JSON: deployment_endpoint, deployment_id, default_max_tpm, default_max_rpm, ...
     config          VARCHAR(5000)   NOT NULL,
     active          BOOLEAN         NOT NULL DEFAULT TRUE,
     created_at      TIMESTAMP WITH TIME ZONE NOT NULL,
-    updated_at      TIMESTAMP WITH TIME ZONE NOT NULL
+    created_by      VARCHAR(255)    NOT NULL,
+    updated_at      TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_by      VARCHAR(255)    NOT NULL
 );
 
 CREATE INDEX idx_service_offering_category ON service_offering (category);
+CREATE INDEX idx_service_offering_provider ON service_offering (provider);
 CREATE INDEX idx_service_offering_active ON service_offering (active);
 
 -- Entitlement linking a participant to a service offering
@@ -40,7 +47,9 @@ CREATE TABLE participant_service_entitlement (
     config                  VARCHAR(5000)   NOT NULL,
     notes                   VARCHAR(500),
     created_at              TIMESTAMP WITH TIME ZONE NOT NULL,
+    created_by              VARCHAR(255)    NOT NULL,
     updated_at              TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_by              VARCHAR(255)    NOT NULL,
     CONSTRAINT fk_entitlement_participant
         FOREIGN KEY (participant_id) REFERENCES participant (id),
     CONSTRAINT fk_entitlement_service_offering
@@ -59,7 +68,9 @@ CREATE TABLE participant_caller_registration (
     participant_id  VARCHAR(40)     NOT NULL,
     status          VARCHAR(32)     NOT NULL,
     created_at      TIMESTAMP WITH TIME ZONE NOT NULL,
+    created_by      VARCHAR(255)    NOT NULL,
     updated_at      TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_by      VARCHAR(255)    NOT NULL,
     CONSTRAINT fk_caller_registration_participant
         FOREIGN KEY (participant_id) REFERENCES participant (id)
 );
@@ -72,16 +83,24 @@ CREATE TABLE participant_call_consumption (
     id                      UUID            NOT NULL PRIMARY KEY,
     caller_id               VARCHAR(255)    NOT NULL,
     service_offering_id     VARCHAR(100)    NOT NULL,
+    -- Source Reference Identification: unique key from consumption reporters
+    -- (e.g. request UUID). Optional; unique when present (multiple NULLs allowed).
+    source_ref_id           VARCHAR(255),
     -- JSON: endpoint_url, input_token, output_token, cache_token, ...
     consumption_data        TEXT            NOT NULL,
+    -- When the consumption was captured at the service runtime (business event time)
+    captured_at             TIMESTAMP WITH TIME ZONE NOT NULL,
+    -- When this row was inserted into the platform (audit time)
     created_at              TIMESTAMP WITH TIME ZONE NOT NULL,
     CONSTRAINT fk_consumption_caller_id
         FOREIGN KEY (caller_id) REFERENCES participant_caller_registration (caller_id),
     CONSTRAINT fk_consumption_service_offering
         FOREIGN KEY (service_offering_id) REFERENCES service_offering (id),
-    CONSTRAINT uq_consumption_caller_service_ts UNIQUE (caller_id, service_offering_id, created_at)
+    CONSTRAINT uq_consumption_caller_service_ts UNIQUE (caller_id, service_offering_id, captured_at)
 );
 
 CREATE INDEX idx_consumption_caller ON participant_call_consumption (caller_id);
 CREATE INDEX idx_consumption_service ON participant_call_consumption (service_offering_id);
-CREATE INDEX idx_consumption_ts ON participant_call_consumption (created_at);
+CREATE INDEX idx_consumption_captured_at ON participant_call_consumption (captured_at);
+CREATE INDEX idx_consumption_created_at ON participant_call_consumption (created_at);
+CREATE UNIQUE INDEX uq_consumption_source_ref_id ON participant_call_consumption (source_ref_id);

@@ -78,11 +78,11 @@ export function ConsumptionListPage() {
       }
       if (fromAt) {
         const from = new Date(fromAt).getTime()
-        if (new Date(c.createdAt).getTime() < from) return false
+        if (new Date(c.capturedAt).getTime() < from) return false
       }
       if (toAt) {
         const to = new Date(toAt).getTime()
-        if (new Date(c.createdAt).getTime() > to) return false
+        if (new Date(c.capturedAt).getTime() > to) return false
       }
       if (jsonQuery.trim()) {
         const s = jsonQuery.toLowerCase()
@@ -183,10 +183,10 @@ export function ConsumptionListPage() {
             placeholder="email / client id substring"
           />
         </Field>
-        <Field label="From (client, event time)">
+        <Field label="From (client, captured at)">
           <input type="datetime-local" value={fromAt} onChange={(e) => setFromAt(e.target.value)} />
         </Field>
-        <Field label="To (client, event time)">
+        <Field label="To (client, captured at)">
           <input type="datetime-local" value={toAt} onChange={(e) => setToAt(e.target.value)} />
         </Field>
         <Field label="Search JSON / names (client)">
@@ -210,7 +210,7 @@ export function ConsumptionListPage() {
         <table>
           <thead>
             <tr>
-              <th>When (UTC)</th>
+              <th>Captured at (UTC)</th>
               <th>Source ref</th>
               <th>Caller ID</th>
               <th>Participant</th>
@@ -222,7 +222,7 @@ export function ConsumptionListPage() {
           <tbody>
             {filtered.map((c) => (
               <tr key={c.id}>
-                <td className="nowrap">{formatDateTime(c.createdAt)}</td>
+                <td className="nowrap">{formatDateTime(c.capturedAt)}</td>
                 <td>
                   <code>{c.sourceRefId ?? '—'}</code>
                 </td>

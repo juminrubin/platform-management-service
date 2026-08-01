@@ -1,6 +1,7 @@
 package org.jrtech.platformmanagement.security
 
 import org.jrtech.platformmanagement.config.AppSecurityProperties
+import org.springframework.beans.factory.ObjectProvider
 import org.springframework.security.authentication.AnonymousAuthenticationToken
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.security.oauth2.jwt.Jwt
@@ -17,12 +18,16 @@ import org.springframework.stereotype.Component
  * Keep services free of security annotations so they compose without
  * re-checking roles on internal calls.
  *
- * App roles are matched from Spring authorities (`ROLE_System.Reader`) and, as a
- * fallback, from the JWT `roles` claim on the principal (in case claim mapping differs).
+ * App roles are matched from:
+ * 1. Spring authorities (`ROLE_System.Reader`)
+ * 2. JWT `roles` claim
+ * 3. Human membership in Entra `Platform-System-*` groups (Graph cache → app role)
+ * 4. Static / JWT `groups` claim mappings
  */
 @Component("authz")
 class Authz(
-    private val securityProperties: AppSecurityProperties
+    private val securityProperties: AppSecurityProperties,
+    private val humanAuthorization: ObjectProvider<EntraHumanAuthorizationService>
 ) {
 
     /** True when the app is in open test mode. */
@@ -95,14 +100,19 @@ class Authz(
 
         val fromGranted = authentication.authorities.mapNotNull { it.authority }.toMutableSet()
 
-        // Fallback: if ROLE_* was not mapped into GrantedAuthority, read JWT `roles` claim.
-        // /auth/me can show claim roles while method security would otherwise still 403.
         val jwt: Jwt? = when (val principal = authentication.principal) {
             is Jwt -> principal
             else -> (authentication as? JwtAuthenticationToken)?.token
         }
         if (jwt != null) {
-            JwtAuthorityMapper.extractRoles(jwt).forEach { role ->
+            // JWT roles claim + static group mappings + Platform-System-* membership roles
+            val humanAuth = humanAuthorization.getIfAvailable()
+            val effectiveRoles = if (humanAuth != null) {
+                humanAuth.extractEffectiveRoles(jwt)
+            } else {
+                JwtAuthorityMapper.extractEffectiveRoles(jwt, securityProperties)
+            }
+            effectiveRoles.forEach { role ->
                 fromGranted += if (role.startsWith("ROLE_")) role else "ROLE_$role"
                 if (!role.startsWith("ROLE_")) {
                     fromGranted += role

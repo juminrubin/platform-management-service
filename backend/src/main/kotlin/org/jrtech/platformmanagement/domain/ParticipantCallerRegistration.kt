@@ -36,6 +36,19 @@ class ParticipantCallerRegistration(
     @field:JoinColumn(name = "participant_id", nullable = false)
     var participant: Participant,
 
+    /**
+     * Actor that created the row. Set only by business logic (services);
+     * no entity or schema default.
+     */
+    @field:Column(name = "created_by", nullable = false, updatable = false, length = 255)
+    var createdBy: String,
+
+    /**
+     * Actor that last updated the row. Set only by business logic on every write.
+     */
+    @field:Column(name = "updated_by", nullable = false, length = 255)
+    var updatedBy: String,
+
     @field:Convert(converter = CallerRegistrationStatusConverter::class)
     @field:Column(nullable = false, length = 32)
     var status: CallerRegistrationStatus = CallerRegistrationStatus.ACTIVE,

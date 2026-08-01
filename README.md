@@ -2,31 +2,66 @@
 
 Kotlin/Spring Boot **API** + React (**Vite**) **UI** + **deploy** assets for managing participants, service offerings, entitlements, and consumption — secured with Microsoft Entra ID.
 
+**Integrations** are modeled as **connectors** (Entra directory, Blob Capture backfill, Event Hub live ingest). Full architecture: [`docs/design/connectors-entra-blob-eventhub.md`](docs/design/connectors-entra-blob-eventhub.md).
+
 ```text
 platform-management-service/
 ├── backend/                 # Spring Boot 4 API (Maven)
 │   ├── src/
 │   ├── pom.xml
 │   ├── Dockerfile
-│   ├── scripts/             # get-token-human.sh, get-token-mi.sh
-│   └── README.md            # API & Entra details
+│   ├── scripts/             # get-token-mi.sh (+ legacy get-token-human.sh)
+│   └── README.md            # API, Entra, connectors
 ├── frontend/                # React + TypeScript + MSAL
 │   ├── src/
 │   ├── Dockerfile
 │   └── .env.example
+├── scripts/                 # Human JWT helpers (get-token-human, curl-api, …)
 ├── deploy/
 │   ├── docker-compose.yml   # local API + UI
 │   ├── k8s/                 # AKS manifests (API + optional UI)
 │   └── scripts/             # build-and-push-acr, ci-deploy, deploy-aks
+├── docs/
+│   └── design/              # Architecture / design documents
 ├── .gitlab-ci.yml
 └── .github/workflows/
 ```
+
+## Architecture (high level)
+
+```text
+                    ┌─────────────────────────────────────┐
+  Humans / SPA ──►  │  Platform Management Service (API)  │
+  MI / SP ────────► │  Entra JWT resource server          │
+                    │                                     │
+                    │  Domain: Participants, Offerings,   │
+                    │  Entitlements, Callers, Consumptions│
+                    │                                     │
+                    │  Connectors (feature-flagged):      │
+                    │   • Entra directory (Graph cache)   │
+                    │   • Blob Capture Avro (backfill)    │
+                    │   • Event Hub (continuous ingest)   │
+                    └─────────────────────────────────────┘
+                              │              │
+             Managed Identity │              │ Managed Identity
+                              ▼              ▼
+                    Azure Blob (Capture)   Azure Event Hubs
+                              ▲
+                              │ EH Capture (platform)
+                   Producers ─┘
+```
+
+| Concern | Local / CI | Production (AKS) |
+|---------|------------|------------------|
+| Database | **H2** in-memory (`MODE=PostgreSQL`) | **Azure Database for PostgreSQL Flexible Server** |
+| Blob + Event Hubs | Optional; MI via `az login` / mocks | **Managed Identity** (Workload Identity) — no connection strings |
+| Auth | Entra JWT always on | Same |
 
 ## Prerequisites
 
 | Component | Need |
 |-----------|------|
-| Backend | JDK 17+, Maven 3.9+, `APP_AZURE_TENANT_ID`, `APP_AZURE_API_CLIENT_ID` |
+| Backend | **JDK 21+** (project targets Java 21; JDK 25 OK), Maven 3.9+, `APP_AZURE_TENANT_ID`, `APP_AZURE_API_CLIENT_ID` |
 | Frontend | Node 22+, Entra **SPA** app registration |
 | Deploy | Docker (compose), optional Azure CLI / kubectl |
 
@@ -42,12 +77,15 @@ export APP_AZURE_API_CLIENT_ID=<api-app-client-id>
 mvn spring-boot:run
 ```
 
-Token helpers (from `backend/`):
+Token helpers (human JWT — from monorepo root; see [scripts/README.md](scripts/README.md)):
 
 ```bash
 export APP_AZURE_TENANT_ID=...
 export APP_AZURE_API_CLIENT_ID=...
 ./scripts/get-token-human.sh --print-claims
+# or:
+eval "$(./scripts/get-token-human.sh --export --print-claims)"
+./scripts/curl-api.sh GET /api/v1/auth/me
 ```
 
 ### 2. UI
@@ -87,6 +125,17 @@ Human users: assign API app roles (`System.Maintainer`, `System.Reader`, …) to
 
 Details: [backend/README.md](backend/README.md).
 
+## Consumption ingest (connectors)
+
+| Path | Role | Status |
+|------|------|--------|
+| **POST `/api/v1/consumptions`** | Push / direct registration | **Implemented** (`Consumption.Registrator` or Maintainer) |
+| **Blob Capture backfill** | Historical load (`fromDate` / `untilDate`), async jobs | **Designed** — Maintainer-only; MI to storage |
+| **Event Hub continuous** | Live events; **start/stop API** for Maintainer | **Implemented** (default off; MI + Blob checkpoints) |
+
+Design and rollout: [docs/design/connectors-entra-blob-eventhub.md](docs/design/connectors-entra-blob-eventhub.md).  
+Backend API notes: [backend/README.md § Connectors](backend/README.md#connectors-integrations).
+
 ## Deploy
 
 ### AKS (API)
@@ -99,6 +148,8 @@ export APP_AZURE_API_CLIENT_ID=...
 ```
 
 Optional UI manifests: `deploy/k8s/ui-deployment.yaml` (build UI image with `VITE_*` build-args).
+
+Production expects **Azure PostgreSQL Flexible Server** and **Workload Identity** for Graph / Blob / Event Hubs as connectors are enabled.
 
 ### GitLab CI
 
@@ -115,7 +166,14 @@ Optional UI manifests: `deploy/k8s/ui-deployment.yaml` (build UI image with `VIT
 
 Backend stays a pure Spring project; frontend stays a pure Vite app; deploy owns cluster and compose wiring.
 
+## Documentation
+
+| Doc | Description |
+|-----|-------------|
+| [backend/README.md](backend/README.md) | API endpoints, Entra, domain, connectors |
+| [frontend/README.md](frontend/README.md) | SPA setup (if present) |
+| [docs/design/connectors-entra-blob-eventhub.md](docs/design/connectors-entra-blob-eventhub.md) | Connector architecture (Entra, Blob, Event Hub) |
+
 ## License
 
 This project is licensed under the [Apache License 2.0](LICENSE).
-

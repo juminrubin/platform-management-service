@@ -8,6 +8,11 @@
 #   APP_AZURE_REQUIRED_SCOPE  Extra filter-layer gate (e.g. access_as_user); leave empty to
 #                             authorize only via app roles (System.Maintainer, …)
 #   APP_CORS_ALLOWED_ORIGINS  Comma-separated browser origins
+#   app.security.group-role-mappings / application-registrations — map Entra groups
+#     and OAuth scopes from Application Registration IDs (see comments near app.security)
+#   APP_ENTRA_DIRECTORY_ENABLED=true — load members of groups named Platform-System-* via Graph
+#   APP_AZURE_GRAPH_CLIENT_ID / APP_AZURE_GRAPH_CLIENT_SECRET — optional Graph credential
+#     (else DefaultAzureCredential / managed identity)
 #
 # Run:
 #   export APP_AZURE_TENANT_ID=...
@@ -107,6 +112,17 @@ springdoc:
 
 # App roles (JWT "roles" claim) drive @PreAuthorize — see security/AppRoles.kt
 #   System.Maintainer | System.Reader | Entitlement.Reader | Consumption.Registrator
+#
+# Optional Entra security group → app role mapping (JWT "groups" claim):
+#   APP_AZURE_GROUP_ROLE_MAPPINGS JSON, e.g.
+#     {"11111111-2222-3333-4444-555555555555":["System.Maintainer"]}
+# Prefer assigning app roles to groups in Entra; use this only when tokens carry
+# groups without resolved roles.
+#
+# Optional per Application Registration ID mappings (scopes + group→roles):
+#   app.security.application-registrations[0].client-id: <app registration client id>
+#   app.security.application-registrations[0].oauth-scopes: access_as_user
+#   app.security.application-registrations[0].group-role-mappings: { <group-oid>: [System.Reader] }
 app:
   security:
     # Always require Entra JWT + roles (never open the API)
@@ -115,10 +131,53 @@ app:
     # (auth/me stays open to any authenticated JWT).
     required-scope: ${APP_AZURE_REQUIRED_SCOPE:}
     cors-allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:3000}
+    # Global group object-id → app role values (defaults to empty; omit if unused).
+    # Example (uncomment and replace GUIDs):
+    # group-role-mappings:
+    #   "11111111-2222-3333-4444-555555555555":
+    #     - System.Maintainer
+    #   "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee":
+    #     - System.Reader
+    #
+    # Per Application Registration (client) ID: expected OAuth scopes + group→role map.
+    # Matched against token azp / appid / aud. Defaults include the API app registration
+    # with the common delegated scope when APP_AZURE_API_CLIENT_ID is set.
+    application-registrations:
+      - client-id: ${APP_AZURE_API_CLIENT_ID:}
+        oauth-scopes:
+          - access_as_user
+          - api://${APP_AZURE_API_CLIENT_ID:}/access_as_user
+        # group-role-mappings:
+        #   "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee":
+        #     - System.Maintainer
 
-  # Background import of consumption Avro files from Azure Blob Storage.
-  # Schema: classpath:avro/consumption-event.avsc
-  # Auth: set APP_AZURE_STORAGE_CONNECTION_STRING or APP_AZURE_STORAGE_ACCOUNT_URL (+ MI).
+  # Microsoft Entra directory: load members of groups named Platform-System-* via Graph
+  # into a thread-safe ConcurrentHashMap (groupId → members), refreshed every 15 minutes.
+  # Human users (email/UPN) are authorized by membership; group display names map to app roles:
+  #   Platform-System-Maintainer → System.Maintainer
+  #   Platform-System-Reader → System.Reader
+  #   Platform-System-Entitlement-Reader → Entitlement.Reader
+  #   Platform-System-Consumption-Registrator → Consumption.Registrator
+  # Requires Graph application permissions (admin consent) on the credential principal:
+  #   Group.Read.All + GroupMember.Read.All + User.Read.All
+  #   (or Directory.Read.All alone — covers user profile attributes on members)
+  # Members are loaded via /members/microsoft.graph.user and may hydrate via GET /users/{id}.
+  # Auth: client secret (APP_AZURE_GRAPH_CLIENT_ID/SECRET) or DefaultAzureCredential (MI).
+  entra-directory:
+    enabled: ${APP_ENTRA_DIRECTORY_ENABLED:true}
+    group-name-prefix: ${APP_ENTRA_GROUP_NAME_PREFIX:Platform-System-}
+    include-transitive-members: ${APP_ENTRA_INCLUDE_TRANSITIVE_MEMBERS:false}
+    # Default 900000 ms = 15 minutes
+    refresh-interval-ms: ${APP_ENTRA_DIRECTORY_REFRESH_MS:900000}
+    load-on-startup: ${APP_ENTRA_DIRECTORY_LOAD_ON_STARTUP:true}
+    graph-base-url: ${APP_ENTRA_GRAPH_BASE_URL:https://graph.microsoft.com/v1.0}
+    tenant-id: ${AZURE_TENANT_ID}
+    client-id: ${AZURE_CLIENT_ID:${APP_AZURE_API_CLIENT_ID:}}
+    client-secret: ${AZURE_CLIENT_SECRET:}
+
+  # Background import of consumption Avro files from Azure Blob Storage (legacy keys).
+  # Prefer app.connectors.consumption-blob.* going forward (see design doc).
+  # Auth: Managed Identity via account URL (prod); connection string optional for local only.
   consumption-import:
     enabled: ${APP_CONSUMPTION_IMPORT_ENABLED:false}
     connection-string: ${APP_AZURE_STORAGE_CONNECTION_STRING:}
@@ -128,6 +187,45 @@ app:
     poll-interval-ms: ${APP_CONSUMPTION_IMPORT_POLL_MS:300000}
     max-blobs-per-run: ${APP_CONSUMPTION_IMPORT_MAX_BLOBS:20}
     require-avro-extension: true
+
+  # Connectors (integrations). Defaults off; Blob/EH use Managed Identity in production.
+  # Unified API (System.Maintainer):
+  #   GET  /api/v1/connectors
+  #   GET  /api/v1/connectors/{id}
+  #   POST /api/v1/connectors/{id}/start|stop
+  # ids: consumption-storage | consumption-eventhub | entra-directory
+  # entra-directory start = Graph group/member refresh; view data via /api/v1/entra/**
+  connectors:
+    consumption-eventhub:
+      enabled: ${APP_CONNECTOR_EH_ENABLED:false}
+      # When true and enabled, start on ApplicationReady; prefer false and use Maintainer API.
+      auto-start: ${APP_CONNECTOR_EH_AUTO_START:false}
+      fully-qualified-namespace: ${APP_CONNECTOR_EH_NAMESPACE:}
+      event-hub-name: ${APP_CONNECTOR_EH_NAME:}
+      consumer-group: ${APP_CONNECTOR_EH_CONSUMER_GROUP:$Default}
+      checkpoint-storage-account-url: ${APP_CONNECTOR_EH_CHECKPOINT_ACCOUNT_URL:}
+      checkpoint-container: ${APP_CONNECTOR_EH_CHECKPOINT_CONTAINER:eh-checkpoints}
+      require-source-ref-id: ${APP_CONNECTOR_EH_REQUIRE_SOURCE_REF_ID:true}
+      poison-skip-after: ${APP_CONNECTOR_EH_POISON_SKIP_AFTER:5}
+    # Hierarchical Avro: {blob-prefix}/yyyy/MM/dd/HH_mm_ss.avro (multiple prefixes supported)
+    # GET /api/v1/connectors/consumption-storage?startDate=&endDate=
+    consumption-blob:
+      enabled: ${APP_CONNECTOR_BLOB_ENABLED:false}
+      runner-enabled: ${APP_CONNECTOR_BLOB_RUNNER_ENABLED:false}
+      storage-account-url: ${APP_CONNECTOR_BLOB_ACCOUNT_URL:}
+      # Optional local-only override; prefer Managed Identity + storage-account-url in prod
+      connection-string: ${APP_CONNECTOR_BLOB_CONNECTION_STRING:${APP_AZURE_STORAGE_CONNECTION_STRING:}}
+      container: ${APP_CONNECTOR_BLOB_CONTAINER:}
+      # Prefer list form (YAML) or APP_CONNECTOR_BLOB_PREFIXES_0 / _1 / …
+      # blob-prefixes:
+      #   - eh-capture
+      #   - manual/import
+      blob-prefixes: []
+      # Singular or comma-separated (merged with blob-prefixes); e.g. "a,b" or APP_CONNECTOR_BLOB_PREFIX
+      blob-prefix: ${APP_CONNECTOR_BLOB_PREFIX:}
+      max-range-days: ${APP_CONNECTOR_BLOB_MAX_RANGE_DAYS:31}
+      max-blobs-per-job: ${APP_CONNECTOR_BLOB_MAX_BLOBS:500}
+      require-source-ref-id: ${APP_CONNECTOR_BLOB_REQUIRE_SOURCE_REF_ID:true}
 
 # Logging is configured in logback-spring.xml (Logback).
 # Levels here still work as overrides via Spring Boot's LoggingSystem.

@@ -19,6 +19,7 @@ import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import java.util.Optional
+import org.jrtech.platformmanagement.TestAudit
 
 @ExtendWith(MockitoExtension::class)
 class ParticipantServiceTest {
@@ -131,5 +132,7 @@ class ParticipantServiceTest {
     }
 
     private fun participant(id: String, name: String) =
-        Participant(id = id, name = name, contact = null, status = ParticipantStatus.ACTIVE)
+        Participant(id = id, name = name, contact = null, status = ParticipantStatus.ACTIVE,
+            createdBy = TestAudit.BY,
+            updatedBy = TestAudit.BY)
 }

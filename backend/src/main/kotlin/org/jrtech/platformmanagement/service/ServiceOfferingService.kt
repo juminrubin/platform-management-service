@@ -1,5 +1,6 @@
 package org.jrtech.platformmanagement.service
 
+import org.jrtech.platformmanagement.domain.AuditActors
 import org.jrtech.platformmanagement.domain.ServiceOffering
 import org.jrtech.platformmanagement.dto.CreateServiceOfferingRequest
 import org.jrtech.platformmanagement.dto.ServiceOfferingResponse
@@ -52,11 +53,14 @@ class ServiceOfferingService(
                 name = request.name.trim(),
                 description = request.description?.trim(),
                 category = request.category.trim().uppercase(),
+                provider = normalizeProvider(request.provider),
                 config = request.config.trim().ifEmpty { "{}" },
-                active = request.active
+                active = request.active,
+                createdBy = AuditActors.SYSTEM,
+                updatedBy = AuditActors.SYSTEM
             )
         )
-        log.info("Created service offering id={}", saved.id)
+        log.info("Created service offering id={} provider={} createdBy={}", saved.id, saved.provider, saved.createdBy)
         return ServiceOfferingResponse.from(saved)
     }
 
@@ -67,10 +71,18 @@ class ServiceOfferingService(
         entity.name = request.name.trim()
         entity.description = request.description?.trim()
         entity.category = request.category.trim().uppercase()
+        entity.provider = normalizeProvider(request.provider)
         entity.config = request.config.trim().ifEmpty { "{}" }
         entity.active = request.active
+        entity.updatedBy = AuditActors.SYSTEM
         val saved = serviceOfferingRepository.save(entity)
-        log.info("Updated service offering id={} active={}", saved.id, saved.active)
+        log.info(
+            "Updated service offering id={} provider={} active={} updatedBy={}",
+            saved.id,
+            saved.provider,
+            saved.active,
+            saved.updatedBy
+        )
         return ServiceOfferingResponse.from(saved)
     }
 
@@ -90,4 +102,8 @@ class ServiceOfferingService(
             log.warn("Service offering not found id={}", id)
             ResourceNotFoundException("Service offering not found: $id")
         }
+
+    /** Trim, uppercase; null/blank values fall back to [ServiceOffering.DEFAULT_PROVIDER]. */
+    private fun normalizeProvider(provider: String?): String =
+        provider?.trim()?.uppercase()?.ifEmpty { null } ?: ServiceOffering.DEFAULT_PROVIDER
 }

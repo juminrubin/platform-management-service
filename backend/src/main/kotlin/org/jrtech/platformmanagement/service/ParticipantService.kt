@@ -1,5 +1,6 @@
 package org.jrtech.platformmanagement.service
 
+import org.jrtech.platformmanagement.domain.AuditActors
 import org.jrtech.platformmanagement.domain.Participant
 import org.jrtech.platformmanagement.domain.ParticipantStatus
 import org.jrtech.platformmanagement.dto.CreateParticipantRequest
@@ -54,10 +55,12 @@ class ParticipantService(
                 id = id,
                 name = name,
                 contact = request.contact?.trim(),
-                status = request.status
+                status = request.status,
+                createdBy = AuditActors.SYSTEM,
+                updatedBy = AuditActors.SYSTEM
             )
         )
-        log.info("Created participant id={}", saved.id)
+        log.info("Created participant id={} createdBy={}", saved.id, saved.createdBy)
         return ParticipantResponse.from(saved)
     }
 
@@ -73,8 +76,9 @@ class ParticipantService(
         entity.name = name
         entity.contact = request.contact?.trim()
         entity.status = request.status
+        entity.updatedBy = AuditActors.SYSTEM
         val saved = participantRepository.save(entity)
-        log.info("Updated participant id={} status={}", saved.id, saved.status)
+        log.info("Updated participant id={} status={} updatedBy={}", saved.id, saved.status, saved.updatedBy)
         return ParticipantResponse.from(saved)
     }
 

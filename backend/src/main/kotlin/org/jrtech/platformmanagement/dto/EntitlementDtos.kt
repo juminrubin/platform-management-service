@@ -61,7 +61,9 @@ data class EntitlementResponse(
     val config: String,
     val notes: String?,
     val createdAt: Instant,
-    val updatedAt: Instant
+    val createdBy: String,
+    val updatedAt: Instant,
+    val updatedBy: String
 ) {
     companion object {
         fun from(entity: ParticipantServiceEntitlement) = EntitlementResponse(
@@ -76,7 +78,9 @@ data class EntitlementResponse(
             config = entity.config,
             notes = entity.notes,
             createdAt = entity.createdAt,
-            updatedAt = entity.updatedAt
+            createdBy = entity.createdBy,
+            updatedAt = entity.updatedAt,
+            updatedBy = entity.updatedBy
         )
     }
 }
@@ -84,15 +88,24 @@ data class EntitlementResponse(
 /**
  * Result of checking whether a registered caller may use a service offering.
  * Used by [Entitlement.Reader] and [System.Maintainer] roles.
+ *
+ * Validity is evaluated over the closed UTC date range [[fromDate], [untilDate]]
+ * (inclusive). Defaults to "today" for both when the client omits the params.
  */
 data class EntitlementCheckResponse(
-    /** True when an ACTIVE entitlement covers the service for the caller's participant on [asOf]. */
+    /**
+     * True when an ACTIVE entitlement fully covers the service for the caller's
+     * participant over [[fromDate], [untilDate]].
+     */
     val allowed: Boolean,
     val reason: String,
     /** Unique principal key of the caller registration. */
     val callerId: String?,
     val participantId: String?,
     val serviceOfferingId: String,
-    val asOf: LocalDate,
+    /** Start of the evaluation window (UTC calendar day, inclusive). */
+    val fromDate: LocalDate,
+    /** End of the evaluation window (UTC calendar day, inclusive). */
+    val untilDate: LocalDate,
     val entitlement: EntitlementResponse?
 )

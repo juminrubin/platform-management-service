@@ -18,6 +18,7 @@ import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import java.util.Optional
+import org.jrtech.platformmanagement.TestAudit
 
 @ExtendWith(MockitoExtension::class)
 class ServiceOfferingServiceTest {
@@ -82,7 +83,25 @@ class ServiceOfferingServiceTest {
         )
         assertThat(result.id).isEqualTo("gpt-5.1")
         assertThat(result.category).isEqualTo("LLM")
+        assertThat(result.provider).isEqualTo("SYSTEM")
         assertThat(result.config).contains("default_max_tpm")
+    }
+
+    @Test
+    fun `create defaults blank provider to SYSTEM and uppercases provider`() {
+        whenever(serviceOfferingRepository.existsById("m1")).thenReturn(false)
+        whenever(serviceOfferingRepository.save(any(ServiceOffering::class.java))).thenAnswer { it.getArgument(0) }
+
+        val blank = serviceOfferingService.create(
+            CreateServiceOfferingRequest(id = "m1", name = "M", category = "LLM", provider = "  ")
+        )
+        assertThat(blank.provider).isEqualTo("SYSTEM")
+
+        whenever(serviceOfferingRepository.existsById("m2")).thenReturn(false)
+        val azure = serviceOfferingService.create(
+            CreateServiceOfferingRequest(id = "m2", name = "M", category = "LLM", provider = " azure ")
+        )
+        assertThat(azure.provider).isEqualTo("AZURE")
     }
 
     @Test
@@ -101,10 +120,18 @@ class ServiceOfferingServiceTest {
 
         val result = serviceOfferingService.update(
             "gpt",
-            UpdateServiceOfferingRequest(name = "Updated", description = null, category = "speech", config = "{}", active = false)
+            UpdateServiceOfferingRequest(
+                name = "Updated",
+                description = null,
+                category = "speech",
+                provider = "azure",
+                config = "{}",
+                active = false
+            )
         )
         assertThat(result.name).isEqualTo("Updated")
         assertThat(result.category).isEqualTo("SPEECH")
+        assertThat(result.provider).isEqualTo("AZURE")
         assertThat(result.active).isFalse()
     }
 
@@ -116,5 +143,7 @@ class ServiceOfferingServiceTest {
     }
 
     private fun offering(id: String, active: Boolean = true) =
-        ServiceOffering(id = id, name = "Name", category = "LLM", active = active)
+        ServiceOffering(id = id, name = "Name", category = "LLM", active = active,
+            createdBy = TestAudit.BY,
+            updatedBy = TestAudit.BY)
 }

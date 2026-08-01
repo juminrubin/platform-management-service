@@ -15,7 +15,7 @@ export function ConsumptionFormPage() {
   const [consumptionData, setConsumptionData] = useState(
     '{\n  "endpoint_url": "",\n  "input_token": 0,\n  "output_token": 0,\n  "cache_token": 0\n}',
   )
-  const [consumedAt, setConsumedAt] = useState('')
+  const [capturedAt, setCapturedAt] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -39,16 +39,16 @@ export function ConsumptionFormPage() {
       return
     }
     try {
-      let consumedAtIso: string | null = null
-      if (consumedAt) {
-        consumedAtIso = new Date(consumedAt).toISOString()
+      let capturedAtIso: string | null = null
+      if (capturedAt) {
+        capturedAtIso = new Date(capturedAt).toISOString()
       }
       const created = await createConsumption({
         callerId,
         serviceOfferingId,
         sourceRefId: sourceRefId.trim() || null,
         consumptionData: consumptionData.trim() || '{}',
-        consumedAt: consumedAtIso,
+        capturedAt: capturedAtIso,
       })
       navigate(`/consumptions/${created.id}`)
     } catch (err) {
@@ -109,8 +109,11 @@ export function ConsumptionFormPage() {
             maxLength={255}
           />
         </Field>
-        <Field label="Event time (optional)" hint="Defaults to now if empty.">
-          <input type="datetime-local" value={consumedAt} onChange={(e) => setConsumedAt(e.target.value)} />
+        <Field
+          label="Captured at (optional)"
+          hint="When the consumption was captured at runtime. Defaults to now if empty."
+        >
+          <input type="datetime-local" value={capturedAt} onChange={(e) => setCapturedAt(e.target.value)} />
         </Field>
         <Field label="Consumption data (JSON)">
           <textarea

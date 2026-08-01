@@ -78,9 +78,15 @@ class MicrosoftEntraSecurityTest {
                         token.claim("tid", "tenant-guid")
                         token.claim("roles", listOf(AppRoles.ENTITLEMENT_READER))
                         token.claim("azp", "client-app-id")
+                        token.claim("scp", "access_as_user")
+                        token.claim("groups", listOf("group-object-id-1"))
                         token.audience(listOf("api-client-id"))
                     }
-                    .authorities(SimpleGrantedAuthority("ROLE_${AppRoles.ENTITLEMENT_READER}"))
+                    .authorities(
+                        SimpleGrantedAuthority("ROLE_${AppRoles.ENTITLEMENT_READER}"),
+                        SimpleGrantedAuthority("SCOPE_access_as_user"),
+                        SimpleGrantedAuthority("GROUP_group-object-id-1")
+                    )
             )
         }.andExpect {
             status { isOk() }
@@ -90,6 +96,8 @@ class MicrosoftEntraSecurityTest {
             jsonPath("$.tenantId") { value("tenant-guid") }
             jsonPath("$.clientId") { value("client-app-id") }
             jsonPath("$.roles[0]") { value(AppRoles.ENTITLEMENT_READER) }
+            jsonPath("$.scopes[0]") { value("access_as_user") }
+            jsonPath("$.groups[0]") { value("group-object-id-1") }
         }
     }
 

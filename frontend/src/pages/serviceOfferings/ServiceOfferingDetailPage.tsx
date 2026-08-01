@@ -61,9 +61,12 @@ export function ServiceOfferingDetailPage() {
               { label: 'Name', value: item.name },
               { label: 'Description', value: item.description },
               { label: 'Category', value: item.category },
+              { label: 'Provider', value: item.provider },
               { label: 'Active', value: item.active ? 'Yes' : 'No' },
               { label: 'Created', value: formatDateTime(item.createdAt) },
+              { label: 'Created by', value: item.createdBy },
               { label: 'Updated', value: formatDateTime(item.updatedAt) },
+              { label: 'Updated by', value: item.updatedBy },
             ]}
           />
           <h3>Config (JSON)</h3>

@@ -22,11 +22,31 @@ class ServiceOffering(
     @field:Column(nullable = false)
     var name: String,
 
+    @field:Column(nullable = false, length = 100)
+    var category: String,
+
+    /**
+     * Actor that created the row. Set only by business logic (services);
+     * no entity or schema default.
+     */
+    @field:Column(name = "created_by", nullable = false, updatable = false, length = 255)
+    var createdBy: String,
+
+    /**
+     * Actor that last updated the row. Set only by business logic on every write.
+     */
+    @field:Column(name = "updated_by", nullable = false, length = 255)
+    var updatedBy: String,
+
     @field:Column(length = 1000)
     var description: String? = null,
 
-    @field:Column(nullable = false, length = 64)
-    var category: String,
+    /**
+     * Provider of the offering (e.g. SYSTEM, AZURE, AWS).
+     * Defaults to SYSTEM for platform-managed catalog entries.
+     */
+    @field:Column(nullable = false, length = 100)
+    var provider: String = DEFAULT_PROVIDER,
 
     /** JSON configuration (deployment_endpoint, default_max_tpm, …) — VARCHAR(5000) NOT NULL */
     @field:Column(nullable = false, length = 5000)
@@ -53,5 +73,9 @@ class ServiceOffering(
     @PreUpdate
     fun onUpdate() {
         updatedAt = UtcTimestamps.now()
+    }
+
+    companion object {
+        const val DEFAULT_PROVIDER: String = "SYSTEM"
     }
 }

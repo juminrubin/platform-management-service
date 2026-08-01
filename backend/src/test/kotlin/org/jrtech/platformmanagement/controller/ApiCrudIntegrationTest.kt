@@ -107,6 +107,7 @@ class ApiCrudIntegrationTest {
         }.andExpect {
             status { isCreated() }
             jsonPath("$.category") { value("LLM") }
+            jsonPath("$.provider") { value("SYSTEM") }
         }
 
         mockMvc.get("/api/v1/service-offerings/$offeringId") {
@@ -114,6 +115,7 @@ class ApiCrudIntegrationTest {
         }.andExpect {
             status { isOk() }
             jsonPath("$.id") { value(offeringId) }
+            jsonPath("$.provider") { value("SYSTEM") }
         }
 
         mockMvc.put("/api/v1/service-offerings/$offeringId") {
@@ -123,6 +125,7 @@ class ApiCrudIntegrationTest {
                   "name":"Updated $suffix",
                   "description":null,
                   "category":"speech",
+                  "provider":"azure",
                   "config":"{}",
                   "active":false
                 }
@@ -131,6 +134,7 @@ class ApiCrudIntegrationTest {
             status { isOk() }
             jsonPath("$.active") { value(false) }
             jsonPath("$.category") { value("SPEECH") }
+            jsonPath("$.provider") { value("AZURE") }
         }
 
         mockMvc.get("/api/v1/service-offerings") {
@@ -243,7 +247,7 @@ class ApiCrudIntegrationTest {
                   "serviceOfferingId":"$offeringId",
                   "sourceRefId":"$sourceRefId",
                   "consumptionData":"{\"input_token\":3}",
-                  "consumedAt":"2024-08-01T12:00:00Z"
+                  "capturedAt":"2024-08-01T12:00:00Z"
                 }
             """.trimIndent()
         }.andExpect {
@@ -259,7 +263,8 @@ class ApiCrudIntegrationTest {
             accept = MediaType.APPLICATION_JSON
         }.andExpect {
             status { isOk() }
-            jsonPath("$.createdAt") { value("2024-08-01T12:00:00Z") }
+            jsonPath("$.capturedAt") { value("2024-08-01T12:00:00Z") }
+            jsonPath("$.createdAt") { exists() }
             jsonPath("$.sourceRefId") { value(sourceRefId) }
         }
 

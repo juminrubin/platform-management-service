@@ -4,6 +4,9 @@ import org.jrtech.platformmanagement.config.AppSecurityProperties
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
+import org.mockito.kotlin.mock
+import org.mockito.kotlin.whenever
+import org.springframework.beans.factory.ObjectProvider
 import org.springframework.security.authentication.AnonymousAuthenticationToken
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.authority.SimpleGrantedAuthority
@@ -21,7 +24,7 @@ class AuthzTest {
 
     @Test
     fun `permit-all short-circuits role and auth checks`() {
-        val authz = Authz(AppSecurityProperties(permitAll = true, requiredScope = ""))
+        val authz = authz(AppSecurityProperties(permitAll = true, requiredScope = ""))
         assertThat(authz.permitAll()).isTrue()
         assertThat(authz.isAuthenticated()).isTrue()
         assertThat(authz.canMaintain()).isTrue()
@@ -33,7 +36,7 @@ class AuthzTest {
 
     @Test
     fun `isAuthenticated rejects missing and anonymous principals`() {
-        val authz = Authz(AppSecurityProperties(permitAll = false, requiredScope = ""))
+        val authz = authz(AppSecurityProperties(permitAll = false, requiredScope = ""))
         SecurityContextHolder.clearContext()
         assertThat(authz.isAuthenticated()).isFalse()
 
@@ -44,7 +47,7 @@ class AuthzTest {
 
     @Test
     fun `role helpers honor ROLE_ prefix and bare role values`() {
-        val authz = Authz(AppSecurityProperties(permitAll = false, requiredScope = ""))
+        val authz = authz(AppSecurityProperties(permitAll = false, requiredScope = ""))
         setAuth(SimpleGrantedAuthority("ROLE_${AppRoles.SYSTEM_READER}"))
         assertThat(authz.isAuthenticated()).isTrue()
         assertThat(authz.canRead()).isTrue()
@@ -59,7 +62,7 @@ class AuthzTest {
 
     @Test
     fun `hasAnyRole handles empty roles and blank role names`() {
-        val authz = Authz(AppSecurityProperties(permitAll = false, requiredScope = ""))
+        val authz = authz(AppSecurityProperties(permitAll = false, requiredScope = ""))
         setAuth(SimpleGrantedAuthority("ROLE_${AppRoles.SYSTEM_MAINTAINER}"))
         assertThat(authz.hasAnyRole()).isFalse()
         assertThat(authz.hasAnyRole("  ", AppRoles.SYSTEM_MAINTAINER)).isTrue()
@@ -68,14 +71,14 @@ class AuthzTest {
 
     @Test
     fun `hasAnyRole returns false when security context has no authentication`() {
-        val authz = Authz(AppSecurityProperties(permitAll = false, requiredScope = ""))
+        val authz = authz(AppSecurityProperties(permitAll = false, requiredScope = ""))
         SecurityContextHolder.clearContext()
         assertThat(authz.hasAnyRole(AppRoles.SYSTEM_MAINTAINER)).isFalse()
     }
 
     @Test
     fun `canRead falls back to JWT roles claim when GrantedAuthorities omit ROLE_ prefix mapping`() {
-        val authz = Authz(AppSecurityProperties(permitAll = false, requiredScope = ""))
+        val authz = authz(AppSecurityProperties(permitAll = false, requiredScope = ""))
         val now = Instant.parse("2024-06-01T00:00:00Z")
         val jwt = Jwt.withTokenValue("t")
             .header("alg", "none")
@@ -84,11 +87,43 @@ class AuthzTest {
             .issuedAt(now)
             .expiresAt(now.plusSeconds(3600))
             .build()
-        // Simulate incomplete authority mapping (only scope, no ROLE_System.Reader)
         SecurityContextHolder.getContext().authentication =
             JwtAuthenticationToken(jwt, listOf(SimpleGrantedAuthority("SCOPE_access_as_user")))
         assertThat(authz.canRead()).isTrue()
         assertThat(authz.canMaintain()).isFalse()
+    }
+
+    @Test
+    fun `canRead falls back to group-role mapping when token has groups but no roles claim`() {
+        val groupId = "maintainer-group-oid"
+        val authz = authz(
+            AppSecurityProperties(
+                permitAll = false,
+                requiredScope = "",
+                groupRoleMappings = mapOf(groupId to listOf(AppRoles.SYSTEM_READER))
+            )
+        )
+        val now = Instant.parse("2024-06-01T00:00:00Z")
+        val jwt = Jwt.withTokenValue("t")
+            .header("alg", "none")
+            .subject("user-1")
+            .claim("groups", listOf(groupId))
+            .issuedAt(now)
+            .expiresAt(now.plusSeconds(3600))
+            .build()
+        SecurityContextHolder.getContext().authentication =
+            JwtAuthenticationToken(jwt, listOf(SimpleGrantedAuthority("SCOPE_access_as_user")))
+        assertThat(authz.canRead()).isTrue()
+        assertThat(authz.canMaintain()).isFalse()
+    }
+
+    private fun authz(
+        props: AppSecurityProperties,
+        human: EntraHumanAuthorizationService? = null
+    ): Authz {
+        val provider = mock<ObjectProvider<EntraHumanAuthorizationService>>()
+        whenever(provider.getIfAvailable()).thenReturn(human)
+        return Authz(props, provider)
     }
 
     private fun setAuth(vararg authorities: SimpleGrantedAuthority) {

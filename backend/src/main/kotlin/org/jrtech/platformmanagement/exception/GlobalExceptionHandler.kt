@@ -7,8 +7,10 @@ import org.springframework.security.access.AccessDeniedException
 import org.springframework.security.core.AuthenticationException
 import org.springframework.validation.FieldError
 import org.springframework.web.bind.MethodArgumentNotValidException
+import org.springframework.web.bind.MissingServletRequestParameterException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException
 import java.net.URI
 
 @RestControllerAdvice
@@ -25,6 +27,20 @@ class GlobalExceptionHandler {
     @ExceptionHandler(BadRequestException::class)
     fun handleBadRequest(ex: BadRequestException): ProblemDetail =
         problem(HttpStatus.BAD_REQUEST, ex.message ?: "Bad request")
+
+    @ExceptionHandler(MissingServletRequestParameterException::class)
+    fun handleMissingRequestParam(ex: MissingServletRequestParameterException): ProblemDetail =
+        problem(
+            HttpStatus.BAD_REQUEST,
+            ex.message ?: "Required request parameter '${ex.parameterName}' is not present"
+        )
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException::class)
+    fun handleTypeMismatch(ex: MethodArgumentTypeMismatchException): ProblemDetail =
+        problem(
+            HttpStatus.BAD_REQUEST,
+            ex.message ?: "Invalid value for parameter '${ex.name}'"
+        )
 
     @ExceptionHandler(MethodArgumentNotValidException::class)
     fun handleValidation(ex: MethodArgumentNotValidException): ProblemDetail {

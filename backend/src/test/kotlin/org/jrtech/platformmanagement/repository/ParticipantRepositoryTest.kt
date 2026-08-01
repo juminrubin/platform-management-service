@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
 import org.springframework.test.context.ActiveProfiles
 import java.util.UUID
+import org.jrtech.platformmanagement.TestAudit
 
 @DataJpaTest
 @ActiveProfiles("test")
@@ -19,7 +20,9 @@ class ParticipantRepositoryTest @Autowired constructor(
     fun `save and findById returns participant`() {
         val id = "p-${UUID.randomUUID().toString().take(8)}"
         val saved = participantRepository.save(
-            Participant(id = id, name = "Test Corp", contact = "ops@test.example", status = ParticipantStatus.ACTIVE)
+            Participant(id = id, name = "Test Corp", contact = "ops@test.example", status = ParticipantStatus.ACTIVE,
+            createdBy = TestAudit.BY,
+            updatedBy = TestAudit.BY)
         )
 
         val found = participantRepository.findById(saved.id)
@@ -31,7 +34,9 @@ class ParticipantRepositoryTest @Autowired constructor(
     @Test
     fun `findByName returns matching participant`() {
         val id = "p-${UUID.randomUUID().toString().take(8)}"
-        participantRepository.save(Participant(id = id, name = "Unique Name $id", status = ParticipantStatus.ACTIVE))
+        participantRepository.save(Participant(id = id, name = "Unique Name $id", status = ParticipantStatus.ACTIVE,
+            createdBy = TestAudit.BY,
+            updatedBy = TestAudit.BY))
 
         assertThat(participantRepository.findByName("Unique Name $id")).isNotNull
         assertThat(participantRepository.findByName("missing")).isNull()
@@ -40,8 +45,12 @@ class ParticipantRepositoryTest @Autowired constructor(
     @Test
     fun `findByStatus returns only matching status`() {
         val suffix = UUID.randomUUID().toString().take(8)
-        participantRepository.save(Participant(id = "act-$suffix", name = "Active $suffix", status = ParticipantStatus.ACTIVE))
-        participantRepository.save(Participant(id = "sus-$suffix", name = "Suspended $suffix", status = ParticipantStatus.SUSPENDED))
+        participantRepository.save(Participant(id = "act-$suffix", name = "Active $suffix", status = ParticipantStatus.ACTIVE,
+            createdBy = TestAudit.BY,
+            updatedBy = TestAudit.BY))
+        participantRepository.save(Participant(id = "sus-$suffix", name = "Suspended $suffix", status = ParticipantStatus.SUSPENDED,
+            createdBy = TestAudit.BY,
+            updatedBy = TestAudit.BY))
 
         val suspended = participantRepository.findByStatus(ParticipantStatus.SUSPENDED)
         assertThat(suspended.map { it.id }).contains("sus-$suffix")
@@ -52,7 +61,9 @@ class ParticipantRepositoryTest @Autowired constructor(
     fun `existsByName and existsByNameAndIdNot`() {
         val suffix = UUID.randomUUID().toString().take(8)
         val id = "ex-$suffix"
-        participantRepository.save(Participant(id = id, name = "Exists $suffix", status = ParticipantStatus.INACTIVE))
+        participantRepository.save(Participant(id = id, name = "Exists $suffix", status = ParticipantStatus.INACTIVE,
+            createdBy = TestAudit.BY,
+            updatedBy = TestAudit.BY))
 
         assertThat(participantRepository.existsByName("Exists $suffix")).isTrue()
         assertThat(participantRepository.existsByNameAndIdNot("Exists $suffix", id)).isFalse()
@@ -62,7 +73,9 @@ class ParticipantRepositoryTest @Autowired constructor(
     @Test
     fun `delete removes participant`() {
         val id = "del-${UUID.randomUUID().toString().take(8)}"
-        participantRepository.save(Participant(id = id, name = "Delete $id", status = ParticipantStatus.ACTIVE))
+        participantRepository.save(Participant(id = id, name = "Delete $id", status = ParticipantStatus.ACTIVE,
+            createdBy = TestAudit.BY,
+            updatedBy = TestAudit.BY))
         participantRepository.deleteById(id)
         assertThat(participantRepository.findById(id)).isEmpty
     }

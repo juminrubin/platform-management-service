@@ -19,6 +19,7 @@ import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
 import org.springframework.context.annotation.Import
 import org.springframework.test.context.ActiveProfiles
 import java.util.UUID
+import org.jrtech.platformmanagement.TestAudit
 
 @DataJpaTest
 @Import(
@@ -44,10 +45,14 @@ class CallerRegistrationAndConsumptionPersistenceTest @Autowired constructor(
     fun setUp() {
         val suffix = UUID.randomUUID().toString().take(8)
         participant = participantRepository.save(
-            Participant(id = "p-$suffix", name = "CC $suffix", status = ParticipantStatus.ACTIVE)
+            Participant(id = "p-$suffix", name = "CC $suffix", status = ParticipantStatus.ACTIVE,
+            createdBy = TestAudit.BY,
+            updatedBy = TestAudit.BY)
         )
         offering = serviceOfferingRepository.save(
-            ServiceOffering(id = "so-$suffix", name = "Model $suffix", category = "LLM", active = true)
+            ServiceOffering(id = "so-$suffix", name = "Model $suffix", category = "LLM", active = true,
+            createdBy = TestAudit.BY,
+            updatedBy = TestAudit.BY)
         )
     }
 
@@ -86,6 +91,8 @@ class CallerRegistrationAndConsumptionPersistenceTest @Autowired constructor(
         assertThat(consumption.callerId).isEqualTo("user@example.com")
         assertThat(consumption.serviceOfferingId).isEqualTo(offering.id)
         assertThat(consumption.sourceRefId).isEqualTo(sourceRef)
+        assertThat(consumption.capturedAt).isNotNull()
+        assertThat(consumption.createdAt).isNotNull()
         assertThat(consumptionRepository.existsById(consumption.id)).isTrue()
         assertThat(consumptionRepository.existsBySourceRefId(sourceRef)).isTrue()
 

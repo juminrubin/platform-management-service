@@ -1,9 +1,13 @@
 package org.jrtech.platformmanagement.controller
 
+import org.jrtech.platformmanagement.config.AppSecurityProperties
 import org.jrtech.platformmanagement.dto.AuthenticatedUserResponse
+import org.jrtech.platformmanagement.security.EntraHumanAuthorizationService
+import org.jrtech.platformmanagement.security.JwtAuthorityMapper
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.security.SecurityRequirement
 import io.swagger.v3.oas.annotations.tags.Tag
+import org.springframework.beans.factory.ObjectProvider
 import org.springframework.http.HttpStatus
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.security.core.Authentication
@@ -25,7 +29,10 @@ import org.springframework.web.server.ResponseStatusException
 @RequestMapping("/api/v1/auth")
 @Tag(name = "Auth")
 @SecurityRequirement(name = "bearer-jwt")
-class AuthController {
+class AuthController(
+    private val securityProperties: AppSecurityProperties,
+    private val humanAuthorization: ObjectProvider<EntraHumanAuthorizationService>
+) {
 
     /**
      * Returns claims/authorities from the current access token.
@@ -35,7 +42,9 @@ class AuthController {
     @PreAuthorize("isAuthenticated()")
     @Operation(
         summary = "Current authenticated principal",
-        description = "Returns Entra JWT claims and mapped authorities. " +
+        description = "Returns Entra JWT claims and mapped authorities (scopes, app roles, " +
+            "Platform-System-* group membership for humans mapped to System.* roles, " +
+            "and Application Registration config). " +
             "Any authenticated user (valid Bearer token) may call this — no app role required."
     )
     fun me(
@@ -49,13 +58,17 @@ class AuthController {
                 "No JWT principal — call with Authorization: Bearer <entra-access-token>"
             )
 
-        val scopes = (token.getClaimAsString("scp") ?: token.getClaimAsString("scope") ?: "")
-            .split(" ")
-            .map { it.trim() }
-            .filter { it.isNotEmpty() }
-
-        val roles = (token.getClaimAsStringList("roles") ?: emptyList())
-            .filterNotNull()
+        val scopes = JwtAuthorityMapper.extractScopes(token)
+        val groups = JwtAuthorityMapper.extractGroups(token)
+        val humanAuth = humanAuthorization.getIfAvailable()
+        val roles = if (humanAuth != null) {
+            humanAuth.extractEffectiveRoles(token)
+        } else {
+            JwtAuthorityMapper.extractEffectiveRoles(token, securityProperties)
+        }
+        val platformGroups = humanAuth?.resolvePlatformGroupNames(token).orEmpty()
+        val matchedRegs = JwtAuthorityMapper.matchingApplicationRegistrations(token, securityProperties)
+        val expectedScopes = JwtAuthorityMapper.expectedOauthScopes(token, securityProperties)
 
         val authorities: List<String> = (auth?.authorities ?: emptyList())
             .mapNotNull { it.authority }
@@ -73,7 +86,11 @@ class AuthController {
             audience = audience,
             authorities = authorities,
             scopes = scopes,
-            roles = roles
+            roles = roles,
+            groups = groups,
+            platformGroups = platformGroups,
+            expectedScopes = expectedScopes,
+            matchedApplicationRegistrationIds = matchedRegs.map { it.clientId.trim() }.filter { it.isNotEmpty() }
         )
     }
 

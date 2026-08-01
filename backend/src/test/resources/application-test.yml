@@ -43,9 +43,26 @@ app:
     # Unit / @DataJpaTest slices: no JWT required.
     # Role-based security tests set permit-all=false via @TestPropertySource.
     permit-all: true
+  entra-directory:
+    # No live Microsoft Graph calls in tests; unit tests inject mock Graph clients.
+    enabled: false
+    load-on-startup: false
+    refresh-interval-ms: 0
   consumption-import:
     # Keep Azure blob polling off in tests (unit tests exercise the service with mocks).
     enabled: false
+  connectors:
+    consumption-eventhub:
+      enabled: false
+      auto-start: false
+    consumption-blob:
+      enabled: false
+      runner-enabled: false
+      storage-account-url: ""
+      container: ""
+      blob-prefixes: []
+      blob-prefix: ""
+      require-source-ref-id: true
 
 logging:
   level:

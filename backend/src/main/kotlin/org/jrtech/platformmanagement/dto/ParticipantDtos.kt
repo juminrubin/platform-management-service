@@ -38,7 +38,9 @@ data class ParticipantResponse(
     val contact: String?,
     val status: ParticipantStatus,
     val createdAt: Instant,
-    val updatedAt: Instant
+    val createdBy: String,
+    val updatedAt: Instant,
+    val updatedBy: String
 ) {
     companion object {
         fun from(entity: Participant) = ParticipantResponse(
@@ -47,7 +49,9 @@ data class ParticipantResponse(
             contact = entity.contact,
             status = entity.status,
             createdAt = entity.createdAt,
-            updatedAt = entity.updatedAt
+            createdBy = entity.createdBy,
+            updatedAt = entity.updatedAt,
+            updatedBy = entity.updatedBy
         )
     }
 }

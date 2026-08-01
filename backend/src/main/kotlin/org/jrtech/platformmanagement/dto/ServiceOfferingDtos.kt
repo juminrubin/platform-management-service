@@ -18,8 +18,15 @@ data class CreateServiceOfferingRequest(
     val description: String? = null,
 
     @field:NotBlank
-    @field:Size(max = 64)
+    @field:Size(max = 100)
     val category: String,
+
+    /**
+     * Defaults to SYSTEM when omitted, null, or blank.
+     * Nullable so Jackson can omit the property without failing non-null construction.
+     */
+    @field:Size(max = 100)
+    val provider: String? = null,
 
     @field:NotBlank
     @field:Size(max = 5000)
@@ -37,8 +44,12 @@ data class UpdateServiceOfferingRequest(
     val description: String? = null,
 
     @field:NotBlank
-    @field:Size(max = 64)
+    @field:Size(max = 100)
     val category: String,
+
+    @field:NotBlank
+    @field:Size(max = 100)
+    val provider: String,
 
     @field:NotBlank
     @field:Size(max = 5000)
@@ -52,10 +63,13 @@ data class ServiceOfferingResponse(
     val name: String,
     val description: String?,
     val category: String,
+    val provider: String,
     val config: String,
     val active: Boolean,
     val createdAt: Instant,
-    val updatedAt: Instant
+    val createdBy: String,
+    val updatedAt: Instant,
+    val updatedBy: String
 ) {
     companion object {
         fun from(entity: ServiceOffering) = ServiceOfferingResponse(
@@ -63,10 +77,13 @@ data class ServiceOfferingResponse(
             name = entity.name,
             description = entity.description,
             category = entity.category,
+            provider = entity.provider,
             config = entity.config,
             active = entity.active,
             createdAt = entity.createdAt,
-            updatedAt = entity.updatedAt
+            createdBy = entity.createdBy,
+            updatedAt = entity.updatedAt,
+            updatedBy = entity.updatedBy
         )
     }
 }
