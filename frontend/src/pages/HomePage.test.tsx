@@ -26,7 +26,23 @@ describe('HomePage', () => {
     expect(screen.getByText('Platform Management Service')).toBeInTheDocument()
     expect(screen.getByText('Participants')).toBeInTheDocument()
     expect(screen.getByText('Consumptions')).toBeInTheDocument()
+    expect(screen.getByText('Connectors')).toBeInTheDocument()
     expect(screen.getByText(/alice@contoso.com/)).toBeInTheDocument()
+  })
+
+  it('hides connectors module for non-maintainers', () => {
+    isAuthenticated = true
+    renderWithRouter(<HomePage />, {
+      auth: {
+        canMaintain: false,
+        canRead: true,
+        canCheckEntitlement: true,
+        canRegisterConsumption: false,
+        roles: ['System.Reader'],
+      },
+    })
+    expect(screen.getByText('Participants')).toBeInTheDocument()
+    expect(screen.queryByText('Connectors')).not.toBeInTheDocument()
   })
 
   it('prompts sign-in when unauthenticated', async () => {

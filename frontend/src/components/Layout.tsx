@@ -1,8 +1,9 @@
 import { Link, NavLink, Outlet } from 'react-router-dom'
 import { useIsAuthenticated, useMsal } from '@azure/msal-react'
+import { useAuthorization } from '../auth/AuthorizationContext'
 import { signInWithPopup, signOutWithPopup } from '../auth/msalConfig'
 
-const nav = [
+const baseNav = [
   { to: '/participants', label: 'Participants' },
   { to: '/caller-registrations', label: 'Caller registrations' },
   { to: '/service-offerings', label: 'Service offerings' },
@@ -14,6 +15,14 @@ const nav = [
 export function Layout() {
   const { accounts } = useMsal()
   const isAuthenticated = useIsAuthenticated()
+  const { canMaintain } = useAuthorization()
+  const nav = canMaintain
+    ? [
+        ...baseNav.slice(0, 5),
+        { to: '/connectors', label: 'Connectors' },
+        ...baseNav.slice(5),
+      ]
+    : baseNav
 
   async function onSignIn() {
     try {

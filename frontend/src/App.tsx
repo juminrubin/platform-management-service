@@ -21,6 +21,8 @@ import { EntitlementFormPage } from './pages/entitlements/EntitlementFormPage'
 import { ConsumptionListPage } from './pages/consumptions/ConsumptionListPage'
 import { ConsumptionDetailPage } from './pages/consumptions/ConsumptionDetailPage'
 import { ConsumptionFormPage } from './pages/consumptions/ConsumptionFormPage'
+import { ConnectorListPage } from './pages/connectors/ConnectorListPage'
+import { ConnectorDetailPage } from './pages/connectors/ConnectorDetailPage'
 import './App.css'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -220,6 +222,23 @@ function AppRoutes() {
               <RequireAuth>
                 <ConsumptionDetailPage />
               </RequireAuth>
+            }
+          />
+
+          <Route
+            path="/connectors"
+            element={
+              <RequireMaintain fallback="/">
+                <ConnectorListPage />
+              </RequireMaintain>
+            }
+          />
+          <Route
+            path="/connectors/:id"
+            element={
+              <RequireMaintain fallback="/">
+                <ConnectorDetailPage />
+              </RequireMaintain>
             }
           />
         </Route>

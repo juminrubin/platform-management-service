@@ -16,6 +16,11 @@ import org.springframework.boot.context.properties.ConfigurationProperties
  * Auth (in order of preference when [enabled] is true):
  * 1. Client secret: [clientId] + [clientSecret] + [tenantId]
  * 2. Otherwise [DefaultAzureCredential] (managed identity, `az login`, …)
+ *
+ * Lifecycle (connector `entra-directory`):
+ * - [autoStart] arms the connector on application ready (initial Graph load + schedule)
+ * - Periodic refresh runs only while the connector is **running** (start/stop API)
+ * - Stop does not cancel an in-flight load; it only prevents the next run
  */
 @ConfigurationProperties(prefix = "app.entra-directory")
 data class EntraDirectoryProperties(
@@ -35,13 +40,18 @@ data class EntraDirectoryProperties(
     val includeTransitiveMembers: Boolean = false,
 
     /**
-     * How often to rebuild the thread-safe group→members map from Microsoft Graph (ms).
-     * Default **900_000** (15 minutes). 0 disables scheduling.
+     * How often to rebuild the thread-safe group→members map from Microsoft Graph (ms)
+     * while the connector is **running**. Default **900_000** (15 minutes).
+     * 0 disables the periodic schedule (start still performs one immediate load).
      */
     val refreshIntervalMs: Long = 900_000L,
 
-    /** Load groups/members once when the application is ready. */
-    val loadOnStartup: Boolean = true,
+    /**
+     * When true and [enabled], start the connector on application ready
+     * (immediate Graph load for human authorization + arm periodic refresh).
+     * Primary ongoing control remains Maintainer Web API start/stop.
+     */
+    val autoStart: Boolean = true,
 
     val graphBaseUrl: String = "https://graph.microsoft.com/v1.0",
 
@@ -59,5 +69,4 @@ data class EntraDirectoryProperties(
      * Leave empty to use DefaultAzureCredential (MI / developer login).
      */
     val clientSecret: String = "",
-
 )

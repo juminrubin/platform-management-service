@@ -1,5 +1,6 @@
 import { useIsAuthenticated, useMsal } from '@azure/msal-react'
 import { Link } from 'react-router-dom'
+import { useAuthorization } from '../auth/AuthorizationContext'
 import { signInWithPopup } from '../auth/msalConfig'
 
 const modules = [
@@ -14,9 +15,19 @@ const modules = [
   { to: '/consumptions', title: 'Consumptions', desc: 'Token / usage events with rich filters' },
 ]
 
+const maintainerModules = [
+  {
+    to: '/connectors',
+    title: 'Connectors',
+    desc: 'Operate Entra, Blob, and Event Hub processes (start/stop, config, logs)',
+  },
+]
+
 export function HomePage() {
   const { accounts } = useMsal()
   const isAuthenticated = useIsAuthenticated()
+  const { canMaintain } = useAuthorization()
+  const cards = canMaintain ? [...modules, ...maintainerModules] : modules
 
   async function onSignIn() {
     try {
@@ -45,7 +56,7 @@ export function HomePage() {
             Signed in as <strong>{accounts[0]?.username ?? accounts[0]?.name}</strong>
           </p>
           <div className="module-grid">
-            {modules.map((m) => (
+            {cards.map((m) => (
               <Link key={m.to} className="module-card" to={m.to}>
                 <strong>{m.title}</strong>
                 <span className="muted">{m.desc}</span>

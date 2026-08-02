@@ -6,6 +6,7 @@ import org.springframework.http.ProblemDetail
 import org.springframework.security.access.AccessDeniedException
 import org.springframework.security.core.AuthenticationException
 import org.springframework.validation.FieldError
+import org.springframework.web.HttpRequestMethodNotSupportedException
 import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.MissingServletRequestParameterException
 import org.springframework.web.bind.annotation.ExceptionHandler
@@ -64,6 +65,10 @@ class GlobalExceptionHandler {
     @ExceptionHandler(AuthenticationException::class)
     fun handleAuthentication(ex: AuthenticationException): ProblemDetail =
         problem(HttpStatus.UNAUTHORIZED, ex.message ?: "Full authentication is required")
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException::class)
+    fun handleMethodNotSupported(ex: HttpRequestMethodNotSupportedException): ProblemDetail =
+        problem(HttpStatus.METHOD_NOT_ALLOWED, ex.message ?: "Request method is not supported")
 
     @ExceptionHandler(Exception::class)
     fun handleGeneric(ex: Exception): ProblemDetail =

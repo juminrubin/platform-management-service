@@ -7,6 +7,10 @@ import { getAccount, msalInstance, setActiveAccountFromResult, tokenRequest } fr
 import type {
   AuthenticatedUser,
   CallerRegistration,
+  ConnectorConfigResponse,
+  ConnectorConfigureRequest,
+  ConnectorInfo,
+  ConnectorListResponse,
   Consumption,
   CreateCallerRegistration,
   CreateConsumption,
@@ -237,3 +241,28 @@ export const createConsumption = (body: CreateConsumption) =>
 
 export const deleteConsumption = (id: string) =>
   apiFetch<void>(`/api/v1/consumptions/${encodeURIComponent(id)}`, { method: 'DELETE' })
+
+// —— Connectors (System.Maintainer control plane) ——
+export const listConnectors = () => apiFetch<ConnectorListResponse>('/api/v1/connectors')
+
+export const getConnector = (id: string) =>
+  apiFetch<ConnectorInfo>(`/api/v1/connectors/${encodeURIComponent(id)}`)
+
+export const getConnectorConfig = (id: string) =>
+  apiFetch<ConnectorConfigResponse>(`/api/v1/connectors/${encodeURIComponent(id)}/config`)
+
+export const updateConnectorConfig = (id: string, body: ConnectorConfigureRequest) =>
+  apiFetch<ConnectorConfigResponse>(`/api/v1/connectors/${encodeURIComponent(id)}/config`, {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  })
+
+export const startConnector = (id: string) =>
+  apiFetch<ConnectorInfo>(`/api/v1/connectors/${encodeURIComponent(id)}/start`, {
+    method: 'POST',
+  })
+
+export const stopConnector = (id: string) =>
+  apiFetch<ConnectorInfo>(`/api/v1/connectors/${encodeURIComponent(id)}/stop`, {
+    method: 'POST',
+  })

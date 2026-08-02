@@ -160,7 +160,7 @@ class EntraHumanAuthorizationServiceTest {
         val provider = mock<ObjectProvider<MicrosoftGraphClient>>()
         whenever(provider.getIfAvailable()).thenReturn(null)
         val service = EntraGroupDirectoryService(
-            properties = EntraDirectoryProperties(enabled = true, loadOnStartup = false),
+            properties = EntraDirectoryProperties(enabled = true, autoStart = false),
             graphClientProvider = provider
         )
         service.replaceCacheForTesting(groups)

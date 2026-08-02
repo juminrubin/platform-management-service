@@ -10,133 +10,224 @@ import org.jrtech.platformmanagement.exception.BadRequestException
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
+import org.mockito.kotlin.any
 import org.mockito.kotlin.mock
+import org.mockito.kotlin.never
+import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
+import org.springframework.scheduling.TaskScheduler
+import java.time.Duration
 import java.time.Instant
+import java.util.concurrent.ScheduledFuture
 
 class EntraDirectoryConnectorTest {
 
     private val directoryService = mock<EntraGroupDirectoryService>()
+    private val taskScheduler = mock<TaskScheduler>()
+    private val scheduledFuture = mock<ScheduledFuture<*>>()
+
+    init {
+        whenever(
+            taskScheduler.scheduleWithFixedDelay(any(), any<Duration>())
+        ).thenReturn(scheduledFuture)
+    }
 
     @Test
-    fun `status reports disabled when not enabled`() {
-        val connector = EntraDirectoryConnector(
-            properties = EntraDirectoryProperties(enabled = false),
-            directoryService = directoryService
+    fun `info reports disabled when not enabled`() {
+        val connector = connector(EntraDirectoryProperties(enabled = false))
+        stubStatusReads(
+            snapshot = emptySnapshot(enabled = false),
+            hasGraph = false
         )
-        whenever(directoryService.snapshot()).thenReturn(
-            EntraDirectorySnapshot(
-                enabled = false,
-                groupNamePrefix = "Platform-System-",
-                loadedAt = null,
-                groups = emptyList()
-            )
-        )
-        whenever(directoryService.hasGraphClient()).thenReturn(false)
-        whenever(directoryService.isRefreshInProgress()).thenReturn(false)
-        whenever(directoryService.lastLoadedAt()).thenReturn(null)
-        whenever(directoryService.lastRefreshStartedAt()).thenReturn(null)
-        whenever(directoryService.lastRefreshFinishedAt()).thenReturn(null)
-        whenever(directoryService.lastRefreshBy()).thenReturn(null)
-        whenever(directoryService.lastError()).thenReturn(null)
-        whenever(directoryService.allMembers()).thenReturn(emptyList())
 
-        val status = connector.status()
-        assertThat(status.id).isEqualTo("entra-directory")
-        assertThat(status.enabled).isFalse()
-        assertThat(status.detail).isEqualTo("disabled")
+        val info = connector.info()
+        assertThat(info.id).isEqualTo("entra-directory")
+        assertThat(info.enabled).isFalse()
+        assertThat(info.running).isFalse()
+        assertThat(info.detail).isEqualTo("disabled")
+        assertThat(info.status).isEqualTo("DISABLED")
+        assertThat(info.logSnapshot.maxBytes).isEqualTo(32 * 1024)
+        assertThat(info.configuration["dataPlane"]).isNotNull
         assertThat(connector.health().status).isEqualTo("DISABLED")
     }
 
     @Test
-    fun `status reports ready with counts after load`() {
+    fun `start arms schedule and records log lines`() {
         val loadedAt = Instant.parse("2024-07-01T10:00:00Z")
-        val connector = EntraDirectoryConnector(
-            properties = EntraDirectoryProperties(enabled = true, refreshIntervalMs = 900_000L),
-            directoryService = directoryService
+        val connector = connector(
+            EntraDirectoryProperties(enabled = true, refreshIntervalMs = 900_000L)
         )
-        whenever(directoryService.snapshot()).thenReturn(
-            EntraDirectorySnapshot(
-                enabled = true,
-                groupNamePrefix = "Platform-System-",
-                loadedAt = loadedAt,
-                groups = listOf(
-                    EntraGroupWithMembers(
-                        group = EntraGroup("g1", "Platform-System-Maintainer"),
-                        members = listOf(
-                            EntraDirectoryMember(id = "u1", displayName = "Alice")
-                        )
-                    )
-                )
-            )
+        whenever(directoryService.refresh(triggeredBy = "admin@x.com")).thenReturn(
+            snapshotWithOneGroup(loadedAt)
         )
-        whenever(directoryService.hasGraphClient()).thenReturn(true)
-        whenever(directoryService.isRefreshInProgress()).thenReturn(false)
-        whenever(directoryService.lastLoadedAt()).thenReturn(loadedAt)
-        whenever(directoryService.lastRefreshStartedAt()).thenReturn(loadedAt)
-        whenever(directoryService.lastRefreshFinishedAt()).thenReturn(loadedAt)
-        whenever(directoryService.lastRefreshBy()).thenReturn("SYSTEM-schedule")
-        whenever(directoryService.lastError()).thenReturn(null)
-        whenever(directoryService.allMembers()).thenReturn(
-            listOf(EntraDirectoryMember(id = "u1", displayName = "Alice"))
+        stubStatusReads(
+            snapshot = snapshotWithOneGroup(loadedAt),
+            hasGraph = true,
+            lastLoadedAt = loadedAt,
+            lastRefreshBy = "admin@x.com",
+            uniqueMembers = listOf(EntraDirectoryMember(id = "u1", displayName = "Alice"))
         )
 
-        val status = connector.status()
-        assertThat(status.configured).isTrue()
-        assertThat(status.groupCount).isEqualTo(1)
-        assertThat(status.memberCount).isEqualTo(1)
-        assertThat(status.uniqueMemberCount).isEqualTo(1)
-        assertThat(status.lastRefreshBy).isEqualTo("SYSTEM-schedule")
-        assertThat(status.detail).isEqualTo("ready")
-        assertThat(connector.health().status).isEqualTo("UP")
-        assertThat(connector.health().attributes["groupCount"]).isEqualTo("1")
+        val info = connector.start("admin@x.com")
+        assertThat(info.running).isTrue()
+        assertThat(info.status).isEqualTo("RUNNING")
+        assertThat(info.logSnapshot.lineCount).isGreaterThan(0)
+        assertThat(info.logSnapshot.lines.any { it.contains("start by=admin@x.com") }).isTrue()
+        verify(taskScheduler).scheduleWithFixedDelay(any(), any<Duration>())
     }
 
     @Test
     fun `start rejected when disabled`() {
-        val connector = EntraDirectoryConnector(
-            properties = EntraDirectoryProperties(enabled = false),
-            directoryService = directoryService
-        )
+        val connector = connector(EntraDirectoryProperties(enabled = false))
         assertThatThrownBy { connector.start("admin@x.com") }
             .isInstanceOf(BadRequestException::class.java)
             .hasMessageContaining("disabled")
     }
 
     @Test
-    fun `start triggers refresh with actor`() {
-        val connector = EntraDirectoryConnector(
-            properties = EntraDirectoryProperties(enabled = true),
-            directoryService = directoryService
-        )
+    fun `start is idempotent when already running`() {
+        val connector = connector(EntraDirectoryProperties(enabled = true))
         whenever(directoryService.refresh(triggeredBy = "admin@x.com")).thenReturn(
-            EntraDirectorySnapshot(
-                enabled = true,
-                groupNamePrefix = "Platform-System-",
-                loadedAt = Instant.parse("2024-07-01T11:00:00Z"),
-                groups = emptyList()
-            )
+            emptySnapshot(enabled = true, loadedAt = Instant.parse("2024-07-01T11:00:00Z"))
         )
-        whenever(directoryService.snapshot()).thenReturn(
-            EntraDirectorySnapshot(
+        stubStatusReads(
+            snapshot = emptySnapshot(
                 enabled = true,
-                groupNamePrefix = "Platform-System-",
-                loadedAt = Instant.parse("2024-07-01T11:00:00Z"),
-                groups = emptyList()
-            )
+                loadedAt = Instant.parse("2024-07-01T11:00:00Z")
+            ),
+            hasGraph = true,
+            lastLoadedAt = Instant.parse("2024-07-01T11:00:00Z"),
+            lastRefreshBy = "admin@x.com"
         )
-        whenever(directoryService.hasGraphClient()).thenReturn(true)
-        whenever(directoryService.isRefreshInProgress()).thenReturn(false)
-        whenever(directoryService.lastLoadedAt()).thenReturn(Instant.parse("2024-07-01T11:00:00Z"))
-        whenever(directoryService.lastRefreshStartedAt()).thenReturn(Instant.parse("2024-07-01T11:00:00Z"))
-        whenever(directoryService.lastRefreshFinishedAt()).thenReturn(Instant.parse("2024-07-01T11:00:00Z"))
-        whenever(directoryService.lastRefreshBy()).thenReturn("admin@x.com")
-        whenever(directoryService.lastError()).thenReturn(null)
-        whenever(directoryService.allMembers()).thenReturn(emptyList())
 
-        val status = connector.start("admin@x.com")
-        assertThat(status.lastRefreshBy).isEqualTo("admin@x.com")
-        verify(directoryService).refresh(triggeredBy = "admin@x.com")
+        connector.start("admin@x.com")
+        connector.start("admin@x.com")
+
+        verify(directoryService, times(1)).refresh(triggeredBy = "admin@x.com")
+        verify(taskScheduler, times(1)).scheduleWithFixedDelay(any(), any<Duration>())
     }
+
+    @Test
+    fun `stop disarms schedule and retains data-plane attributes`() {
+        val loadedAt = Instant.parse("2024-07-01T10:00:00Z")
+        val connector = connector(EntraDirectoryProperties(enabled = true))
+        whenever(directoryService.refresh(triggeredBy = "admin@x.com")).thenReturn(
+            snapshotWithOneGroup(loadedAt)
+        )
+        stubStatusReads(
+            snapshot = snapshotWithOneGroup(loadedAt),
+            hasGraph = true,
+            lastLoadedAt = loadedAt,
+            lastRefreshBy = "admin@x.com",
+            uniqueMembers = listOf(EntraDirectoryMember(id = "u1", displayName = "Alice"))
+        )
+
+        connector.start("admin@x.com")
+        val stopped = connector.stop("admin@x.com")
+
+        assertThat(stopped.running).isFalse()
+        assertThat(stopped.lastStoppedBy).isEqualTo("admin@x.com")
+        assertThat(stopped.attributes["groupCount"]).isEqualTo("1")
+        assertThat(stopped.attributes["dataPlane"]).contains("/api/v1/entra/groups")
+        assertThat(stopped.detail).isEqualTo("stopped")
+        assertThat(connector.health().status).isEqualTo("STOPPED")
+        verify(scheduledFuture).cancel(false)
+    }
+
+    @Test
+    fun `configure refreshIntervalMs updates configuration`() {
+        val connector = connector(
+            EntraDirectoryProperties(enabled = true, refreshIntervalMs = 900_000L)
+        )
+        stubStatusReads(snapshot = emptySnapshot(enabled = true), hasGraph = true)
+        val cfg = connector.configure(mapOf("refreshIntervalMs" to 60_000L))
+        assertThat(cfg["refreshIntervalMs"]).isEqualTo(60_000L)
+    }
+
+    @Test
+    fun `autoStartIfConfigured starts when enabled and auto-start true`() {
+        val connector = connector(
+            EntraDirectoryProperties(enabled = true, autoStart = true)
+        )
+        whenever(directoryService.refresh(triggeredBy = "SYSTEM")).thenReturn(
+            emptySnapshot(enabled = true, loadedAt = Instant.parse("2024-07-01T11:00:00Z"))
+        )
+        stubStatusReads(
+            snapshot = emptySnapshot(
+                enabled = true,
+                loadedAt = Instant.parse("2024-07-01T11:00:00Z")
+            ),
+            hasGraph = true,
+            lastLoadedAt = Instant.parse("2024-07-01T11:00:00Z"),
+            lastRefreshBy = "SYSTEM"
+        )
+
+        connector.autoStartIfConfigured()
+        verify(directoryService).refresh(triggeredBy = "SYSTEM")
+        assertThat(connector.info().running).isTrue()
+    }
+
+    @Test
+    fun `autoStartIfConfigured is no-op when auto-start false`() {
+        val connector = connector(
+            EntraDirectoryProperties(enabled = true, autoStart = false)
+        )
+        stubStatusReads(
+            snapshot = emptySnapshot(enabled = true),
+            hasGraph = true
+        )
+        connector.autoStartIfConfigured()
+        verify(directoryService, never()).refresh(triggeredBy = any())
+        assertThat(connector.info().running).isFalse()
+    }
+
+    private fun connector(properties: EntraDirectoryProperties) =
+        EntraDirectoryConnector(
+            properties = properties,
+            directoryService = directoryService,
+            taskScheduler = taskScheduler
+        )
+
+    private fun stubStatusReads(
+        snapshot: EntraDirectorySnapshot,
+        hasGraph: Boolean,
+        lastLoadedAt: Instant? = null,
+        lastRefreshBy: String? = null,
+        uniqueMembers: List<EntraDirectoryMember> = emptyList()
+    ) {
+        whenever(directoryService.snapshot()).thenReturn(snapshot)
+        whenever(directoryService.hasGraphClient()).thenReturn(hasGraph)
+        whenever(directoryService.isRefreshInProgress()).thenReturn(false)
+        whenever(directoryService.lastLoadedAt()).thenReturn(lastLoadedAt)
+        whenever(directoryService.lastRefreshStartedAt()).thenReturn(lastLoadedAt)
+        whenever(directoryService.lastRefreshFinishedAt()).thenReturn(lastLoadedAt)
+        whenever(directoryService.lastRefreshBy()).thenReturn(lastRefreshBy)
+        whenever(directoryService.lastError()).thenReturn(null)
+        whenever(directoryService.allMembers()).thenReturn(uniqueMembers)
+    }
+
+    private fun emptySnapshot(
+        enabled: Boolean,
+        loadedAt: Instant? = null
+    ) = EntraDirectorySnapshot(
+        enabled = enabled,
+        groupNamePrefix = "Platform-System-",
+        loadedAt = loadedAt,
+        groups = emptyList()
+    )
+
+    private fun snapshotWithOneGroup(loadedAt: Instant) = EntraDirectorySnapshot(
+        enabled = true,
+        groupNamePrefix = "Platform-System-",
+        loadedAt = loadedAt,
+        groups = listOf(
+            EntraGroupWithMembers(
+                group = EntraGroup("g1", "Platform-System-Maintainer"),
+                members = listOf(
+                    EntraDirectoryMember(id = "u1", displayName = "Alice")
+                )
+            )
+        )
+    )
 }

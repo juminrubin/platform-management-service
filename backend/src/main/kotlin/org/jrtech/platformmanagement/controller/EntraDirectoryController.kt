@@ -17,13 +17,11 @@ import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 
 /**
- * Microsoft Entra directory **views** for platform system groups.
+ * Data plane for Entra Platform-System-* groups and members (loaded by the
+ * **entra-directory** connector process).
  *
- * Loads security groups whose display names start with `Platform-System-`
- * (configurable) and their members via Microsoft Graph.
- *
- * Loader run monitoring is under the **connectors** API:
- * `GET /api/v1/connectors/entra-directory` and `POST …/start` (refresh).
+ * Control plane (runtime info, config, start/stop, ≤32KB log snapshot):
+ * `/api/v1/connectors/entra-directory`.
  *
  * All endpoints require [org.jrtech.platformmanagement.security.AppRoles.SYSTEM_MAINTAINER].
  */
@@ -70,8 +68,9 @@ class EntraDirectoryController(
     @ResponseStatus(HttpStatus.OK)
     @Operation(
         summary = "Refresh Entra Platform-System-* group membership from Microsoft Graph",
-        description = "Forces a Graph reload. Requires System.Maintainer and app.entra-directory.enabled=true. " +
-            "Equivalent run control: POST /api/v1/connectors/entra-directory/start."
+        description = "Forces a one-shot Graph reload without changing connector running state. " +
+            "Requires System.Maintainer and app.entra-directory.enabled=true. " +
+            "To arm/disarm the periodic schedule: POST /api/v1/connectors/entra-directory/start|stop."
     )
     fun refresh(): EntraDirectorySnapshotResponse {
         try {

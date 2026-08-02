@@ -218,6 +218,8 @@ class AppRoleAuthorizationTest {
             jsonPath("$.id") { value("consumption-eventhub") }
             jsonPath("$.enabled") { value(false) }
             jsonPath("$.running") { value(false) }
+            jsonPath("$.logSnapshot.maxBytes") { value(32768) }
+            jsonPath("$.configuration") { exists() }
         }
 
         // Disabled by default — start returns 400, still authorized as Maintainer

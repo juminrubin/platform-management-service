@@ -8,8 +8,6 @@ import org.jrtech.platformmanagement.dto.EntraGroupWithMembersResponse
 import org.jrtech.platformmanagement.logging.logger
 import org.jrtech.platformmanagement.security.EntraGroupPermissionScopeTable
 import org.springframework.beans.factory.ObjectProvider
-import org.springframework.boot.context.event.ApplicationReadyEvent
-import org.springframework.context.event.EventListener
 import org.springframework.stereotype.Service
 import java.time.Instant
 import java.util.Collections
@@ -30,8 +28,13 @@ import java.util.concurrent.atomic.AtomicReference
  * - member object id → permission scopes
  * - group object id → permission scopes
  *
- * The entire map is replaced atomically on each successful Microsoft Graph refresh
- * (default every **15 minutes**). Readers always see a consistent snapshot.
+ * The entire map is replaced atomically on each successful Microsoft Graph refresh.
+ * Readers always see a consistent snapshot.
+ *
+ * Lifecycle (who calls [refresh]):
+ * - Connector **start** / **auto-start** (immediate load for auth warm-up)
+ * - Connector schedule while **running** (fixed delay)
+ * - Manual `POST /api/v1/entra/groups/refresh` (one-shot; does not change running state)
  *
  * When [EntraDirectoryProperties.enabled] is false, the map stays empty and list
  * APIs return an empty view without failing startup.
@@ -324,33 +327,6 @@ class EntraGroupDirectoryService(
             } finally {
                 refreshInProgress.set(false)
             }
-        }
-    }
-
-    @EventListener(ApplicationReadyEvent::class)
-    fun onApplicationReady() {
-        if (!properties.enabled || !properties.loadOnStartup) {
-            return
-        }
-        try {
-            refresh(triggeredBy = "SYSTEM-startup")
-        } catch (ex: Exception) {
-            log.error("Startup Entra directory load failed; will retry on 15-minute schedule if configured", ex)
-        }
-    }
-
-    /**
-     * Invoked by [EntraDirectoryConfig] on a fixed delay (default 15 minutes).
-     * Safe to call when disabled (no-op).
-     */
-    fun scheduledRefresh() {
-        if (!properties.enabled || properties.refreshIntervalMs <= 0L) {
-            return
-        }
-        try {
-            refresh(triggeredBy = "SYSTEM-schedule")
-        } catch (ex: Exception) {
-            log.error("Scheduled Entra directory refresh failed", ex)
         }
     }
 

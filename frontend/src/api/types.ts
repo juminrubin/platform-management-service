@@ -163,3 +163,61 @@ export type AuthenticatedUser = {
   /** Configured Application Registration client IDs that matched this token. */
   matchedApplicationRegistrationIds?: string[]
 }
+
+// —— Connectors (Maintainer control plane) ——
+
+export type ConnectorIdPath =
+  | 'entra-directory'
+  | 'consumption-storage'
+  | 'consumption-eventhub'
+  | string
+
+/** List row from GET /api/v1/connectors */
+export type ConnectorSummary = {
+  id: ConnectorIdPath
+  enabled: boolean
+  configured: boolean
+  running: boolean
+  status: string
+  detail: string | null
+  attributes: Record<string, string>
+}
+
+export type ConnectorListResponse = {
+  connectors: ConnectorSummary[]
+}
+
+export type ConnectorLogSnapshot = {
+  maxBytes: number
+  bytes: number
+  lineCount: number
+  /** Newest first (index 0). */
+  lines: string[]
+}
+
+/** Full process view from GET /api/v1/connectors/{id} */
+export type ConnectorInfo = {
+  id: ConnectorIdPath
+  enabled: boolean
+  configured: boolean
+  running: boolean
+  status: string
+  detail: string | null
+  lastStartedBy: string | null
+  lastStartedAt: string | null
+  lastStoppedBy: string | null
+  lastStoppedAt: string | null
+  lastError: string | null
+  attributes: Record<string, string>
+  configuration: Record<string, unknown>
+  logSnapshot: ConnectorLogSnapshot
+}
+
+export type ConnectorConfigResponse = {
+  id: ConnectorIdPath
+  configuration: Record<string, unknown>
+}
+
+export type ConnectorConfigureRequest = {
+  configuration: Record<string, unknown>
+}

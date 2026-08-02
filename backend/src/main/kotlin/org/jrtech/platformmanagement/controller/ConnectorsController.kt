@@ -1,186 +1,145 @@
 package org.jrtech.platformmanagement.controller
 
-import org.jrtech.platformmanagement.connectors.ConnectorHealthContributor
 import org.jrtech.platformmanagement.connectors.ConnectorId
-import org.jrtech.platformmanagement.connectors.consumption.blob.ConsumptionBlobImportService
+import org.jrtech.platformmanagement.connectors.consumption.blob.ConsumptionBlobContainerConnector
 import org.jrtech.platformmanagement.connectors.consumption.eventhub.ConsumptionEventHubConnector
 import org.jrtech.platformmanagement.connectors.entra.EntraDirectoryConnector
-import org.jrtech.platformmanagement.dto.ConnectorHealthItemResponse
-import org.jrtech.platformmanagement.dto.ConnectorHealthListResponse
-import org.jrtech.platformmanagement.dto.ConsumptionBlobImportRequest
-import org.jrtech.platformmanagement.dto.ConsumptionBlobImportResponse
-import org.jrtech.platformmanagement.exception.BadRequestException
+import org.jrtech.platformmanagement.connectors.runtime.ManagedConnector
+import org.jrtech.platformmanagement.dto.ConnectorConfigResponse
+import org.jrtech.platformmanagement.dto.ConnectorConfigureRequest
+import org.jrtech.platformmanagement.dto.ConnectorInfoResponse
+import org.jrtech.platformmanagement.dto.ConnectorListResponse
+import org.jrtech.platformmanagement.dto.ConnectorSummaryResponse
 import org.jrtech.platformmanagement.service.AuditPrincipalResolver
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.security.SecurityRequirement
 import io.swagger.v3.oas.annotations.tags.Tag
-import org.springframework.format.annotation.DateTimeFormat
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.PutMapping
+import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
-import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
-import java.time.LocalDate
 
 /**
- * Unified Maintainer control plane for connectors.
+ * Unified Maintainer control plane for backend connector processes.
  *
- * | Method | Path | Purpose |
- * |--------|------|---------|
- * | GET | `/api/v1/connectors` | List connector health |
- * | GET | `/api/v1/connectors/{id}` | Status or connector-specific action |
- * | POST | `/api/v1/connectors/{id}/start` | Start / run (Event Hub; Entra refresh) |
- * | POST | `/api/v1/connectors/{id}/stop` | Stop (Event Hub) |
+ * GET  /api/v1/connectors              - list process summaries
+ * GET  /api/v1/connectors/{id}         - runtime info, public config, log snapshot (max 32KB)
+ * GET  /api/v1/connectors/{id}/config  - public configuration only
+ * PUT  /api/v1/connectors/{id}/config  - update runtime configuration
+ * POST /api/v1/connectors/{id}/start   - start / arm the process
+ * POST /api/v1/connectors/{id}/stop    - stop / disarm (in-flight work completes)
  *
- * Known `{id}` values: [ConnectorId.pathId]
- * (`consumption-storage`, `consumption-eventhub`, `entra-directory`).
+ * Domain data is not returned here:
+ * - Entra groups/members: /api/v1/entra/groups and /api/v1/entra/members
+ * - Blob import result: /api/v1/consumption/blob
+ * - Consumption rows: /api/v1/consumptions
+ *
+ * Known path ids: consumption-storage, consumption-eventhub, entra-directory.
  */
 @RestController
 @RequestMapping("/api/v1/connectors")
 @Tag(name = "Connectors")
 @SecurityRequirement(name = "bearer-jwt")
 class ConnectorsController(
-    private val healthContributors: List<ConnectorHealthContributor>,
+    private val managedConnectors: List<ManagedConnector>,
     private val eventHubConnector: ConsumptionEventHubConnector,
-    private val blobImportService: ConsumptionBlobImportService,
+    private val blobConnector: ConsumptionBlobContainerConnector,
     private val entraDirectoryConnector: EntraDirectoryConnector,
     private val auditPrincipalResolver: AuditPrincipalResolver
 ) {
 
     @GetMapping
     @PreAuthorize("@authz.canMaintain()")
-    @Operation(summary = "List connector health (System.Maintainer)")
-    fun listConnectors(): ConnectorHealthListResponse =
-        ConnectorHealthListResponse(
-            connectors = healthContributors.map { c ->
-                val h = c.health()
-                ConnectorHealthItemResponse(
-                    id = h.id.pathId,
-                    enabled = h.enabled,
-                    status = h.status,
-                    detail = h.detail,
-                    attributes = h.attributes
+    @Operation(summary = "List connector process summaries (System.Maintainer)")
+    fun listConnectors(): ConnectorListResponse =
+        ConnectorListResponse(
+            connectors = managedConnectors.map { c ->
+                val info = c.info()
+                ConnectorSummaryResponse(
+                    id = info.id,
+                    enabled = info.enabled,
+                    configured = info.configured,
+                    running = info.running,
+                    status = info.status,
+                    detail = info.detail,
+                    attributes = info.attributes
                 )
             }
         )
 
-    /**
-     * Per-connector GET:
-     * - `consumption-eventhub` → status snapshot
-     * - `entra-directory` → load/run monitor info (not group content)
-     * - `consumption-storage` → retrieve/import Avro for [startDate]..[endDate]
-     */
     @GetMapping("/{id}")
     @PreAuthorize("@authz.canMaintain()")
     @Operation(
-        summary = "Get connector status or run connector-specific retrieve",
-        description = "Requires System.Maintainer. " +
-            "consumption-eventhub: status. " +
-            "entra-directory: Graph load run info (use /api/v1/entra/** to view groups/members). " +
-            "consumption-storage: requires startDate and endDate to import Avro."
+        summary = "Get connector runtime info",
+        description = "Process status, public configuration, operational attributes, " +
+            "and a log snapshot capped at 32 KB UTF-8. Does not return domain data."
     )
     fun getConnector(
         @Parameter(description = "Connector path id, e.g. consumption-storage, consumption-eventhub, entra-directory")
+        @PathVariable id: String
+    ): ConnectorInfoResponse = resolve(id).info()
+
+    @GetMapping("/{id}/config")
+    @PreAuthorize("@authz.canMaintain()")
+    @Operation(summary = "Get connector public configuration")
+    fun getConfig(@PathVariable id: String): ConnectorConfigResponse {
+        val connector = resolve(id)
+        return ConnectorConfigResponse(id = connector.id.pathId, configuration = connector.configuration())
+    }
+
+    @PutMapping("/{id}/config")
+    @PreAuthorize("@authz.canMaintain()")
+    @Operation(
+        summary = "Update connector runtime configuration",
+        description = "Keys are connector-specific. Example for consumption-storage: " +
+            "startDate, endDate, dryRun, blobPrefixes. Example for entra-directory: " +
+            "refreshIntervalMs. Example for consumption-eventhub: requireSourceRefId."
+    )
+    fun putConfig(
         @PathVariable id: String,
-
-        @Parameter(description = "Required for consumption-storage: inclusive start (YYYY-MM-DD)")
-        @RequestParam(required = false)
-        @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
-        startDate: LocalDate?,
-
-        @Parameter(description = "Required for consumption-storage: inclusive end (YYYY-MM-DD)")
-        @RequestParam(required = false)
-        @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
-        endDate: LocalDate?,
-
-        @Parameter(description = "consumption-storage: when true, parse without DB writes")
-        @RequestParam(defaultValue = "false")
-        dryRun: Boolean,
-
-        @Parameter(description = "consumption-storage: optional subset of configured blob prefixes")
-        @RequestParam(required = false)
-        blobPrefixes: List<String>?
-    ): Any {
-        return when (ConnectorId.requirePathId(id)) {
-            ConnectorId.CONSUMPTION_EVENT_HUB -> eventHubConnector.status()
-            ConnectorId.ENTRA_DIRECTORY -> entraDirectoryConnector.status()
-            ConnectorId.CONSUMPTION_BLOB_AVRO -> retrieveStorage(
-                startDate = startDate,
-                endDate = endDate,
-                dryRun = dryRun,
-                blobPrefixes = blobPrefixes
-            )
-        }
+        @RequestBody body: ConnectorConfigureRequest
+    ): ConnectorConfigResponse {
+        val connector = resolve(id)
+        val updated = connector.configure(body.configuration)
+        return ConnectorConfigResponse(id = connector.id.pathId, configuration = updated)
     }
 
     @PostMapping("/{id}/start")
     @PreAuthorize("@authz.canMaintain()")
     @Operation(
-        summary = "Start or run a connector",
-        description = "Requires System.Maintainer. " +
+        summary = "Start connector process",
+        description = "entra-directory: arm schedule + Graph load. " +
             "consumption-eventhub: start processor. " +
-            "entra-directory: trigger Graph group/member refresh. " +
-            "consumption-storage: not supported."
+            "consumption-storage: run one import using configured startDate/endDate."
     )
-    fun startConnector(
-        @PathVariable id: String
-    ): Any {
+    fun startConnector(@PathVariable id: String): ConnectorInfoResponse {
         val actor = auditPrincipalResolver.current()
-        return when (val connectorId = ConnectorId.requirePathId(id)) {
-            ConnectorId.CONSUMPTION_EVENT_HUB -> eventHubConnector.start(actor = actor)
-            ConnectorId.ENTRA_DIRECTORY -> entraDirectoryConnector.start(actor = actor)
-            ConnectorId.CONSUMPTION_BLOB_AVRO ->
-                throw BadRequestException(
-                    "Connector '${connectorId.pathId}' does not support start. " +
-                        "Use GET /api/v1/connectors/consumption-storage?startDate=&endDate= to import."
-                )
-        }
+        return resolve(id).start(actor)
     }
 
     @PostMapping("/{id}/stop")
     @PreAuthorize("@authz.canMaintain()")
     @Operation(
-        summary = "Stop a connector",
-        description = "Requires System.Maintainer. Supported for consumption-eventhub only."
+        summary = "Stop connector process",
+        description = "Disarms the process. In-flight work is not hard-cancelled " +
+            "(Entra Graph load finishes; blob import cancels between blobs)."
     )
-    fun stopConnector(
-        @PathVariable id: String
-    ): Any {
-        return when (val connectorId = ConnectorId.requirePathId(id)) {
-            ConnectorId.CONSUMPTION_EVENT_HUB ->
-                eventHubConnector.stop(actor = auditPrincipalResolver.current())
-            ConnectorId.ENTRA_DIRECTORY,
-            ConnectorId.CONSUMPTION_BLOB_AVRO ->
-                throw BadRequestException(
-                    "Connector '${connectorId.pathId}' does not support stop. " +
-                        "Use stop only for consumption-eventhub."
-                )
-        }
+    fun stopConnector(@PathVariable id: String): ConnectorInfoResponse {
+        val actor = auditPrincipalResolver.current()
+        return resolve(id).stop(actor)
     }
 
-    private fun retrieveStorage(
-        startDate: LocalDate?,
-        endDate: LocalDate?,
-        dryRun: Boolean,
-        blobPrefixes: List<String>?
-    ): ConsumptionBlobImportResponse {
-        if (startDate == null || endDate == null) {
-            throw BadRequestException(
-                "consumption-storage requires query parameters startDate and endDate (YYYY-MM-DD)"
-            )
+    private fun resolve(rawId: String): ManagedConnector {
+        val connectorId = ConnectorId.requirePathId(rawId)
+        return when (connectorId) {
+            ConnectorId.CONSUMPTION_EVENT_HUB -> eventHubConnector
+            ConnectorId.CONSUMPTION_BLOB_AVRO -> blobConnector
+            ConnectorId.ENTRA_DIRECTORY -> entraDirectoryConnector
         }
-        val request = ConsumptionBlobImportRequest(
-            startDate = startDate,
-            endDate = endDate,
-            dryRun = dryRun,
-            blobPrefixes = blobPrefixes?.takeIf { it.isNotEmpty() }
-        )
-        return blobImportService.importRange(
-            request,
-            requestedBy = auditPrincipalResolver.current()
-        )
     }
 }

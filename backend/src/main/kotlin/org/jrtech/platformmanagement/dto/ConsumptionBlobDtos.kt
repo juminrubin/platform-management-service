@@ -5,8 +5,10 @@ import java.time.Instant
 import java.time.LocalDate
 
 /**
- * Parameters for on-demand consumption Avro retrieve/import from hierarchical blob storage.
- * Bound from `GET /api/v1/connectors/{id}` query parameters when id is consumption-storage.
+ * Parameters for a consumption Avro import job (runtime job config / start override).
+ * Configured via `PUT /api/v1/connectors/consumption-storage/config` and applied on start.
+ * Data view: `GET /api/v1/consumption/blob?fromDate=&untilDate=` (defaults: today UTC).
+ * Domain rows: `/api/v1/consumptions`.
  */
 data class ConsumptionBlobImportRequest(
     /** Inclusive start of the calendar day range (UTC day folders yyyy/MM/dd). */
@@ -49,6 +51,31 @@ data class ConsumptionBlobImportResponse(
     val rowsInvalid: Int,
     val rowsFailed: Int,
     val errors: List<String> = emptyList()
+)
+
+/**
+ * Data-plane view of Avro blobs under hierarchical day folders for [fromDate]..[untilDate].
+ * Returned by `GET /api/v1/consumption/blob`.
+ */
+data class ConsumptionBlobViewResponse(
+    val fromDate: LocalDate,
+    val untilDate: LocalDate,
+    /** Root prefixes visited (empty string = container root). */
+    val blobPrefixes: List<String> = emptyList(),
+    val daysVisited: Int,
+    val blobCount: Int,
+    val blobs: List<ConsumptionBlobObjectView> = emptyList(),
+    val errors: List<String> = emptyList(),
+    /**
+     * Last import job summary when its configured range overlaps [fromDate]..[untilDate].
+     */
+    val lastImport: ConsumptionBlobImportResponse? = null
+)
+
+data class ConsumptionBlobObjectView(
+    /** Full path within the container, e.g. `eh-capture/2024/07/01/14_30_00.avro`. */
+    val name: String,
+    val size: Long? = null
 )
 
 data class ConsumptionBlobConnectorStatusResponse(

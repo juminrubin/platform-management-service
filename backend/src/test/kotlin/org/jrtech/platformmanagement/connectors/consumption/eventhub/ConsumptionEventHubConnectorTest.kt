@@ -31,11 +31,12 @@ class ConsumptionEventHubConnectorTest {
             ),
             runtime = runtime
         )
-        assertThat(connector.status().running).isFalse()
+        assertThat(connector.info().running).isFalse()
 
         val started = connector.start("admin@x.com")
         assertThat(started.running).isTrue()
         assertThat(started.lastStartedBy).isEqualTo("admin@x.com")
+        assertThat(started.logSnapshot.lineCount).isGreaterThan(0)
         assertThat(runtime.isRunning()).isTrue()
 
         val stopped = connector.stop("admin@x.com")
@@ -52,5 +53,55 @@ class ConsumptionEventHubConnectorTest {
         )
         assertThat(connector.health().status).isEqualTo("DISABLED")
         assertThat(connector.isEnabled()).isFalse()
+    }
+
+    @Test
+    fun `configure requireSourceRefId updates public configuration`() {
+        val connector = ConsumptionEventHubConnector(
+            connectorsProperties = ConnectorsProperties(
+                consumptionEventHub = ConsumptionEventHubProperties(
+                    enabled = true,
+                    requireSourceRefId = true
+                )
+            ),
+            runtime = InMemoryEventHubProcessorRuntime()
+        )
+        val cfg = connector.configure(mapOf("requireSourceRefId" to false))
+        assertThat(cfg["requireSourceRefId"]).isEqualTo(false)
+        assertThat(connector.status().requireSourceRefId).isFalse()
+    }
+
+    @Test
+    fun `autoStartIfConfigured starts when enabled and auto-start true`() {
+        val runtime = InMemoryEventHubProcessorRuntime()
+        val connector = ConsumptionEventHubConnector(
+            connectorsProperties = ConnectorsProperties(
+                consumptionEventHub = ConsumptionEventHubProperties(
+                    enabled = true,
+                    autoStart = true
+                )
+            ),
+            runtime = runtime
+        )
+        connector.autoStartIfConfigured()
+        assertThat(runtime.isRunning()).isTrue()
+        assertThat(connector.info().running).isTrue()
+        assertThat(connector.info().lastStartedBy).isEqualTo("SYSTEM")
+    }
+
+    @Test
+    fun `autoStartIfConfigured is no-op when auto-start false`() {
+        val runtime = InMemoryEventHubProcessorRuntime()
+        val connector = ConsumptionEventHubConnector(
+            connectorsProperties = ConnectorsProperties(
+                consumptionEventHub = ConsumptionEventHubProperties(
+                    enabled = true,
+                    autoStart = false
+                )
+            ),
+            runtime = runtime
+        )
+        connector.autoStartIfConfigured()
+        assertThat(runtime.isRunning()).isFalse()
     }
 }

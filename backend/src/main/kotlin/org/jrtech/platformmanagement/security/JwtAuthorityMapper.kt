@@ -74,7 +74,7 @@ object JwtAuthorityMapper {
         jwt.getClaimAsString("azp")?.trim()?.takeIf { it.isNotEmpty() }?.let { ids += it }
         jwt.getClaimAsString("appid")?.trim()?.takeIf { it.isNotEmpty() }?.let { ids += it }
         for (aud in jwt.audience.orEmpty()) {
-            val trimmed = aud?.trim().orEmpty()
+            val trimmed = aud.trim()
             if (trimmed.isEmpty()) continue
             ids += trimmed
             // Also index bare id when audience is api://{client-id}

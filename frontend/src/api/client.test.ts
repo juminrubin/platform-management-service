@@ -13,17 +13,23 @@ import {
   deleteParticipant,
   deleteServiceOffering,
   getCallerRegistration,
+  getConnector,
+  getConnectorConfig,
   getConsumption,
   getEntitlement,
   getMe,
   getParticipant,
   getServiceOffering,
   listCallerRegistrations,
+  listConnectors,
   listConsumptions,
   listEntitlements,
   listParticipants,
   listServiceOfferings,
+  startConnector,
+  stopConnector,
   updateCallerRegistration,
+  updateConnectorConfig,
   updateEntitlement,
   updateParticipant,
   updateServiceOffering,
@@ -270,6 +276,48 @@ describe('api client', () => {
       })
       stubFetchJson(undefined, { status: 204 })
       await deleteConsumption('d1')
+    })
+
+    it('supports connector control plane helpers', async () => {
+      stubFetchJson({ connectors: [] })
+      await listConnectors()
+      expect(fetch).toHaveBeenLastCalledWith('/api/v1/connectors', expect.anything())
+
+      stubFetchJson({ id: 'entra-directory', running: false })
+      await getConnector('entra-directory')
+      expect(fetch).toHaveBeenLastCalledWith(
+        '/api/v1/connectors/entra-directory',
+        expect.anything(),
+      )
+
+      stubFetchJson({ id: 'entra-directory', configuration: {} })
+      await getConnectorConfig('entra-directory')
+      expect(fetch).toHaveBeenLastCalledWith(
+        '/api/v1/connectors/entra-directory/config',
+        expect.anything(),
+      )
+
+      await updateConnectorConfig('entra-directory', {
+        configuration: { refreshIntervalMs: 60_000 },
+      })
+      expect(fetch).toHaveBeenLastCalledWith(
+        '/api/v1/connectors/entra-directory/config',
+        expect.objectContaining({ method: 'PUT' }),
+      )
+
+      stubFetchJson({ id: 'entra-directory', running: true })
+      await startConnector('entra-directory')
+      expect(fetch).toHaveBeenLastCalledWith(
+        '/api/v1/connectors/entra-directory/start',
+        expect.objectContaining({ method: 'POST' }),
+      )
+
+      stubFetchJson({ id: 'entra-directory', running: false })
+      await stopConnector('entra-directory')
+      expect(fetch).toHaveBeenLastCalledWith(
+        '/api/v1/connectors/entra-directory/stop',
+        expect.objectContaining({ method: 'POST' }),
+      )
     })
   })
 })

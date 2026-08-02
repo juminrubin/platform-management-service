@@ -152,7 +152,11 @@ app:
         #     - System.Maintainer
 
   # Microsoft Entra directory: load members of groups named Platform-System-* via Graph
-  # into a thread-safe ConcurrentHashMap (groupId → members), refreshed every 15 minutes.
+  # into a thread-safe ConcurrentHashMap (groupId → members).
+  # Lifecycle via connector entra-directory:
+  #   auto-start=true → arm on boot (immediate load for human auth + fixed-delay refresh)
+  #   POST /api/v1/connectors/entra-directory/start|stop → arm/disarm schedule
+  #   stop never cancels an in-flight Graph load; cache retained for authorization
   # Human users (email/UPN) are authorized by membership; group display names map to app roles:
   #   Platform-System-Maintainer → System.Maintainer
   #   Platform-System-Reader → System.Reader
@@ -167,12 +171,13 @@ app:
     enabled: ${APP_ENTRA_DIRECTORY_ENABLED:true}
     group-name-prefix: ${APP_ENTRA_GROUP_NAME_PREFIX:Platform-System-}
     include-transitive-members: ${APP_ENTRA_INCLUDE_TRANSITIVE_MEMBERS:false}
-    # Default 900000 ms = 15 minutes
+    # Default 900000 ms = 15 minutes (while connector running)
     refresh-interval-ms: ${APP_ENTRA_DIRECTORY_REFRESH_MS:900000}
-    load-on-startup: ${APP_ENTRA_DIRECTORY_LOAD_ON_STARTUP:true}
+    # Arm connector on boot (initial load + schedule). Prefer true so auth has a warm cache.
+    auto-start: ${APP_ENTRA_DIRECTORY_AUTO_START:true}
     graph-base-url: ${APP_ENTRA_GRAPH_BASE_URL:https://graph.microsoft.com/v1.0}
     tenant-id: ${AZURE_TENANT_ID}
-    client-id: ${AZURE_CLIENT_ID:${APP_AZURE_API_CLIENT_ID:}}
+    client-id: ${AZURE_CLIENT_ID:}
     client-secret: ${AZURE_CLIENT_SECRET:}
 
   # Background import of consumption Avro files from Azure Blob Storage (legacy keys).
@@ -189,12 +194,16 @@ app:
     require-avro-extension: true
 
   # Connectors (integrations). Defaults off; Blob/EH use Managed Identity in production.
-  # Unified API (System.Maintainer):
+  # Unified control plane (System.Maintainer):
   #   GET  /api/v1/connectors
-  #   GET  /api/v1/connectors/{id}
+  #   GET  /api/v1/connectors/{id}           # runtime info + log snapshot (≤32KB)
+  #   GET|PUT /api/v1/connectors/{id}/config
   #   POST /api/v1/connectors/{id}/start|stop
   # ids: consumption-storage | consumption-eventhub | entra-directory
-  # entra-directory start = Graph group/member refresh; view data via /api/v1/entra/**
+  # Data plane (not under /connectors):
+  #   entra-directory → /api/v1/entra/groups|members
+  #   consumption-storage → /api/v1/consumption/blob (+ domain /api/v1/consumptions)
+  #   consumption-eventhub → /api/v1/consumptions
   connectors:
     consumption-eventhub:
       enabled: ${APP_CONNECTOR_EH_ENABLED:false}

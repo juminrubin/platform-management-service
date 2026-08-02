@@ -76,8 +76,9 @@ class ApiCrudIntegrationTest {
             status { isNotFound() }
         }
 
+        // Domain APIs intentionally expose no DELETE (immutable operational records).
         mockMvc.delete("/api/v1/participants/$id").andExpect {
-            status { isNoContent() }
+            status { isMethodNotAllowed() }
         }
     }
 
@@ -274,11 +275,20 @@ class ApiCrudIntegrationTest {
             param("serviceOfferingId", offeringId)
         }.andExpect { status { isOk() } }
 
-        mockMvc.delete("/api/v1/consumptions/$consumptionId").andExpect { status { isNoContent() } }
-        mockMvc.delete("/api/v1/entitlements/$entitlementId").andExpect { status { isNoContent() } }
-        mockMvc.delete("/api/v1/caller-registrations/$callerId").andExpect { status { isNoContent() } }
-        mockMvc.delete("/api/v1/service-offerings/$offeringId").andExpect { status { isNoContent() } }
-        mockMvc.delete("/api/v1/participants/$participantId").andExpect { status { isNoContent() } }
+        // Domain APIs intentionally expose no DELETE.
+        mockMvc.delete("/api/v1/consumptions/$consumptionId").andExpect { status { isMethodNotAllowed() } }
+        mockMvc.delete("/api/v1/entitlements/$entitlementId").andExpect { status { isMethodNotAllowed() } }
+        mockMvc.delete("/api/v1/caller-registrations/$callerId").andExpect { status { isMethodNotAllowed() } }
+        mockMvc.delete("/api/v1/service-offerings/$offeringId").andExpect { status { isMethodNotAllowed() } }
+        mockMvc.delete("/api/v1/participants/$participantId").andExpect { status { isMethodNotAllowed() } }
+
+        // Resources remain readable after rejected delete attempts.
+        mockMvc.get("/api/v1/participants/$participantId") {
+            accept = MediaType.APPLICATION_JSON
+        }.andExpect { status { isOk() } }
+        mockMvc.get("/api/v1/consumptions/$consumptionId") {
+            accept = MediaType.APPLICATION_JSON
+        }.andExpect { status { isOk() } }
     }
 
     @Test

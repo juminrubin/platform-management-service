@@ -55,10 +55,34 @@ describe('Layout', () => {
 
     expect(screen.getByRole('link', { name: 'Participants' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Consumptions' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Connectors' })).toBeInTheDocument()
     expect(screen.getByText('alice@contoso.com')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /sign out/i }))
     expect(signOutWithPopup).toHaveBeenCalled()
+  })
+
+  it('hides connectors nav for non-maintainers', () => {
+    isAuthenticated = true
+    renderWithRouter(
+      <Routes>
+        <Route element={<Layout />}>
+          <Route path="/" element={<div>Home content</div>} />
+        </Route>
+      </Routes>,
+      {
+        route: '/',
+        auth: {
+          canMaintain: false,
+          canRead: true,
+          canCheckEntitlement: true,
+          canRegisterConsumption: false,
+          roles: ['System.Reader'],
+        },
+      },
+    )
+    expect(screen.getByRole('link', { name: 'Participants' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Connectors' })).not.toBeInTheDocument()
   })
 
   it('logs sign-in failures without crashing', async () => {

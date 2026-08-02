@@ -226,7 +226,7 @@ class MicrosoftGraphClientImpl(
                 "Microsoft Graph request failed status={} url={} body={}",
                 ex.statusCode.value(),
                 uri,
-                ex.responseBodyAsString?.take(500)
+                ex.responseBodyAsString.take(500)
             )
             throw IllegalStateException(
                 "Microsoft Graph request failed with HTTP ${ex.statusCode.value()}: ${ex.message}",
@@ -245,13 +245,13 @@ class MicrosoftGraphClientImpl(
     private fun textOrEmpty(node: JsonNode, field: String): String {
         val child = node.get(field) ?: return ""
         if (child.isNull) return ""
-        return child.asText("").trim()
+        return child.asString("").trim()
     }
 
     private fun textOrNull(node: JsonNode, field: String): String? {
         val child = node.get(field) ?: return null
         if (child.isNull) return null
-        val text = child.asText("").trim()
+        val text = child.asString("").trim()
         return text.takeIf { it.isNotEmpty() }
     }
 

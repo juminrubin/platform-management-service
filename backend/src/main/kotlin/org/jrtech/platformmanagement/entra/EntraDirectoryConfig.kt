@@ -10,10 +10,14 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.scheduling.annotation.EnableScheduling
-import org.springframework.scheduling.annotation.SchedulingConfigurer
-import org.springframework.scheduling.config.ScheduledTaskRegistrar
-import java.time.Duration
 
+/**
+ * Graph client wiring for Entra directory loading.
+ *
+ * Periodic refresh is **not** registered here — it is owned by
+ * [org.jrtech.platformmanagement.connectors.entra.EntraDirectoryConnector]
+ * start/stop lifecycle (`TaskScheduler` + cancelable future for *next* runs only).
+ */
 @Configuration
 @EnableScheduling
 @EnableConfigurationProperties(EntraDirectoryProperties::class)
@@ -54,32 +58,4 @@ class EntraDirectoryConfig {
         properties: EntraDirectoryProperties,
         credential: TokenCredential
     ): MicrosoftGraphClient = MicrosoftGraphClientImpl(properties, credential)
-
-    /**
-     * Rebuilds the ConcurrentHashMap of Entra group → members from Microsoft Graph
-     * on a fixed delay (default 15 minutes). Only registered when directory loading
-     * is enabled and [EntraDirectoryProperties.refreshIntervalMs] is positive.
-     */
-    @Bean
-    @ConditionalOnProperty(prefix = "app.entra-directory", name = ["enabled"], havingValue = "true")
-    fun entraDirectorySchedulingConfigurer(
-        properties: EntraDirectoryProperties,
-        directoryService: EntraGroupDirectoryService
-    ): SchedulingConfigurer = SchedulingConfigurer { taskRegistrar: ScheduledTaskRegistrar ->
-        val intervalMs = properties.refreshIntervalMs
-        if (intervalMs > 0L) {
-            val minutes = intervalMs / 60_000.0
-            log.info(
-                "Scheduling Entra group→member ConcurrentHashMap refresh every {} ms (~{} min)",
-                intervalMs,
-                String.format("%.1f", minutes)
-            )
-            taskRegistrar.addFixedDelayTask(
-                { directoryService.scheduledRefresh() },
-                Duration.ofMillis(intervalMs)
-            )
-        } else {
-            log.info("Entra directory periodic refresh disabled (refresh-interval-ms <= 0)")
-        }
-    }
 }

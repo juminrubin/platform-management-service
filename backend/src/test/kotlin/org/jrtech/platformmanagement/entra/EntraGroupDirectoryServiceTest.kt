@@ -208,33 +208,6 @@ class EntraGroupDirectoryServiceTest {
             .hasMessageContaining("Graph down")
     }
 
-    @Test
-    fun `scheduled refresh skips when disabled`() {
-        val graph = mock<MicrosoftGraphClient>()
-        val service = service(
-            properties = EntraDirectoryProperties(enabled = false, refreshIntervalMs = 300_000),
-            graph = graph
-        )
-        service.scheduledRefresh()
-        verify(graph, never()).listGroupsByDisplayNamePrefix(any())
-    }
-
-    @Test
-    fun `scheduled refresh invokes graph when enabled`() {
-        val graph = mock<MicrosoftGraphClient>()
-        whenever(graph.listGroupsByDisplayNamePrefix(any())).thenReturn(emptyList())
-        val service = service(
-            properties = EntraDirectoryProperties(
-                enabled = true,
-                refreshIntervalMs = 60_000,
-                groupNamePrefix = "Platform-System-"
-            ),
-            graph = graph
-        )
-        service.scheduledRefresh()
-        verify(graph, times(1)).listGroupsByDisplayNamePrefix("Platform-System-")
-    }
-
     private fun service(
         properties: EntraDirectoryProperties,
         graph: MicrosoftGraphClient?

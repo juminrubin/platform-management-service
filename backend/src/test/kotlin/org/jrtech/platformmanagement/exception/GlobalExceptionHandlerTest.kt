@@ -8,6 +8,7 @@ import org.springframework.security.access.AccessDeniedException
 import org.springframework.security.authentication.BadCredentialsException
 import org.springframework.validation.BeanPropertyBindingResult
 import org.springframework.validation.FieldError
+import org.springframework.web.HttpRequestMethodNotSupportedException
 import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.MissingServletRequestParameterException
 import kotlin.reflect.jvm.javaMethod
@@ -84,6 +85,15 @@ class GlobalExceptionHandlerTest {
         val server = handler.handleGeneric(IllegalStateException("boom"))
         assertThat(server.status).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR.value())
         assertThat(server.detail).contains("boom")
+    }
+
+    @Test
+    fun `maps method not supported to 405`() {
+        val result = handler.handleMethodNotSupported(
+            HttpRequestMethodNotSupportedException("DELETE")
+        )
+        assertThat(result.status).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED.value())
+        assertThat(result.detail).contains("DELETE")
     }
 
     @Suppress("unused")

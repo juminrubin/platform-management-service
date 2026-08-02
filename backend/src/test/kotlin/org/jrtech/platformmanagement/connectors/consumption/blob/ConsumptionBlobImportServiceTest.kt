@@ -31,9 +31,9 @@ class ConsumptionBlobImportServiceTest {
     private val avroReader = mock<ConsumptionAvroFileReader>()
     private val consumptionService = mock<ConsumptionService>()
 
-    private fun service(props: ConsumptionBlobProperties = enabledProps()): ConsumptionBlobImportService {
+    private fun service(props: ConsumptionBlobProperties = enabledProps()): ConsumptionBlobContainerConnector {
         whenever(storageProvider.getIfAvailable()).thenReturn(storage)
-        return ConsumptionBlobImportService(
+        return ConsumptionBlobContainerConnector(
             connectorsProperties = ConnectorsProperties(consumptionBlob = props),
             storageClientProvider = storageProvider,
             avroFileReader = avroReader,
@@ -64,6 +64,75 @@ class ConsumptionBlobImportServiceTest {
         assertThat(status.configured).isTrue()
         assertThat(status.detail).isEqualTo("ready")
         assertThat(status.container).isEqualTo("consumption")
+    }
+
+    @Test
+    fun `configure sets job dates and start runs import`() {
+        val day = LocalDate.of(2024, 7, 1)
+        val blobName = "2024/07/01/14_30_00.avro"
+        whenever(storage.listAvroBlobs("2024/07/01/"))
+            .thenReturn(listOf(BlobObjectRef(blobName, 100)))
+        whenever(storage.openBlob(blobName)).thenReturn(ByteArrayInputStream(byteArrayOf(1)))
+        whenever(avroReader.readAll(any(), eq(true))).thenReturn(emptyList())
+
+        val svc = service()
+        svc.configure(
+            mapOf(
+                "startDate" to "2024-07-01",
+                "endDate" to day,
+                "dryRun" to true,
+                "blobPrefixes" to listOf("")
+            )
+        )
+        assertThat(svc.configuration()["startDate"]).isEqualTo("2024-07-01")
+        assertThat(svc.configuration()["endDate"]).isEqualTo("2024-07-01")
+        assertThat(svc.configuration()["dryRun"]).isEqualTo(true)
+
+        val info = svc.start("admin@x.com")
+        assertThat(info.running).isFalse()
+        assertThat(info.lastStartedBy).isEqualTo("admin@x.com")
+        assertThat(svc.lastImportResult()).isNotNull
+        assertThat(svc.lastImportResult()!!.dryRun).isTrue()
+        assertThat(svc.info().logSnapshot.lineCount).isGreaterThan(0)
+    }
+
+    @Test
+    fun `start without job dates is rejected`() {
+        assertThatThrownBy { service().start("admin@x.com") }
+            .isInstanceOf(BadRequestException::class.java)
+            .hasMessageContaining("startDate")
+    }
+
+    @Test
+    fun `stop when idle is idempotent`() {
+        val info = service().stop("admin@x.com")
+        assertThat(info.running).isFalse()
+        assertThat(info.lastStoppedBy).isEqualTo("admin@x.com")
+    }
+
+    @Test
+    fun `viewRange lists avro blobs for date range`() {
+        val day = LocalDate.of(2024, 7, 1)
+        val blobName = "2024/07/01/14_30_00.avro"
+        whenever(storage.listAvroBlobs("2024/07/01/"))
+            .thenReturn(listOf(BlobObjectRef(blobName, 100)))
+
+        val view = service().viewRange(day, day)
+        assertThat(view.fromDate).isEqualTo(day)
+        assertThat(view.untilDate).isEqualTo(day)
+        assertThat(view.daysVisited).isEqualTo(1)
+        assertThat(view.blobCount).isEqualTo(1)
+        assertThat(view.blobs.single().name).isEqualTo(blobName)
+        assertThat(view.blobs.single().size).isEqualTo(100)
+        assertThat(view.lastImport).isNull()
+    }
+
+    @Test
+    fun `viewRange rejects inverted dates`() {
+        assertThatThrownBy {
+            service().viewRange(LocalDate.of(2024, 7, 5), LocalDate.of(2024, 7, 1))
+        }.isInstanceOf(BadRequestException::class.java)
+            .hasMessageContaining("untilDate")
     }
 
     @Test
