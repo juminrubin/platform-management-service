@@ -38,21 +38,28 @@ export function HomePage() {
   }
 
   return (
-    <section className="card">
-      <h1>Platform Management Service</h1>
-      <p className="muted">
-        Manage participants, caller registrations, offerings, entitlements, and consumption. API roles:{' '}
-        <code>System.Maintainer</code>, <code>System.Reader</code>, <code>Entitlement.Reader</code>,{' '}
-        <code>Consumption.Registrator</code>.
-      </p>
+    <section className="card home-card">
+      <header className="home-hero">
+        <h1 className="home-title">Platform Management Service</h1>
+        <p className="muted home-lead">
+          Manage participants, caller registrations, offerings, entitlements, and consumption.
+        </p>
+        <p className="home-roles muted">
+          API roles:{' '}
+          <code>System.Maintainer</code>, <code>System.Reader</code>, <code>Entitlement.Reader</code>,{' '}
+          <code>Consumption.Registrator</code>
+        </p>
+      </header>
 
       {!isAuthenticated ? (
-        <button type="button" className="primary" onClick={() => void onSignIn()}>
-          Sign in with Microsoft
-        </button>
+        <div className="home-actions">
+          <button type="button" className="primary" onClick={() => void onSignIn()}>
+            Sign in with Microsoft
+          </button>
+        </div>
       ) : (
-        <div className="stack">
-          <p>
+        <div className="stack home-content">
+          <p className="home-signed-in">
             Signed in as <strong>{accounts[0]?.username ?? accounts[0]?.name}</strong>
           </p>
           <div className="module-grid">
@@ -63,9 +70,11 @@ export function HomePage() {
               </Link>
             ))}
           </div>
-          <Link className="button" to="/me">
-            Inspect my token / roles
-          </Link>
+          <div className="home-actions">
+            <Link className="button" to="/me">
+              Inspect my token / roles
+            </Link>
+          </div>
         </div>
       )}
     </section>

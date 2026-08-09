@@ -48,6 +48,16 @@ describe('Layout', () => {
     expect(signInWithPopup).toHaveBeenCalled()
   })
 
+  it('pins a compact build footer at the bottom', () => {
+    isAuthenticated = false
+    renderLayout()
+    const footer = screen.getByRole('contentinfo', { name: /build information/i })
+    expect(footer).toHaveClass('app-footer')
+    expect(footer).toHaveTextContent(/UI\s+v/)
+    expect(footer).toHaveTextContent(/\d+\.\d+\.\d+/)
+    expect(footer.querySelector('time')).toBeTruthy()
+  })
+
   it('shows nav links and sign-out when authenticated', async () => {
     isAuthenticated = true
     const user = userEvent.setup()

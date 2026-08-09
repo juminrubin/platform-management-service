@@ -9,6 +9,8 @@ import io.swagger.v3.oas.models.security.SecurityRequirement
 import io.swagger.v3.oas.models.security.SecurityScheme
 import io.swagger.v3.oas.models.servers.Server
 import io.swagger.v3.oas.models.tags.Tag
+import org.springframework.beans.factory.ObjectProvider
+import org.springframework.boot.info.BuildProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 
@@ -19,13 +21,21 @@ import org.springframework.context.annotation.Configuration
  * JSON (public, no token): http://localhost:8080/v3/api-docs
  *
  * API Try it out still requires a Microsoft Entra JWT via Swagger Authorize.
+ *
+ * Title version and description stamp come from Maven [BuildProperties] when present.
  */
 @Configuration
-class OpenApiConfig {
+class OpenApiConfig(
+    private val buildProperties: ObjectProvider<BuildProperties>
+) {
 
     @Bean
-    fun openAPI(): OpenAPI =
-        OpenAPI()
+    fun openAPI(): OpenAPI {
+        val build = buildProperties.ifAvailable
+        val version = build?.version ?: FALLBACK_VERSION
+        val buildTime = build?.time?.toString() ?: BuildInfoStartupLogger.UNKNOWN
+
+        return OpenAPI()
             .info(
                 Info()
                     .title("Platform Management Service API")
@@ -33,6 +43,8 @@ class OpenApiConfig {
                         """
                         REST API for participants, caller registrations, service offerings,
                         entitlements, and call consumption.
+
+                        **Build:** version `$version` · time `$buildTime`
 
                         ### Using Swagger UI
                         - Opening this page does not require a token (docs are public).
@@ -50,14 +62,15 @@ class OpenApiConfig {
                         - Consumption.Registrator: create consumption records
                         """.trimIndent()
                     )
-                    .version("1.0.0")
+                    .version(version)
                     .contact(
                         Contact()
                             .name("Platform Management Service")
                     )
                     .license(
                         License()
-                            .name("Proprietary")
+                            .name("Apache License, Version 2.0")
+                            .url("https://www.apache.org/licenses/LICENSE-2.0.txt")
                     )
             )
             .servers(
@@ -98,8 +111,10 @@ class OpenApiConfig {
             .addSecurityItem(
                 SecurityRequirement().addList(BEARER_JWT)
             )
+    }
 
     companion object {
         const val BEARER_JWT = "bearer-jwt"
+        const val FALLBACK_VERSION = "1.0.0-SNAPSHOT"
     }
 }

@@ -82,6 +82,12 @@ management:
     web:
       exposure:
         include: health,info
+  info:
+    # Expose Maven-stamped META-INF/build-info.properties (version + time) on /actuator/info
+    build:
+      enabled: true
+    env:
+      enabled: false
 
 # OpenAPI 3 / Swagger UI (springdoc-openapi)
 # Canonical UI entries (all work):

@@ -2,6 +2,16 @@ import { Link, NavLink, Outlet } from 'react-router-dom'
 import { useIsAuthenticated, useMsal } from '@azure/msal-react'
 import { useAuthorization } from '../auth/AuthorizationContext'
 import { signInWithPopup, signOutWithPopup } from '../auth/msalConfig'
+import { buildInfo } from '../buildInfo'
+
+function formatBuildTimestamp(iso: string): string {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) {
+    return iso
+  }
+  // Compact UTC display: 2026-08-09 12:04 UTC
+  return date.toISOString().replace('T', ' ').replace(/:\d{2}\.\d{3}Z$/, ' UTC')
+}
 
 const baseNav = [
   { to: '/participants', label: 'Participants' },
@@ -74,9 +84,23 @@ export function Layout() {
           )}
         </div>
       </header>
-      <main>
+      <main className="layout-main">
         <Outlet />
       </main>
+      <footer className="app-footer" aria-label="Build information">
+        <span className="app-footer-item">
+          UI <span className="app-footer-value">v{buildInfo.version}</span>
+        </span>
+        <span className="app-footer-sep" aria-hidden="true">
+          ·
+        </span>
+        <span className="app-footer-item">
+          built{' '}
+          <time className="app-footer-value" dateTime={buildInfo.timestamp}>
+            {formatBuildTimestamp(buildInfo.timestamp)}
+          </time>
+        </span>
+      </footer>
     </div>
   )
 }

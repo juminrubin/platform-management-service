@@ -1,11 +1,18 @@
 /// <reference types="vitest/config" />
-import { copyFileSync, existsSync, mkdirSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 
 const rootDir = dirname(fileURLToPath(import.meta.url))
+
+const packageJson = JSON.parse(readFileSync(resolve(rootDir, 'package.json'), 'utf-8')) as {
+  version: string
+}
+/** Stamp version (package.json) and ISO-8601 build time into the SPA bundle. */
+const buildVersion = process.env.APP_BUILD_VERSION || packageJson.version
+const buildTimestamp = process.env.APP_BUILD_TIMESTAMP || new Date().toISOString()
 
 /** Keep public/msal-redirect-bridge.min.js in sync with the installed @azure/msal-browser package. */
 function copyMsalRedirectBridge(): Plugin {
@@ -34,6 +41,10 @@ export default defineConfig({
   plugins: [react(), copyMsalRedirectBridge()],
   // Expose APP_* from .env to import.meta.env (default Vite prefix is only VITE_)
   envPrefix: ['APP_', 'VITE_'],
+  define: {
+    'import.meta.env.APP_BUILD_VERSION': JSON.stringify(buildVersion),
+    'import.meta.env.APP_BUILD_TIMESTAMP': JSON.stringify(buildTimestamp),
+  },
   server: {
     port: 3000,
     strictPort: true,
