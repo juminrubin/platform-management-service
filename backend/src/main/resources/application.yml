@@ -161,6 +161,22 @@ app:
         #   "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee":
         #     - System.Maintainer
 
+  # Seed / catalog load from datasource.json on ApplicationReady (idempotent inserts).
+  # Disable in environments that must start empty: APP_DATASOURCE_LOADER_ENABLED=false
+  datasource-loader:
+    enabled: ${APP_DATASOURCE_LOADER_ENABLED:true}
+    location: ${APP_DATASOURCE_LOADER_LOCATION:classpath:datasource.json}
+
+  # In-memory concurrent maps for GET /api/v1/entitlements/check (services, callers, entitlements).
+  # Entitlements: ACTIVE only and valid for today (UTC) at each refresh — keeps the index small.
+  # Reloaded on startup, hourly, and via POST /api/v1/entitlements/cache/refresh (System.Maintainer).
+  entitlement-check-cache:
+    enabled: ${APP_ENTITLEMENT_CHECK_CACHE_ENABLED:true}
+    load-on-startup: ${APP_ENTITLEMENT_CHECK_CACHE_LOAD_ON_STARTUP:true}
+    scheduled-refresh-enabled: ${APP_ENTITLEMENT_CHECK_CACHE_SCHEDULED:true}
+    # Default 3600000 ms = 1 hour (fixed delay after each completed refresh)
+    refresh-interval-ms: ${APP_ENTITLEMENT_CHECK_CACHE_REFRESH_MS:3600000}
+
   # Microsoft Entra directory: load members of groups named Platform-System-* via Graph
   # into a thread-safe ConcurrentHashMap (groupId → members).
   # Lifecycle via connector entra-directory:

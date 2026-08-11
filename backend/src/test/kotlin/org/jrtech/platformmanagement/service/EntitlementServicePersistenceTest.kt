@@ -24,7 +24,12 @@ import java.util.UUID
 import org.jrtech.platformmanagement.TestAudit
 
 @DataJpaTest
-@Import(EntitlementService::class, ParticipantService::class, ServiceOfferingService::class)
+@Import(
+    EntitlementService::class,
+    ParticipantService::class,
+    ServiceOfferingService::class,
+    org.jrtech.platformmanagement.cache.EntitlementCheckCache::class
+)
 @ActiveProfiles("test")
 class EntitlementServicePersistenceTest @Autowired constructor(
     private val entitlementService: EntitlementService,

@@ -1,5 +1,6 @@
 package org.jrtech.platformmanagement.service
 
+import org.jrtech.platformmanagement.cache.EntitlementCheckCache
 import org.jrtech.platformmanagement.domain.CallerRegistrationStatus
 import org.jrtech.platformmanagement.domain.EntitlementStatus
 import org.jrtech.platformmanagement.domain.Participant
@@ -16,11 +17,13 @@ import org.jrtech.platformmanagement.repository.ParticipantCallerRegistrationRep
 import org.jrtech.platformmanagement.repository.ParticipantServiceEntitlementRepository
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.ArgumentMatchers.any
 import org.mockito.InjectMocks
 import org.mockito.Mock
+import org.mockito.Mockito
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
@@ -44,8 +47,17 @@ class EntitlementServiceTest {
     @Mock
     private lateinit var serviceOfferingService: ServiceOfferingService
 
+    @Mock
+    private lateinit var entitlementCheckCache: EntitlementCheckCache
+
     @InjectMocks
     private lateinit var entitlementService: EntitlementService
+
+    @BeforeEach
+    fun useDatabaseCheckPath() {
+        // Unit tests exercise the DB path; cache path is covered separately.
+        Mockito.lenient().whenever(entitlementCheckCache.isUsableForChecks()).thenReturn(false)
+    }
 
     @Test
     fun `findAll without filters uses findAllWithRelations`() {

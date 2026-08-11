@@ -1,5 +1,6 @@
 package org.jrtech.platformmanagement.service
 
+import org.jrtech.platformmanagement.cache.EntitlementCheckCache
 import org.jrtech.platformmanagement.domain.AuditActors
 import org.jrtech.platformmanagement.domain.CallerRegistrationStatus
 import org.jrtech.platformmanagement.domain.EntitlementStatus
@@ -25,7 +26,8 @@ class EntitlementService(
     private val entitlementRepository: ParticipantServiceEntitlementRepository,
     private val callerRegistrationRepository: ParticipantCallerRegistrationRepository,
     private val participantService: ParticipantService,
-    private val serviceOfferingService: ServiceOfferingService
+    private val serviceOfferingService: ServiceOfferingService,
+    private val entitlementCheckCache: EntitlementCheckCache
 ) {
     private val log = logger()
 
@@ -149,6 +151,9 @@ class EntitlementService(
      * - [untilDate] defaults to [fromDate] when omitted (point-in-time check)
      *
      * The entitlement must fully cover the requested range (inclusive).
+     *
+     * When [EntitlementCheckCache] is loaded, this path is pure in-memory lookup
+     * (service + caller + entitlement maps). Otherwise falls back to the database.
      */
     @Transactional(readOnly = true)
     fun checkByCallerAndService(
@@ -172,6 +177,87 @@ class EntitlementService(
             throw BadRequestException("untilDate must be on or after fromDate")
         }
 
+        return if (entitlementCheckCache.isUsableForChecks()) {
+            checkFromCache(resolvedCallerId, offeringId, resolvedFrom, resolvedUntil)
+        } else {
+            checkFromDatabase(resolvedCallerId, offeringId, resolvedFrom, resolvedUntil)
+        }
+    }
+
+    private fun checkFromCache(
+        resolvedCallerId: String,
+        offeringId: String,
+        resolvedFrom: LocalDate,
+        resolvedUntil: LocalDate
+    ): EntitlementCheckResponse {
+        // Ensure service offering exists (stable 404 for typos)
+        if (entitlementCheckCache.findService(offeringId) == null) {
+            throw ResourceNotFoundException("Service offering not found: $offeringId")
+        }
+
+        fun deny(
+            reason: String,
+            callerIdValue: String?,
+            participantId: String?,
+            entitlement: EntitlementResponse? = null
+        ) = EntitlementCheckResponse(
+            allowed = false,
+            reason = reason,
+            callerId = callerIdValue,
+            participantId = participantId,
+            serviceOfferingId = offeringId,
+            fromDate = resolvedFrom,
+            untilDate = resolvedUntil,
+            entitlement = entitlement
+        )
+
+        val caller = entitlementCheckCache.findCaller(resolvedCallerId)
+            ?: return deny(
+                reason = "CALLER_NOT_FOUND",
+                callerIdValue = resolvedCallerId,
+                participantId = null
+            )
+
+        if (caller.status != CallerRegistrationStatus.ACTIVE) {
+            log.debug(
+                "Entitlement check (cache) denied: caller inactive callerId={} status={}",
+                caller.callerId,
+                caller.status
+            )
+            return deny(
+                reason = "CALLER_NOT_ACTIVE",
+                callerIdValue = caller.callerId,
+                participantId = caller.participantId
+            )
+        }
+
+        val entitlement = entitlementCheckCache.findEntitlement(caller.participantId, offeringId)
+            ?: return deny(
+                reason = "NO_ENTITLEMENT",
+                callerIdValue = caller.callerId,
+                participantId = caller.participantId
+            )
+
+        return evaluateEntitlement(
+            callerId = caller.callerId,
+            participantId = caller.participantId,
+            offeringId = offeringId,
+            resolvedFrom = resolvedFrom,
+            resolvedUntil = resolvedUntil,
+            status = entitlement.status,
+            validFrom = entitlement.validFrom,
+            validTo = entitlement.validTo,
+            entitlementResponse = entitlement.toResponse(),
+            source = "cache"
+        )
+    }
+
+    private fun checkFromDatabase(
+        resolvedCallerId: String,
+        offeringId: String,
+        resolvedFrom: LocalDate,
+        resolvedUntil: LocalDate
+    ): EntitlementCheckResponse {
         // Ensure service offering exists (stable 404 for typos)
         serviceOfferingService.getEntity(offeringId)
 
@@ -200,7 +286,7 @@ class EntitlementService(
 
         if (caller.status != CallerRegistrationStatus.ACTIVE) {
             log.debug(
-                "Entitlement check denied: caller inactive callerId={} status={}",
+                "Entitlement check (db) denied: caller inactive callerId={} status={}",
                 caller.callerId,
                 caller.status
             )
@@ -223,22 +309,45 @@ class EntitlementService(
             )
         }
 
-        val response = EntitlementResponse.from(entitlement)
-        // Full coverage of [resolvedFrom, resolvedUntil] against entitlement.validFrom/validTo
+        return evaluateEntitlement(
+            callerId = caller.callerId,
+            participantId = caller.participant.id,
+            offeringId = offeringId,
+            resolvedFrom = resolvedFrom,
+            resolvedUntil = resolvedUntil,
+            status = entitlement.status,
+            validFrom = entitlement.validFrom,
+            validTo = entitlement.validTo,
+            entitlementResponse = EntitlementResponse.from(entitlement),
+            source = "db"
+        )
+    }
+
+    private fun evaluateEntitlement(
+        callerId: String,
+        participantId: String,
+        offeringId: String,
+        resolvedFrom: LocalDate,
+        resolvedUntil: LocalDate,
+        status: EntitlementStatus,
+        validFrom: LocalDate,
+        validTo: LocalDate?,
+        entitlementResponse: EntitlementResponse,
+        source: String
+    ): EntitlementCheckResponse {
+        // Full coverage of [resolvedFrom, resolvedUntil] against validFrom/validTo
         val reason = when {
-            entitlement.status != EntitlementStatus.ACTIVE -> "ENTITLEMENT_NOT_ACTIVE"
-            // Window starts before the entitlement is valid
-            resolvedFrom.isBefore(entitlement.validFrom) -> "ENTITLEMENT_NOT_YET_VALID"
-            // Window ends after the entitlement expires (open-ended validTo = no expiry)
-            entitlement.validTo != null && resolvedUntil.isAfter(entitlement.validTo) ->
-                "ENTITLEMENT_EXPIRED"
+            status != EntitlementStatus.ACTIVE -> "ENTITLEMENT_NOT_ACTIVE"
+            resolvedFrom.isBefore(validFrom) -> "ENTITLEMENT_NOT_YET_VALID"
+            validTo != null && resolvedUntil.isAfter(validTo) -> "ENTITLEMENT_EXPIRED"
             else -> "ALLOWED"
         }
         val allowed = reason == "ALLOWED"
 
         log.debug(
-            "Entitlement check callerId={} service={} from={} until={} allowed={} reason={}",
-            caller.callerId,
+            "Entitlement check source={} callerId={} service={} from={} until={} allowed={} reason={}",
+            source,
+            callerId,
             offeringId,
             resolvedFrom,
             resolvedUntil,
@@ -249,12 +358,12 @@ class EntitlementService(
         return EntitlementCheckResponse(
             allowed = allowed,
             reason = reason,
-            callerId = caller.callerId,
-            participantId = caller.participant.id,
+            callerId = callerId,
+            participantId = participantId,
             serviceOfferingId = offeringId,
             fromDate = resolvedFrom,
             untilDate = resolvedUntil,
-            entitlement = response
+            entitlement = entitlementResponse
         )
     }
 

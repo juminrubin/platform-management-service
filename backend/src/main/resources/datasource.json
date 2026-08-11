@@ -1,0 +1,122 @@
+{
+  "services": [
+    {
+      "id": "gpt-5.1",
+      "name": "GPT 5.1",
+      "category": "Language Models",
+      "description": "OpenAI GPT 5.1 model",
+      "tags": ["gpt-5.1"],
+      "provider": "OpenAI",
+      "config": "{'deployment_endpoint':'https://aoai.example/gpt-5.1','deployment_id':'gpt-5.1','default_max_tpm':120000,'default_max_rpm':120}",
+      "active": true
+    },
+    {
+      "id": "gpt-5.4-mini",
+      "name": "GPT 5.4 Mini",
+      "category": "Language Models",
+      "description": "OpenAI GPT 5.4 Mini model",
+      "tags": ["gpt-5.4-mini"],
+      "provider": "OpenAI",
+      "config": "{'deployment_endpoint':'https://aoai.example/gpt-5.4-mini','deployment_id':'gpt-5.4-mini','default_max_tpm':1000000,'default_max_rpm':1000}",
+      "active": true
+    },
+    {
+      "id": "az-whisper-stt",
+      "name": "Azure Whisper STT",
+      "category": "Audio Models",
+      "description": "OpenAI Azure Whisper STT model",
+      "tags": ["whisper"],
+      "provider": "OpenAI",
+      "config": "{'deployment_id':'whisper','default_max_rpm':30}",
+      "active": true
+    }
+  ],
+  "participants": [
+    {
+      "id": "P001",
+      "name": "Marketing Department",
+      "contact": "sky.walker@company.com",
+      "status": "ACTIVE",
+      "callers": [
+        {
+          "id": "11111111-2222-3333-4444-555555555555",
+          "label": "CRM Application",
+          "status": "ACTIVE"
+        },
+        {
+          "id": "sky.walker@company.com",
+          "label": "",
+          "status": "ACTIVE"
+        }
+      ],
+      "entitlements": [
+        {
+          "serviceId": "gpt-5.1",
+          "status": "ACTIVE",
+          "validFrom": "2026-01-01",
+          "validTo": "2030-01-01",
+          "config": "",
+          "notes": "Standard LLM package"
+        },
+        {
+          "serviceId": "gpt-5.4-mini",
+          "status": "ACTIVE",
+          "validFrom": "2026-01-01",
+          "validTo": "2030-01-01",
+          "config": "{'max_tpm':2000000,'max_rpm':2000}",
+          "notes": "Standard LLM package"
+        },
+        {
+          "serviceId": "az-whisper-stt",
+          "status": "ACTIVE",
+          "validFrom": "2026-01-01",
+          "validTo": "2030-01-01",
+          "config": "{'max_rpm':50}",
+          "notes": ""
+        }
+      ]
+    },
+    {"id": "P002",
+      "name": "Production Department",
+      "contact": "obi.wan@company.com",
+      "status": "ACTIVE",
+      "callers": [
+        {
+          "id": "11111111-2222-3333-4444-66666666666",
+          "label": "Production Planning Application",
+          "status": "ACTIVE"
+        },
+        {
+          "id": "yoda.grogu@company.com",
+          "label": "",
+          "status": "ACTIVE"
+        }
+      ],
+      "entitlements": [
+        {
+          "serviceId": "gpt-5.1",
+          "status": "ACTIVE",
+          "validFrom": "2026-01-01",
+          "validTo": "2030-01-01",
+          "config": "",
+          "notes": "Standard LLM package"
+        },
+        {
+          "serviceId": "gpt-5.4-mini",
+          "status": "ACTIVE",
+          "validFrom": "2026-01-01",
+          "validTo": "2030-01-01",
+          "config": "",
+          "notes": "Standard LLM package"
+        },
+        {
+          "serviceId": "az-whisper-stt",
+          "status": "ACTIVE",
+          "validFrom": "2026-01-01",
+          "validTo": "2030-01-01",
+          "config": "",
+          "notes": ""
+        }
+      ]}
+  ]
+}

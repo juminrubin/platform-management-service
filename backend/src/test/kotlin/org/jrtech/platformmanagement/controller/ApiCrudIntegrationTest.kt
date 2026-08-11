@@ -293,9 +293,10 @@ class ApiCrudIntegrationTest {
 
     @Test
     fun `conflict and bad request map through exception handler`() {
+        // P001 is seeded from classpath:datasource.json at startup
         mockMvc.post("/api/v1/participants") {
             contentType = MediaType.APPLICATION_JSON
-            content = """{"id":"acme-corp","name":"Duplicate Acme","status":"ACTIVE"}"""
+            content = """{"id":"P001","name":"Duplicate Marketing","status":"ACTIVE"}"""
         }.andExpect {
             status { isConflict() }
             jsonPath("$.detail") { exists() }

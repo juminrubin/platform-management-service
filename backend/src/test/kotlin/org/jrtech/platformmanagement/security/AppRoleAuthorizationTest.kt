@@ -152,12 +152,13 @@ class AppRoleAuthorizationTest {
 
     @Test
     fun `System Reader can check entitlement`() {
+        // Seeded from classpath:datasource.json — P001 / sky.walker@company.com / gpt-5.1
         mockMvc.get("/api/v1/entitlements/check") {
             accept = MediaType.APPLICATION_JSON
-            param("callerId", "alice@acme.example")
+            param("callerId", "sky.walker@company.com")
             param("serviceOfferingId", "gpt-5.1")
-            param("fromDate", "2024-06-15")
-            param("untilDate", "2024-06-15")
+            param("fromDate", "2026-06-15")
+            param("untilDate", "2026-06-15")
             with(jwtWithRoles(AppRoles.SYSTEM_READER))
         }.andExpect {
             status { isOk() }
@@ -189,7 +190,7 @@ class AppRoleAuthorizationTest {
             contentType = MediaType.APPLICATION_JSON
             content = """
                 {
-                  "callerId": "alice@acme.example",
+                  "callerId": "sky.walker@company.com",
                   "serviceOfferingId": "gpt-5.1",
                   "consumptionData": "{}"
                 }
@@ -212,21 +213,21 @@ class AppRoleAuthorizationTest {
 
     @Test
     fun `Entitlement Reader can check entitlement by caller id`() {
-        // Seed entitlement for acme-corp / gpt-5.1 is valid 2024-01-15 .. 2025-12-31
+        // Seed entitlement for P001 / gpt-5.1 is valid 2026-01-01 .. 2030-01-01
         mockMvc.get("/api/v1/entitlements/check") {
             accept = MediaType.APPLICATION_JSON
-            param("callerId", "alice@acme.example")
+            param("callerId", "sky.walker@company.com")
             param("serviceOfferingId", "gpt-5.1")
-            param("fromDate", "2024-06-15")
-            param("untilDate", "2024-06-15")
+            param("fromDate", "2026-06-15")
+            param("untilDate", "2026-06-15")
             with(jwtWithRoles(AppRoles.ENTITLEMENT_READER))
         }.andExpect {
             status { isOk() }
             jsonPath("$.allowed") { value(true) }
             jsonPath("$.reason") { value("ALLOWED") }
-            jsonPath("$.participantId") { value("acme-corp") }
+            jsonPath("$.participantId") { value("P001") }
             jsonPath("$.serviceOfferingId") { value("gpt-5.1") }
-            jsonPath("$.callerId") { value("alice@acme.example") }
+            jsonPath("$.callerId") { value("sky.walker@company.com") }
         }
     }
 
@@ -247,20 +248,20 @@ class AppRoleAuthorizationTest {
             contentType = MediaType.APPLICATION_JSON
             content = """
                 {
-                  "callerId": "alice@acme.example",
+                  "callerId": "sky.walker@company.com",
                   "serviceOfferingId": "gpt-5.1",
                   "sourceRefId": "$sourceRefId",
                   "consumptionData": "{\"input_token\":10,\"output_token\":5}",
-                  "capturedAt": "2024-07-01T12:00:00Z"
+                  "capturedAt": "2026-07-01T12:00:00Z"
                 }
             """.trimIndent()
             with(jwtWithRoles(AppRoles.CONSUMPTION_REGISTRATOR))
         }.andExpect {
             status { isCreated() }
             jsonPath("$.serviceOfferingId") { value("gpt-5.1") }
-            jsonPath("$.callerId") { value("alice@acme.example") }
+            jsonPath("$.callerId") { value("sky.walker@company.com") }
             jsonPath("$.sourceRefId") { value(sourceRefId) }
-            jsonPath("$.capturedAt") { value("2024-07-01T12:00:00Z") }
+            jsonPath("$.capturedAt") { value("2026-07-01T12:00:00Z") }
             jsonPath("$.createdAt") { exists() }
         }
     }
@@ -322,7 +323,7 @@ class AppRoleAuthorizationTest {
     fun `Consumption Registrator cannot check entitlements`() {
         mockMvc.get("/api/v1/entitlements/check") {
             accept = MediaType.APPLICATION_JSON
-            param("callerId", "alice@acme.example")
+            param("callerId", "sky.walker@company.com")
             param("serviceOfferingId", "gpt-5.1")
             with(jwtWithRoles(AppRoles.CONSUMPTION_REGISTRATOR))
         }.andExpect {

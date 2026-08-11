@@ -43,6 +43,17 @@ app:
     # Unit / @DataJpaTest slices: no JWT required.
     # Role-based security tests set permit-all=false via @TestPropertySource.
     permit-all: true
+  # Keep seed load on for full @SpringBootTest (catalog from classpath:datasource.json).
+  # @DataJpaTest slices do not register DataSourceLoader unless imported.
+  datasource-loader:
+    enabled: true
+    location: classpath:datasource.json
+  # Cache on for integration tests; disable scheduled hourly tick noise
+  entitlement-check-cache:
+    enabled: true
+    load-on-startup: true
+    scheduled-refresh-enabled: false
+    refresh-interval-ms: 3600000
   azure:
     credential:
       client-id: ""

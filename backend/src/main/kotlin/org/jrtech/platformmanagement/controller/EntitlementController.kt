@@ -1,10 +1,14 @@
 package org.jrtech.platformmanagement.controller
 
+import org.jrtech.platformmanagement.cache.EntitlementCheckCache
+import org.jrtech.platformmanagement.cache.EntitlementCheckCacheStatusResponse
 import org.jrtech.platformmanagement.domain.EntitlementStatus
 import org.jrtech.platformmanagement.dto.CreateEntitlementRequest
 import org.jrtech.platformmanagement.dto.EntitlementCheckResponse
 import org.jrtech.platformmanagement.dto.EntitlementResponse
 import org.jrtech.platformmanagement.dto.UpdateEntitlementRequest
+import org.jrtech.platformmanagement.exception.BadRequestException
+import org.jrtech.platformmanagement.service.AuditPrincipalResolver
 import org.jrtech.platformmanagement.service.EntitlementService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.security.SecurityRequirement
@@ -20,6 +24,7 @@ import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
+import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 import java.time.LocalDate
 import java.util.UUID
@@ -28,6 +33,7 @@ import java.util.UUID
  * Entitlement API.
  * - GET list/get: [AppRoles.SYSTEM_MAINTAINER] or [AppRoles.SYSTEM_READER]
  * - GET check: maintainer, system reader, or [AppRoles.ENTITLEMENT_READER]
+ * - GET/POST cache: [AppRoles.SYSTEM_MAINTAINER]
  * - write: [AppRoles.SYSTEM_MAINTAINER]
  */
 @RestController
@@ -35,7 +41,9 @@ import java.util.UUID
 @Tag(name = "Entitlements")
 @SecurityRequirement(name = "bearer-jwt")
 class EntitlementController(
-    private val entitlementService: EntitlementService
+    private val entitlementService: EntitlementService,
+    private val entitlementCheckCache: EntitlementCheckCache,
+    private val auditPrincipalResolver: AuditPrincipalResolver
 ) {
 
     /**
@@ -78,6 +86,37 @@ class EntitlementController(
         @RequestParam(required = false) status: EntitlementStatus?
     ): List<EntitlementResponse> =
         entitlementService.findAll(participantId, serviceOfferingId, status)
+
+    @GetMapping("/cache")
+    @PreAuthorize("@authz.canMaintain()")
+    @Operation(
+        summary = "Entitlement check cache status",
+        description = "Returns load counts and last refresh metadata for the in-memory " +
+            "service / caller / entitlement index used by GET /check. " +
+            "Entitlement entries are ACTIVE and valid as of the last refresh day (UTC). " +
+            "Requires System.Maintainer."
+    )
+    fun cacheStatus(): EntitlementCheckCacheStatusResponse =
+        entitlementCheckCache.status()
+
+    @PostMapping("/cache/refresh")
+    @PreAuthorize("@authz.canMaintain()")
+    @ResponseStatus(HttpStatus.OK)
+    @Operation(
+        summary = "Refresh entitlement check cache from the database",
+        description = "Forces a full reload of services, caller registrations, and " +
+            "ACTIVE entitlements whose validity covers today (UTC) into the concurrent " +
+            "in-memory index (does not change the hourly schedule). Requires System.Maintainer."
+    )
+    fun refreshCache(): EntitlementCheckCacheStatusResponse {
+        try {
+            return entitlementCheckCache.refresh(triggeredBy = auditPrincipalResolver.current())
+        } catch (ex: Exception) {
+            throw BadRequestException(
+                "Failed to refresh entitlement check cache: ${ex.message ?: ex.javaClass.simpleName}"
+            )
+        }
+    }
 
     @GetMapping("/{id}")
     @PreAuthorize("@authz.canRead()")
