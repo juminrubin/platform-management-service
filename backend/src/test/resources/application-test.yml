@@ -1,32 +1,10 @@
-# Test profile: no live Entra discovery; open security for unit/persistence tests.
+# Test profile: in-memory store, open security for unit/persistence tests.
 # Security integration tests override app.security.permit-all=false and import TestJwtDecoderConfig.
 spring:
-  datasource:
-    url: jdbc:h2:mem:testdb;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;TIME ZONE=UTC
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
-
-  jpa:
-    hibernate:
-      ddl-auto: validate
-    open-in-view: false
-    show-sql: false
-    properties:
-      hibernate:
-        jdbc:
-          time_zone: UTC
-
   jackson:
     time-zone: UTC
 
-  flyway:
-    enabled: true
-    locations: classpath:db/migration
-    baseline-on-migrate: true
-
   # Do not contact login.microsoftonline.com during tests.
-  # Override Entra placeholders from application.yml so the context loads without Azure env vars.
   security:
     oauth2:
       resourceserver:
@@ -40,34 +18,29 @@ spring:
 
 app:
   security:
-    # Unit / @DataJpaTest slices: no JWT required.
-    # Role-based security tests set permit-all=false via @TestPropertySource.
     permit-all: true
-  # Keep seed load on for full @SpringBootTest (catalog from classpath:datasource.json).
-  # @DataJpaTest slices do not register DataSourceLoader unless imported.
-  datasource-loader:
-    enabled: true
-    location: classpath:datasource.json
-  # Cache on for integration tests; disable scheduled hourly tick noise
+  azure-table:
+    enabled: false
   entitlement-check-cache:
     enabled: true
-    load-on-startup: true
+    load-on-startup: false
     scheduled-refresh-enabled: false
-    refresh-interval-ms: 3600000
   azure:
     credential:
       client-id: ""
       client-secret: ""
       tenant-id: ""
   entra-directory:
-    # No live Microsoft Graph calls in tests; unit tests inject mock Graph clients.
     enabled: false
     auto-start: false
     refresh-interval-ms: 0
   consumption-import:
-    # Keep Azure blob polling off in tests (unit tests exercise the service with mocks).
     enabled: false
   connectors:
+    datasource-loading:
+      enabled: true
+      auto-start: true
+      refresh-interval-ms: 3600000
     consumption-eventhub:
       enabled: false
       auto-start: false

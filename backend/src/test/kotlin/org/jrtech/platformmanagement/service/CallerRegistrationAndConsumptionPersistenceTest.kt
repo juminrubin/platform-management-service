@@ -1,5 +1,7 @@
 package org.jrtech.platformmanagement.service
 
+import org.springframework.boot.test.context.SpringBootTest
+
 import org.jrtech.platformmanagement.domain.CallerRegistrationStatus
 import org.jrtech.platformmanagement.domain.Participant
 import org.jrtech.platformmanagement.domain.ParticipantStatus
@@ -15,19 +17,11 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
-import org.springframework.context.annotation.Import
 import org.springframework.test.context.ActiveProfiles
 import java.util.UUID
 import org.jrtech.platformmanagement.TestAudit
 
-@DataJpaTest
-@Import(
-    CallerRegistrationService::class,
-    ConsumptionService::class,
-    ParticipantService::class,
-    ServiceOfferingService::class
-)
+@SpringBootTest
 @ActiveProfiles("test")
 class CallerRegistrationAndConsumptionPersistenceTest @Autowired constructor(
     private val callerRegistrationService: CallerRegistrationService,
@@ -58,15 +52,16 @@ class CallerRegistrationAndConsumptionPersistenceTest @Autowired constructor(
 
     @Test
     fun `caller registration and consumption end-to-end`() {
+        val callerId = "user-${participant.id}@example.com"
         val registration = callerRegistrationService.create(
             CreateCallerRegistrationRequest(
                 participantId = participant.id,
-                callerId = "user@example.com",
+                callerId = callerId,
                 status = CallerRegistrationStatus.ACTIVE
             )
         )
         assertThat(registration.participantId).isEqualTo(participant.id)
-        assertThat(registration.callerId).isEqualTo("user@example.com")
+        assertThat(registration.callerId).isEqualTo(callerId)
 
         val updated = callerRegistrationService.update(
             registration.callerId,
@@ -88,7 +83,7 @@ class CallerRegistrationAndConsumptionPersistenceTest @Autowired constructor(
                 consumptionData = """{"input_token":100,"output_token":20}"""
             )
         )
-        assertThat(consumption.callerId).isEqualTo("user@example.com")
+        assertThat(consumption.callerId).isEqualTo(callerId)
         assertThat(consumption.serviceOfferingId).isEqualTo(offering.id)
         assertThat(consumption.sourceRefId).isEqualTo(sourceRef)
         assertThat(consumption.capturedAt).isNotNull()

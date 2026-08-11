@@ -18,7 +18,6 @@ import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
-import java.util.Optional
 import org.jrtech.platformmanagement.TestAudit
 
 @ExtendWith(MockitoExtension::class)
@@ -48,7 +47,7 @@ class ParticipantServiceTest {
 
     @Test
     fun `findById returns mapped response`() {
-        whenever(participantRepository.findById("a")).thenReturn(Optional.of(participant("a", "A")))
+        whenever(participantRepository.findById("a")).thenReturn(participant("a", "A"))
         val result = participantService.findById("a")
         assertThat(result.id).isEqualTo("a")
         assertThat(result.name).isEqualTo("A")
@@ -56,9 +55,9 @@ class ParticipantServiceTest {
 
     @Test
     fun `update succeeds when name is free`() {
-        whenever(participantRepository.findById("p1")).thenReturn(Optional.of(participant("p1", "Old")))
+        whenever(participantRepository.findById("p1")).thenReturn(participant("p1", "Old"))
         whenever(participantRepository.existsByNameAndIdNot("New", "p1")).thenReturn(false)
-        whenever(participantRepository.save(any(Participant::class.java))).thenAnswer { it.getArgument(0) }
+        whenever(participantRepository.save(org.mockito.kotlin.anyOrNull())).thenAnswer { it.getArgument(0) }
 
         val result = participantService.update(
             "p1",
@@ -80,7 +79,7 @@ class ParticipantServiceTest {
     fun `create persists trimmed fields`() {
         whenever(participantRepository.existsById("acme")).thenReturn(false)
         whenever(participantRepository.existsByName("Acme")).thenReturn(false)
-        whenever(participantRepository.save(any(Participant::class.java))).thenAnswer { it.getArgument(0) }
+        whenever(participantRepository.save(org.mockito.kotlin.anyOrNull())).thenAnswer { it.getArgument(0) }
 
         val result = participantService.create(
             CreateParticipantRequest(id = " acme ", name = " Acme ", contact = " ops@x.com ", status = ParticipantStatus.ACTIVE)
@@ -96,7 +95,7 @@ class ParticipantServiceTest {
         assertThatThrownBy {
             participantService.create(CreateParticipantRequest(id = "dup", name = "X"))
         }.isInstanceOf(ConflictException::class.java)
-        verify(participantRepository, never()).save(any())
+        verify(participantRepository, never()).save(org.mockito.kotlin.anyOrNull())
     }
 
     @Test
@@ -110,7 +109,7 @@ class ParticipantServiceTest {
 
     @Test
     fun `update throws when name taken by another`() {
-        whenever(participantRepository.findById("p1")).thenReturn(Optional.of(participant("p1", "Old")))
+        whenever(participantRepository.findById("p1")).thenReturn(participant("p1", "Old"))
         whenever(participantRepository.existsByNameAndIdNot("Other", "p1")).thenReturn(true)
         assertThatThrownBy {
             participantService.update("p1", UpdateParticipantRequest(name = "Other", contact = null, status = ParticipantStatus.ACTIVE))
@@ -126,7 +125,7 @@ class ParticipantServiceTest {
 
     @Test
     fun `findById throws when missing`() {
-        whenever(participantRepository.findById("missing")).thenReturn(Optional.empty())
+        whenever(participantRepository.findById("missing")).thenReturn(null)
         assertThatThrownBy { participantService.findById("missing") }
             .isInstanceOf(ResourceNotFoundException::class.java)
     }

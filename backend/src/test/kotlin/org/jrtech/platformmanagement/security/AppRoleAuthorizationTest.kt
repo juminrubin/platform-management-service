@@ -1,5 +1,12 @@
 package org.jrtech.platformmanagement.security
 
+import org.jrtech.platformmanagement.TestCatalogFixtures
+import org.jrtech.platformmanagement.cache.EntitlementCheckCache
+import org.jrtech.platformmanagement.repository.ParticipantCallerRegistrationRepository
+import org.jrtech.platformmanagement.repository.ParticipantRepository
+import org.jrtech.platformmanagement.repository.ParticipantServiceEntitlementRepository
+import org.jrtech.platformmanagement.repository.ServiceOfferingRepository
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -18,9 +25,9 @@ import org.springframework.test.web.servlet.post
  * Verifies Entra app roles map to the correct endpoints.
  */
 @SpringBootTest
+@Import(TestJwtDecoderConfig::class)
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
-@Import(TestJwtDecoderConfig::class)
 @TestPropertySource(
     properties = [
         "app.security.permit-all=false",
@@ -31,6 +38,32 @@ class AppRoleAuthorizationTest {
 
     @Autowired
     private lateinit var mockMvc: MockMvc
+
+    @Autowired
+    private lateinit var participantRepository: ParticipantRepository
+
+    @Autowired
+    private lateinit var serviceOfferingRepository: ServiceOfferingRepository
+
+    @Autowired
+    private lateinit var callerRegistrationRepository: ParticipantCallerRegistrationRepository
+
+    @Autowired
+    private lateinit var entitlementRepository: ParticipantServiceEntitlementRepository
+
+    @Autowired
+    private lateinit var entitlementCheckCache: EntitlementCheckCache
+
+    @BeforeEach
+    fun seedCatalogForChecks() {
+        TestCatalogFixtures.ensureMinimalCatalog(
+            participants = participantRepository,
+            services = serviceOfferingRepository,
+            callers = callerRegistrationRepository,
+            entitlements = entitlementRepository,
+            cache = entitlementCheckCache
+        )
+    }
 
     @Test
     fun `System Maintainer can list participants`() {
@@ -152,7 +185,6 @@ class AppRoleAuthorizationTest {
 
     @Test
     fun `System Reader can check entitlement`() {
-        // Seeded from classpath:datasource.json — P001 / sky.walker@company.com / gpt-5.1
         mockMvc.get("/api/v1/entitlements/check") {
             accept = MediaType.APPLICATION_JSON
             param("callerId", "sky.walker@company.com")
@@ -213,7 +245,7 @@ class AppRoleAuthorizationTest {
 
     @Test
     fun `Entitlement Reader can check entitlement by caller id`() {
-        // Seed entitlement for P001 / gpt-5.1 is valid 2026-01-01 .. 2030-01-01
+        // Fixture entitlement for P001 / gpt-5.1 (TestCatalogFixtures)
         mockMvc.get("/api/v1/entitlements/check") {
             accept = MediaType.APPLICATION_JSON
             param("callerId", "sky.walker@company.com")

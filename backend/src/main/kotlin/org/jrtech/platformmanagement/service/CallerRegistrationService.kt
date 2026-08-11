@@ -11,7 +11,6 @@ import org.jrtech.platformmanagement.exception.ResourceNotFoundException
 import org.jrtech.platformmanagement.logging.logger
 import org.jrtech.platformmanagement.repository.ParticipantCallerRegistrationRepository
 import org.springframework.stereotype.Service
-import org.springframework.transaction.annotation.Transactional
 
 @Service
 class CallerRegistrationService(
@@ -19,8 +18,6 @@ class CallerRegistrationService(
     private val participantService: ParticipantService
 ) {
     private val log = logger()
-
-    @Transactional(readOnly = true)
     fun findAll(participantId: String?, status: CallerRegistrationStatus?): List<CallerRegistrationResponse> {
         log.debug("Listing caller registrations participantId={} status={}", participantId, status)
         var entities = if (participantId != null) {
@@ -33,16 +30,12 @@ class CallerRegistrationService(
         }
         return entities.map(CallerRegistrationResponse::from)
     }
-
-    @Transactional(readOnly = true)
     fun findByCallerId(callerId: String): CallerRegistrationResponse {
         log.debug("Fetching caller registration callerId={}", callerId)
         val entity = callerRegistrationRepository.findByCallerIdWithParticipant(callerId)
             ?: throw ResourceNotFoundException("Caller registration not found: $callerId")
         return CallerRegistrationResponse.from(entity)
     }
-
-    @Transactional
     fun create(request: CreateCallerRegistrationRequest): CallerRegistrationResponse {
         val participantId = request.participantId.trim()
         val callerId = request.callerId.trim()
@@ -67,8 +60,6 @@ class CallerRegistrationService(
         log.info("Created caller registration callerId={} createdBy={}", saved.callerId, saved.createdBy)
         return findByCallerId(saved.callerId)
     }
-
-    @Transactional
     fun update(callerId: String, request: UpdateCallerRegistrationRequest): CallerRegistrationResponse {
         log.info("Updating caller registration callerId={}", callerId)
         val entity = callerRegistrationRepository.findByCallerIdWithParticipant(callerId)
@@ -78,8 +69,6 @@ class CallerRegistrationService(
         callerRegistrationRepository.save(entity)
         return findByCallerId(callerId)
     }
-
-    @Transactional
     fun delete(callerId: String) {
         log.info("Deleting caller registration callerId={}", callerId)
         if (!callerRegistrationRepository.existsById(callerId)) {

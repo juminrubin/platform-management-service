@@ -10,7 +10,9 @@ import org.jrtech.platformmanagement.exception.ResourceNotFoundException
 enum class ConnectorId(val pathId: String) {
     ENTRA_DIRECTORY("entra-directory"),
     CONSUMPTION_BLOB_AVRO("consumption-storage"),
-    CONSUMPTION_EVENT_HUB("consumption-eventhub");
+    CONSUMPTION_EVENT_HUB("consumption-eventhub"),
+    /** Reloads the entitlement check cache from the durable catalog store. */
+    DATASOURCE_LOADING("datasource-loading");
 
     companion object {
         /**

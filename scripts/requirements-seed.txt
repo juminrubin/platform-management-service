@@ -1,0 +1,4 @@
+# Dependencies for scripts/seed-datasource.py (Azure Table mode)
+azure-data-tables>=12.5.0
+azure-identity>=1.15.0
+# REST API mode uses the Python standard library only (urllib).

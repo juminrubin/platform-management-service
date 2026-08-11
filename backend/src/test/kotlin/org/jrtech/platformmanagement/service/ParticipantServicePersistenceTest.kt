@@ -1,5 +1,7 @@
 package org.jrtech.platformmanagement.service
 
+import org.springframework.boot.test.context.SpringBootTest
+
 import org.jrtech.platformmanagement.domain.ParticipantStatus
 import org.jrtech.platformmanagement.dto.CreateParticipantRequest
 import org.jrtech.platformmanagement.dto.UpdateParticipantRequest
@@ -9,13 +11,10 @@ import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
-import org.springframework.context.annotation.Import
 import org.springframework.test.context.ActiveProfiles
 import java.util.UUID
 
-@DataJpaTest
-@Import(ParticipantService::class)
+@SpringBootTest
 @ActiveProfiles("test")
 class ParticipantServicePersistenceTest @Autowired constructor(
     private val participantService: ParticipantService,
@@ -28,7 +27,7 @@ class ParticipantServicePersistenceTest @Autowired constructor(
         val created = participantService.create(
             CreateParticipantRequest(id = id, name = "Persistence Co $id", contact = "a@b.com", status = ParticipantStatus.ACTIVE)
         )
-        assertThat(participantRepository.findById(created.id)).isPresent
+        assertThat(participantRepository.findById(created.id)).isNotNull()
 
         val updated = participantService.update(
             created.id,
@@ -38,7 +37,7 @@ class ParticipantServicePersistenceTest @Autowired constructor(
         assertThat(updated.contact).isEqualTo("c@d.com")
 
         participantService.delete(created.id)
-        assertThat(participantRepository.findById(created.id)).isEmpty
+        assertThat(participantRepository.findById(created.id)).isNull()
     }
 
     @Test

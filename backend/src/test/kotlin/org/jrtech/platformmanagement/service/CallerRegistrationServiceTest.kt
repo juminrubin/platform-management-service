@@ -96,7 +96,7 @@ class CallerRegistrationServiceTest {
             updatedBy = TestAudit.BY)
         whenever(participantService.getEntity("acme")).thenReturn(participant)
         whenever(callerRegistrationRepository.existsByCallerId("user@x.com")).thenReturn(false)
-        whenever(callerRegistrationRepository.save(any(ParticipantCallerRegistration::class.java))).thenAnswer { inv ->
+        whenever(callerRegistrationRepository.save(org.mockito.kotlin.anyOrNull())).thenAnswer { inv ->
             inv.getArgument(0)
         }
         whenever(callerRegistrationRepository.findByCallerIdWithParticipant("user@x.com")).thenReturn(
@@ -129,7 +129,7 @@ class CallerRegistrationServiceTest {
                 CreateCallerRegistrationRequest(participantId = "acme", callerId = "dup")
             )
         }.isInstanceOf(ConflictException::class.java)
-        verify(callerRegistrationRepository, never()).save(any())
+        verify(callerRegistrationRepository, never()).save(org.mockito.kotlin.anyOrNull())
     }
 
     @Test
@@ -143,7 +143,7 @@ class CallerRegistrationServiceTest {
             createdBy = TestAudit.BY,
             updatedBy = TestAudit.BY)
         whenever(callerRegistrationRepository.findByCallerIdWithParticipant("c1")).thenReturn(entity)
-        whenever(callerRegistrationRepository.save(any(ParticipantCallerRegistration::class.java)))
+        whenever(callerRegistrationRepository.save(org.mockito.kotlin.anyOrNull()))
             .thenAnswer { it.getArgument(0) }
 
         val result = callerRegistrationService.update(

@@ -1,16 +1,17 @@
 package org.jrtech.platformmanagement.repository
 
+import org.springframework.boot.test.context.SpringBootTest
+
 import org.jrtech.platformmanagement.domain.Participant
 import org.jrtech.platformmanagement.domain.ParticipantStatus
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
 import org.springframework.test.context.ActiveProfiles
 import java.util.UUID
 import org.jrtech.platformmanagement.TestAudit
 
-@DataJpaTest
+@SpringBootTest
 @ActiveProfiles("test")
 class ParticipantRepositoryTest @Autowired constructor(
     private val participantRepository: ParticipantRepository
@@ -26,9 +27,9 @@ class ParticipantRepositoryTest @Autowired constructor(
         )
 
         val found = participantRepository.findById(saved.id)
-        assertThat(found).isPresent
-        assertThat(found.get().name).isEqualTo("Test Corp")
-        assertThat(found.get().contact).isEqualTo("ops@test.example")
+        assertThat(found).isNotNull
+        assertThat(found!!.name).isEqualTo("Test Corp")
+        assertThat(found.contact).isEqualTo("ops@test.example")
     }
 
     @Test
@@ -77,6 +78,6 @@ class ParticipantRepositoryTest @Autowired constructor(
             createdBy = TestAudit.BY,
             updatedBy = TestAudit.BY))
         participantRepository.deleteById(id)
-        assertThat(participantRepository.findById(id)).isEmpty
+        assertThat(participantRepository.findById(id)).isNull()
     }
 }

@@ -11,15 +11,12 @@ import org.jrtech.platformmanagement.exception.ResourceNotFoundException
 import org.jrtech.platformmanagement.logging.logger
 import org.jrtech.platformmanagement.repository.ParticipantRepository
 import org.springframework.stereotype.Service
-import org.springframework.transaction.annotation.Transactional
 
 @Service
 class ParticipantService(
     private val participantRepository: ParticipantRepository
 ) {
     private val log = logger()
-
-    @Transactional(readOnly = true)
     fun findAll(status: ParticipantStatus?): List<ParticipantResponse> {
         log.debug("Listing participants status={}", status)
         val entities = if (status != null) {
@@ -30,14 +27,10 @@ class ParticipantService(
         log.debug("Found {} participant(s)", entities.size)
         return entities.map(ParticipantResponse::from)
     }
-
-    @Transactional(readOnly = true)
     fun findById(id: String): ParticipantResponse {
         log.debug("Fetching participant id={}", id)
         return ParticipantResponse.from(getEntity(id))
     }
-
-    @Transactional
     fun create(request: CreateParticipantRequest): ParticipantResponse {
         val id = request.id.trim()
         log.info("Creating participant id={}", id)
@@ -63,8 +56,6 @@ class ParticipantService(
         log.info("Created participant id={} createdBy={}", saved.id, saved.createdBy)
         return ParticipantResponse.from(saved)
     }
-
-    @Transactional
     fun update(id: String, request: UpdateParticipantRequest): ParticipantResponse {
         log.info("Updating participant id={}", id)
         val entity = getEntity(id)
@@ -81,8 +72,6 @@ class ParticipantService(
         log.info("Updated participant id={} status={} updatedBy={}", saved.id, saved.status, saved.updatedBy)
         return ParticipantResponse.from(saved)
     }
-
-    @Transactional
     fun delete(id: String) {
         log.info("Deleting participant id={}", id)
         if (!participantRepository.existsById(id)) {
@@ -93,9 +82,12 @@ class ParticipantService(
         log.info("Deleted participant id={}", id)
     }
 
-    fun getEntity(id: String): Participant =
-        participantRepository.findById(id).orElseThrow {
+    fun getEntity(id: String): Participant {
+        val entity = participantRepository.findById(id)
+        if (entity == null) {
             log.warn("Participant not found id={}", id)
-            ResourceNotFoundException("Participant not found: $id")
+            throw ResourceNotFoundException("Participant not found: $id")
         }
+        return entity
+    }
 }

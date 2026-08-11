@@ -3,6 +3,7 @@ package org.jrtech.platformmanagement.controller
 import org.jrtech.platformmanagement.connectors.ConnectorId
 import org.jrtech.platformmanagement.connectors.consumption.blob.ConsumptionBlobContainerConnector
 import org.jrtech.platformmanagement.connectors.consumption.eventhub.ConsumptionEventHubConnector
+import org.jrtech.platformmanagement.connectors.datasource.DatasourceLoadingConnector
 import org.jrtech.platformmanagement.connectors.entra.EntraDirectoryConnector
 import org.jrtech.platformmanagement.connectors.runtime.ManagedConnector
 import org.jrtech.platformmanagement.dto.ConnectorConfigResponse
@@ -39,7 +40,7 @@ import org.springframework.web.bind.annotation.RestController
  * - Blob import result: /api/v1/consumption/blob
  * - Consumption rows: /api/v1/consumptions
  *
- * Known path ids: consumption-storage, consumption-eventhub, entra-directory.
+ * Known path ids: consumption-storage, consumption-eventhub, entra-directory, datasource-loading.
  */
 @RestController
 @RequestMapping("/api/v1/connectors")
@@ -50,6 +51,7 @@ class ConnectorsController(
     private val eventHubConnector: ConsumptionEventHubConnector,
     private val blobConnector: ConsumptionBlobContainerConnector,
     private val entraDirectoryConnector: EntraDirectoryConnector,
+    private val datasourceLoadingConnector: DatasourceLoadingConnector,
     private val auditPrincipalResolver: AuditPrincipalResolver
 ) {
 
@@ -115,7 +117,8 @@ class ConnectorsController(
         summary = "Start connector process",
         description = "entra-directory: arm schedule + Graph load. " +
             "consumption-eventhub: start processor. " +
-            "consumption-storage: run one import using configured startDate/endDate."
+            "consumption-storage: run one import using configured startDate/endDate. " +
+            "datasource-loading: entitlement check cache refresh + hourly schedule."
     )
     fun startConnector(@PathVariable id: String): ConnectorInfoResponse {
         val actor = auditPrincipalResolver.current()
@@ -140,6 +143,7 @@ class ConnectorsController(
             ConnectorId.CONSUMPTION_EVENT_HUB -> eventHubConnector
             ConnectorId.CONSUMPTION_BLOB_AVRO -> blobConnector
             ConnectorId.ENTRA_DIRECTORY -> entraDirectoryConnector
+            ConnectorId.DATASOURCE_LOADING -> datasourceLoadingConnector
         }
     }
 }

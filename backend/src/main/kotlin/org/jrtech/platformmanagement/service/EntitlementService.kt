@@ -16,7 +16,6 @@ import org.jrtech.platformmanagement.logging.logger
 import org.jrtech.platformmanagement.repository.ParticipantCallerRegistrationRepository
 import org.jrtech.platformmanagement.repository.ParticipantServiceEntitlementRepository
 import org.springframework.stereotype.Service
-import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate
 import java.time.ZoneOffset
 import java.util.UUID
@@ -30,8 +29,6 @@ class EntitlementService(
     private val entitlementCheckCache: EntitlementCheckCache
 ) {
     private val log = logger()
-
-    @Transactional(readOnly = true)
     fun findAll(
         participantId: String?,
         serviceOfferingId: String?,
@@ -54,8 +51,6 @@ class EntitlementService(
         log.debug("Found {} entitlement(s)", entities.size)
         return entities.map(EntitlementResponse::from)
     }
-
-    @Transactional(readOnly = true)
     fun findById(id: UUID): EntitlementResponse {
         log.debug("Fetching entitlement id={}", id)
         val entity = entitlementRepository.findByIdWithRelations(id)
@@ -64,8 +59,6 @@ class EntitlementService(
             }
         return EntitlementResponse.from(entity)
     }
-
-    @Transactional
     fun create(request: CreateEntitlementRequest): EntitlementResponse {
         log.info(
             "Creating entitlement participantId={} serviceOfferingId={}",
@@ -109,8 +102,6 @@ class EntitlementService(
         log.info("Created entitlement id={} status={} createdBy={}", saved.id, saved.status, saved.createdBy)
         return findById(saved.id)
     }
-
-    @Transactional
     fun update(id: UUID, request: UpdateEntitlementRequest): EntitlementResponse {
         log.info("Updating entitlement id={}", id)
         validateDates(request.validFrom, request.validTo)
@@ -130,8 +121,6 @@ class EntitlementService(
         log.info("Updated entitlement id={} status={} updatedBy={}", id, request.status, entity.updatedBy)
         return findById(id)
     }
-
-    @Transactional
     fun delete(id: UUID) {
         log.info("Deleting entitlement id={}", id)
         if (!entitlementRepository.existsById(id)) {
@@ -155,7 +144,6 @@ class EntitlementService(
      * When [EntitlementCheckCache] is loaded, this path is pure in-memory lookup
      * (service + caller + entitlement maps). Otherwise falls back to the database.
      */
-    @Transactional(readOnly = true)
     fun checkByCallerAndService(
         callerId: String,
         serviceOfferingId: String,

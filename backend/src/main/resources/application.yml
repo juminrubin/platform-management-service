@@ -11,12 +11,14 @@
 #   app.security.group-role-mappings / application-registrations — map Entra groups
 #     and OAuth scopes from Application Registration IDs (see comments near app.security)
 #   APP_ENTRA_DIRECTORY_ENABLED=true — load members of groups named Platform-System-* via Graph
-#   Azure credential (shared by Graph / Blob / Event Hub) — inferred from fields:
+#   Azure credential (shared by Graph / Blob / Event Hub / Table) — inferred from fields:
 #     client-id  ← APP_UAMI_CLIENT_ID or AZURE_CLIENT_ID
 #     1. client-id + AZURE_CLIENT_SECRET → service principal (username + password)
 #     2. client-id only → UAMI
 #     3. otherwise → SAMI
 #     AZURE_TENANT_ID required for service principal
+#   Catalog persistence: Azure Table Storage (app.azure-table) or process-local in-memory
+#   when APP_AZURE_TABLE_ENABLED=false (default for local/dev).
 #
 # Run:
 #   export APP_AZURE_TENANT_ID=...
@@ -30,40 +32,12 @@ spring:
   application:
     name: platform-management-service
 
-  datasource:
-    # TIME ZONE=UTC keeps H2 session timestamps in UTC
-    url: jdbc:h2:mem:platformmanagementdb;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;TIME ZONE=UTC
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
-
-  h2:
-    console:
-      enabled: true
-      path: /h2-console
-      settings:
-        # H2-level remote block (defense in depth; Spring Security also restricts to loopback)
-        web-allow-others: false
-
-  jpa:
-    hibernate:
-      ddl-auto: validate
-    open-in-view: false
-    properties:
-      hibernate:
-        format_sql: true
-        # Persist Instant / TIMESTAMP WITH TIME ZONE always as UTC
-        jdbc:
-          time_zone: UTC
-    show-sql: false
-
   jackson:
     time-zone: UTC
 
-  flyway:
-    enabled: true
-    locations: classpath:db/migration
-    baseline-on-migrate: true
+  # No JDBC datasource — catalog/consumption use Azure Table or in-memory store
+  autoconfigure:
+    exclude: []
 
   security:
     oauth2:
@@ -161,20 +135,22 @@ app:
         #   "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee":
         #     - System.Maintainer
 
-  # Seed / catalog load from datasource.json on ApplicationReady (idempotent inserts).
-  # Disable in environments that must start empty: APP_DATASOURCE_LOADER_ENABLED=false
-  datasource-loader:
-    enabled: ${APP_DATASOURCE_LOADER_ENABLED:true}
-    location: ${APP_DATASOURCE_LOADER_LOCATION:classpath:datasource.json}
+  # Durable catalog store: Azure Table Storage. When disabled, uses process-local memory
+  # (fine for single-node local/dev; multi-instance production should enable Table).
+  # Catalog seed is external (scripts) — the app does not load datasource.json.
+  azure-table:
+    enabled: ${APP_AZURE_TABLE_ENABLED:false}
+    endpoint: ${APP_AZURE_TABLE_ENDPOINT:}
+    connection-string: ${APP_AZURE_TABLE_CONNECTION_STRING:}
+    table-prefix: ${APP_AZURE_TABLE_PREFIX:pms}
+    create-tables-if-not-exist: ${APP_AZURE_TABLE_CREATE:true}
 
-  # In-memory concurrent maps for GET /api/v1/entitlements/check (services, callers, entitlements).
-  # Entitlements: ACTIVE only and valid for today (UTC) at each refresh — keeps the index small.
-  # Reloaded on startup, hourly, and via POST /api/v1/entitlements/cache/refresh (System.Maintainer).
+  # In-memory concurrent maps for GET /api/v1/entitlements/check.
+  # Lifecycle owned by connector datasource-loading (not independent schedule).
   entitlement-check-cache:
     enabled: ${APP_ENTITLEMENT_CHECK_CACHE_ENABLED:true}
-    load-on-startup: ${APP_ENTITLEMENT_CHECK_CACHE_LOAD_ON_STARTUP:true}
-    scheduled-refresh-enabled: ${APP_ENTITLEMENT_CHECK_CACHE_SCHEDULED:true}
-    # Default 3600000 ms = 1 hour (fixed delay after each completed refresh)
+    load-on-startup: false
+    scheduled-refresh-enabled: false
     refresh-interval-ms: ${APP_ENTITLEMENT_CHECK_CACHE_REFRESH_MS:3600000}
 
   # Microsoft Entra directory: load members of groups named Platform-System-* via Graph
@@ -237,6 +213,14 @@ app:
   #   consumption-storage → /api/v1/consumption/blob (+ domain /api/v1/consumptions)
   #   consumption-eventhub → /api/v1/consumptions
   connectors:
+    # Rebuilds entitlement check cache from durable store (hourly by default).
+    # Does not seed catalog data — populate Table via external scripts.
+    # Control: POST /api/v1/connectors/datasource-loading/start|stop
+    # Manual cache: POST /api/v1/entitlements/cache/refresh
+    datasource-loading:
+      enabled: ${APP_CONNECTOR_DATASOURCE_ENABLED:true}
+      auto-start: ${APP_CONNECTOR_DATASOURCE_AUTO_START:true}
+      refresh-interval-ms: ${APP_CONNECTOR_DATASOURCE_REFRESH_MS:3600000}
     consumption-eventhub:
       enabled: ${APP_CONNECTOR_EH_ENABLED:false}
       # When true and enabled, start on ApplicationReady; prefer false and use Maintainer API.
@@ -276,8 +260,6 @@ logging:
     root: INFO
     org.jrtech.platformmanagement: DEBUG
     org.springframework.security: INFO
-    org.flywaydb: INFO
-
 ---
 # Local/debug profile: same security, more verbose logs (still requires Entra JWT)
 spring:

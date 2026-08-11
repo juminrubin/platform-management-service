@@ -20,9 +20,9 @@ import org.springframework.test.web.servlet.get
  * the same app roles used by `@PreAuthorize` / [Authz].
  */
 @SpringBootTest
+@Import(TestJwtDecoderConfig::class)
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
-@Import(TestJwtDecoderConfig::class)
 @TestPropertySource(
     properties = [
         "app.security.permit-all=false",

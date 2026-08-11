@@ -2,19 +2,20 @@
 
 Kotlin + Spring Boot REST API (**Platform Management Service**) for **Participants**, **Service Offerings**, **Entitlements**, **Caller Registrations**, and **Consumptions** — secured with Microsoft Entra ID.
 
-External systems are integrated as **connectors** (directory, historical Blob Capture, live Event Hub). Architecture: [docs/design/connectors-entra-blob-eventhub.md](../docs/design/connectors-entra-blob-eventhub.md).
+External systems are integrated as **connectors** (datasource loading, directory, historical Blob Capture, live Event Hub). Architecture: [docs/design/connectors-entra-blob-eventhub.md](../docs/design/connectors-entra-blob-eventhub.md).
 
 | Concern | Choice |
 |--------|--------|
-| Language | Kotlin **2.3.21** |
+| Language | Kotlin **2.3.x** |
 | Framework | Spring Boot **4.1.0** |
 | Build | Maven |
 | Runtime / bytecode | **Java 21** (run with JDK 21+) |
-| Database (local/CI) | **H2** in-memory (`MODE=PostgreSQL`) |
-| Database (production) | **Azure Database for PostgreSQL Flexible Server** |
-| Schema | Flyway (PostgreSQL-compatible) |
+| Catalog store (local/CI) | **In-memory** process store (`app.azure-table.enabled=false`) |
+| Catalog store (production) | **Azure Table Storage** (`APP_AZURE_TABLE_ENABLED=true`) |
+| Entitlement check path | In-process concurrent maps (hydrated by **datasource-loading** connector) |
+| Catalog seed | **External scripts only** (not loaded by the app) |
 | Auth | Microsoft Entra ID (Azure AD) JWT resource server |
-| Azure data plane (Blob / Event Hubs / Graph) | **SP / UAMI / SAMI** from one `client-id` (inferred by `AzureCredentialFactory`) |
+| Azure data plane (Blob / Event Hubs / Graph / Table) | **SP / UAMI / SAMI** from one `client-id` (`AzureCredentialFactory`) |
 | Packaging | Docker multi-stage image |
 | Deploy | Kubernetes manifests for Azure Kubernetes Service (AKS) |
 
@@ -24,26 +25,27 @@ External systems are integrated as **connectors** (directory, historical Blob Ca
 
 ```
 src/main/kotlin/org/jrtech/platformmanagement/
+  cache/           # EntitlementCheckCache (concurrent maps for /entitlements/check)
   config/          # Security (Microsoft JWT), CORS, Entra directory, Azure credential factory
   config/azure/    # AzureCredentialFactory (SP / UAMI / SAMI from client-id + secret)
-  connectors/      # Blob Capture, Event Hub, Entra directory runtime adapters
+  connectors/      # Datasource loading, Blob Capture, Event Hub, Entra directory
   controller/      # REST endpoints (domain + Entra + connector control plane)
-  domain/          # JPA entities & enums (audit: createdBy / updatedBy set in services)
+  domain/          # Plain domain models & enums (audit set in services)
   dto/             # Request/response models
   entra/           # Entra directory Graph client + models
   exception/       # API errors (RFC 7807 ProblemDetail)
-  repository/      # Spring Data JPA
+  persistence/     # Azure Table + in-memory repository implementations
+  repository/      # Repository interfaces (store-agnostic)
   security/        # Authz, JWT mapping, group → permission scope table
   service/         # Domain business logic (pure; connectors call into services)
 src/main/resources/
-  application.yml              # App + Microsoft Entra ID JWT (always on)
+  application.yml              # App + Entra JWT + Table / connectors
   application-k8s.yml          # Container / AKS runtime extras
-  db/migration/
-    V1.0__init_schema.sql  # tables + indexes
-    V1.1__seed_data.sql    # sample data
 Dockerfile
 scripts/                       # Entra token scripts (human / MI)
 ```
+
+Sample catalog JSON for **external** seed scripts: [`../scripts/fixtures/datasource.json`](../scripts/fixtures/datasource.json).
 
 Monorepo deploy/CI assets live under `../deploy/`, `../.gitlab-ci.yml`, and `../docs/design/`.
 
@@ -57,10 +59,15 @@ Requires **JDK 21+**, **Maven 3.9+**, and Entra app settings:
 export APP_AZURE_TENANT_ID=<tenant-guid>
 export APP_API_CLIENT_ID=<api-app-client-id>
 # optional: export APP_AZURE_REQUIRED_SCOPE=access_as_user
+# Catalog: in-memory by default (no Azure Table required for local)
 
 cd backend
 mvn spring-boot:run
 ```
+
+On startup the **datasource-loading** connector (default `auto-start=true`) rebuilds the
+entitlement-check cache from the durable store. **It does not seed catalog data** — use
+external scripts to populate Azure Table (or the local in-memory store).
 
 Security is **always on** (configured in `application.yml`). Every `/api/**` call needs:
 
@@ -81,8 +88,6 @@ mvn spring-boot:run -Dspring-boot.run.profiles=local
 - API base: `http://localhost:8080/api/v1`
 - Auth probe: `http://localhost:8080/api/v1/auth/me`
 - Health: `http://localhost:8080/actuator/health` (public)
-- H2 console: `http://localhost:8080/h2-console` (**localhost only** — remote clients get 403)  
-  JDBC URL: `jdbc:h2:mem:platformmanagementdb` · User: `sa` · Password: _(empty)_
 - **OpenAPI / Swagger UI (public — no token to open):** `http://localhost:8080/swagger-ui.html`  
   OpenAPI JSON: `http://localhost:8080/v3/api-docs`  
   **Calling `/api/**` from Try it out still needs a JWT:** click **Authorize**, paste an Entra
@@ -139,17 +144,19 @@ curl -s -X POST http://localhost:8080/api/v1/participants \
 | `GET` | `/api/v1/entitlements/{id}` | Get by id |
 | `POST` | `/api/v1/entitlements` | Create |
 | `PUT` | `/api/v1/entitlements/{id}` | Update |
-| `DELETE` | `/api/v1/entitlements/{id}` | Delete |
+| `GET` | `/api/v1/entitlements/cache` | Check-cache status (Maintainer) |
+| `POST` | `/api/v1/entitlements/cache/refresh` | Force check-cache rebuild (Maintainer) |
 
 ```bash
 curl -s -X POST http://localhost:8080/api/v1/entitlements \
+  -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{
-    "participantId": "acme-corp",
-    "serviceOfferingId": "gpt-5.1-mini",
+    "participantId": "P001",
+    "serviceOfferingId": "gpt-5.1",
     "status": "ACTIVE",
-    "validFrom": "2025-01-01",
-    "validTo": "2025-12-31",
+    "validFrom": "2026-01-01",
+    "validTo": "2030-01-01",
     "config": "{\"max_tpm\":1000,\"max_rpm\":20}",
     "notes": "Pilot entitlement"
   }' | jq
@@ -198,13 +205,16 @@ The entitlement must **fully cover** the closed range `[fromDate, untilDate]` (s
 
 ```bash
 # Point-in-time check (defaults fromDate=untilDate=today UTC)
-curl -s 'http://localhost:8080/api/v1/entitlements/check?callerId=alice@acme.example&serviceOfferingId=gpt-5.1' \
+# Uses in-memory cache when the datasource-loading connector has loaded it
+curl -s 'http://localhost:8080/api/v1/entitlements/check?callerId=sky.walker@company.com&serviceOfferingId=gpt-5.1' \
   -H "Authorization: Bearer $TOKEN" | jq
 
 # Explicit date range
-curl -s 'http://localhost:8080/api/v1/entitlements/check?callerId=alice@acme.example&serviceOfferingId=gpt-5.1&fromDate=2025-01-01&untilDate=2025-03-31' \
+curl -s 'http://localhost:8080/api/v1/entitlements/check?callerId=sky.walker@company.com&serviceOfferingId=gpt-5.1&fromDate=2026-06-01&untilDate=2026-06-30' \
   -H "Authorization: Bearer $TOKEN" | jq
 ```
+
+Warm-cache latency is typically **sub-millisecond** for the decision itself; end-to-end HTTP is dominated by network + JWT validation.
 
 ### Auth (Microsoft Entra principal)
 
@@ -265,7 +275,7 @@ Technical users (MI / SP) continue to use app roles on the token only.
 ```bash
 export APP_ENTRA_DIRECTORY_ENABLED=true
 
-# Shared Azure credential (Graph + Blob + Event Hub).
+# Shared Azure credential (Graph + Blob + Event Hub + Table).
 # One client-id field: APP_UAMI_CLIENT_ID or AZURE_CLIENT_ID.
 #   1. client-id + AZURE_CLIENT_SECRET → service principal (username + password)
 #   2. client-id only                  → UAMI
@@ -303,7 +313,58 @@ Mode is **inferred**:
 | `client-id` only | **UAMI** |
 | neither | **SAMI** |
 
-Seed data (from Flyway `V1.1__seed_data.sql`) is loaded on startup so list endpoints return sample rows immediately.
+---
+
+## Persistence (Azure Table / in-memory)
+
+There is **no JDBC / H2 / Flyway** stack. Catalog and consumption rows are stored via repository interfaces backed by either:
+
+| Mode | When | Multi-node |
+|------|------|------------|
+| **In-memory** | `app.azure-table.enabled=false` (default local/CI) | **No** — process-local only |
+| **Azure Table Storage** | `APP_AZURE_TABLE_ENABLED=true` | **Yes** — shared durable store |
+
+### Configuration
+
+```bash
+# Production
+export APP_AZURE_TABLE_ENABLED=true
+export APP_AZURE_TABLE_ENDPOINT=https://<account>.table.core.windows.net
+# Auth: app.azure.credential (same as Graph/Blob/EH)
+
+# Local Azurite / account key (optional)
+# export APP_AZURE_TABLE_CONNECTION_STRING="DefaultEndpointsProtocol=http;..."
+# export APP_AZURE_TABLE_PREFIX=pms   # table name prefix
+```
+
+```yaml
+app:
+  azure-table:
+    enabled: ${APP_AZURE_TABLE_ENABLED:false}
+    endpoint: ${APP_AZURE_TABLE_ENDPOINT:}
+    connection-string: ${APP_AZURE_TABLE_CONNECTION_STRING:}
+    table-prefix: ${APP_AZURE_TABLE_PREFIX:pms}
+    create-tables-if-not-exist: true
+```
+
+### Table layout (logical)
+
+| Entity | PartitionKey | RowKey |
+|--------|--------------|--------|
+| Services | `service` | serviceId |
+| Participants | `participant` | participantId |
+| Callers | `caller` | callerId |
+| Entitlements | participantId | serviceOfferingId |
+| Consumptions | callerId | consumption UUID |
+| Source-ref index | `sourceRef` | sourceRefId → consumption id |
+
+Uniqueness and referential integrity are enforced in **application** code (services / repositories), not by SQL constraints.
+
+### Catalog seed (external only)
+
+The backend **never** loads `datasource.json` or any other seed file. Populate the durable store
+with your own scripts/tooling. A sample document shape lives at
+[`scripts/fixtures/datasource.json`](../scripts/fixtures/datasource.json).
 
 ---
 
@@ -318,23 +379,58 @@ Participant 1──* ParticipantServiceEntitlement *──1 ServiceOffering
 
 | Entity | Key fields |
 |--------|------------|
-| **Participant** | `id` (VARCHAR), `name`, `contact`, `status`, audit (`createdAt`/`createdBy`, `updatedAt`/`updatedBy`) |
+| **Participant** | `id`, `name`, `contact`, `status`, audit (`createdAt`/`createdBy`, `updatedAt`/`updatedBy`) |
 | **ServiceOffering** | `id` (business key), `name`, `category`, `provider` (default `SYSTEM` in service), `config` (JSON), `active`, audit |
 | **ParticipantServiceEntitlement** | participant ↔ offering, validity window, `config` (JSON limits), status, audit |
 | **ParticipantCallerRegistration** | `callerId` (PK), `participantId`, `status`, audit |
 | **ParticipantCallConsumption** | `callerId` ↔ offering, `sourceRefId` (unique when set), `consumptionData` (JSON), `capturedAt` (runtime), `createdAt` (insert) |
 
-Schema is owned by **Flyway** (`ddl-auto: validate`). Hibernate never mutates the schema.  
-Audit actors (`createdBy` / `updatedBy`) are set in **service** code only (default principal `SYSTEM`); they are not ORM or SQL defaults.
+Domain types are plain Kotlin models (no JPA). Audit actors (`createdBy` / `updatedBy`) are set in **service** code only (default principal `SYSTEM`).
 
 ---
 
 ## Connectors (integrations)
 
-Connectors are **in-process** Spring adapters that call domain services (e.g. `ConsumptionService.createFromImport`). Domain stays free of Azure SDKs.
+Connectors are **in-process** Spring adapters that call domain services (e.g. `ConsumptionService.createFromImport`, `EntitlementCheckCache.refresh`). Domain stays free of Azure SDKs where practical.
 
-Full design (SPI shape, dual-path, security, PR plan):  
+Full design (SPI shape, dual-path, security):  
 **[docs/design/connectors-entra-blob-eventhub.md](../docs/design/connectors-entra-blob-eventhub.md)**
+
+### Datasource loading (entitlement check cache only)
+
+Connector id: **`datasource-loading`**.
+
+```text
+External scripts ──seed──► durable store (Table or memory)
+                                │
+                    hourly schedule / start / manual refresh
+                                ▼
+                    EntitlementCheckCache
+                      • serviceId → service
+                      • callerId → participant + status
+                      • (participantId, serviceId) → entitlement
+                        (ACTIVE and valid for "today" UTC only)
+                                │
+                                ▼
+              GET /api/v1/entitlements/check  (cache-first)
+```
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/api/v1/connectors/datasource-loading` | Maintainer | Status (counts, last refresh, errors) |
+| `POST` | `/api/v1/connectors/datasource-loading/start` | Maintainer | Cache load + arm schedule |
+| `POST` | `/api/v1/connectors/datasource-loading/stop` | Maintainer | Disarm schedule |
+| `PUT` | `/api/v1/connectors/datasource-loading/config` | Maintainer | e.g. `{ "refreshIntervalMs": 3600000 }` |
+| `GET` | `/api/v1/entitlements/cache` | Maintainer | Cache snapshot metadata |
+| `POST` | `/api/v1/entitlements/cache/refresh` | Maintainer | One-shot cache rebuild (no schedule change) |
+
+| Setting | Env / property | Default |
+|---------|----------------|---------|
+| Enable connector | `APP_CONNECTOR_DATASOURCE_ENABLED` | `true` |
+| Auto-start on boot | `APP_CONNECTOR_DATASOURCE_AUTO_START` | `true` |
+| Refresh interval | `APP_CONNECTOR_DATASOURCE_REFRESH_MS` | `3600000` (1 hour) |
+
+Cache holds only **ACTIVE** entitlements whose validity window covers the UTC calendar day of the refresh (reduces memory vs a full 30×200 matrix of historical rows). After entitlement CRUD, either wait for the next hourly tick or call `POST .../cache/refresh`.
 
 ### Dual-path consumption pipeline
 
@@ -347,8 +443,9 @@ Producers → Event Hub ──┬──► Live consumer (Event Hub connector)  
 
 | Connector | Purpose | Auth (prod) | Control | Implementation status |
 |-----------|---------|-------------|---------|------------------------|
+| **Datasource loading** | Rebuild entitlement check cache from store | N/A (reads durable store) | `/api/v1/connectors/datasource-loading/**` | **Implemented** (default auto-start; no in-app seed) |
 | **Entra directory** | Graph cache for `Platform-System-*` groups → human auth | Graph MI / app secret | `/api/v1/entra/**`, scheduled refresh | **Implemented** (`entra/`) |
-| **Blob Capture** | Historical / gap load of Capture Avro by date range | **Storage Blob Data Reader** on MI | Async jobs, **System.Maintainer** only | **Designed** (control plane + runner) |
+| **Blob Capture** | Historical / gap load of Capture Avro by date range | **Storage Blob Data Reader** on MI | Async jobs, **System.Maintainer** only | **Implemented** (control plane + runner; default off) |
 | **Event Hub** | Continuous live consumption events | **Event Hubs Data Receiver** on MI; checkpoint container **Contributor** | **Start/stop Web API** (Maintainer) | **Implemented** (control plane + Azure runtime; default disabled) |
 
 **Also available today:** `POST /api/v1/consumptions` for direct/push registration (`Consumption.Registrator`).
@@ -502,7 +599,14 @@ app:
       client-id: ${APP_UAMI_CLIENT_ID:${AZURE_CLIENT_ID:}}
       client-secret: ${AZURE_CLIENT_SECRET:}   # with client-id → service principal
       tenant-id: ${AZURE_TENANT_ID:}
+  azure-table:
+    enabled: true
+    endpoint: https://<account>.table.core.windows.net
   connectors:
+    datasource-loading:
+      enabled: true
+      auto-start: true
+      refresh-interval-ms: 3600000
     consumption-blob:
       enabled: false          # default off
       runner-enabled: false   # default off (fail-closed)
@@ -517,7 +621,7 @@ app:
       checkpoint-container: eh-checkpoints
 ```
 
-Exact property names land with implementation PRs; see the design doc for the full matrix.
+See `application.yml` and the design doc for the full property matrix.
 
 ### Producer contract (required for dual-path)
 
@@ -534,7 +638,7 @@ The API is an **OAuth2 resource server**. Spring Security validates **Microsoft 
 |------|---------|-----------|
 | Local / default | _(none)_ | Entra JWT + app roles required (`application.yml`) |
 | Local verbose logs | `local` | Same security, DEBUG logging |
-| AKS / Docker | `k8s` | Same security + container probes / no H2 console |
+| AKS / Docker | `k8s` | Same security + container probes |
 
 ```http
 Authorization: Bearer <access_token>
@@ -674,7 +778,8 @@ Use **one mechanism for both humans and technical accounts: Entra app roles** em
 | Consumptions DELETE | ✓ | | | |
 | `POST /consumptions` | ✓ | | | ✓ |
 | Entra directory GET/refresh | ✓ | | | |
-| Connectors (Event Hub start/stop) | ✓ | | | |
+| Connectors (list/start/stop/config) | ✓ | | | |
+| Entitlement cache GET/refresh | ✓ | | | |
 | `GET /auth/me` | ✓ | ✓ | ✓ | ✓ |
 
 ---
@@ -857,7 +962,7 @@ curl -s http://localhost:8080/api/v1/auth/me \
 curl -s http://localhost:8080/api/v1/participants \
   -H "Authorization: Bearer $TOKEN" | jq
 
-curl -s "http://localhost:8080/api/v1/entitlements/check?callerId=alice@acme.example&serviceOfferingId=gpt-5.1" \
+curl -s "http://localhost:8080/api/v1/entitlements/check?callerId=sky.walker@company.com&serviceOfferingId=gpt-5.1" \
   -H "Authorization: Bearer $TOKEN" | jq
 ```
 
@@ -925,11 +1030,11 @@ curl -s -X POST http://localhost:8080/api/v1/consumptions \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "callerId": "alice@acme.example",
+    "callerId": "sky.walker@company.com",
     "serviceOfferingId": "gpt-5.1",
     "sourceRefId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
     "consumptionData": "{\"input_token\":120,\"output_token\":40}",
-    "capturedAt": "2024-07-01T12:00:00Z"
+    "capturedAt": "2026-07-01T12:00:00Z"
   }' | jq
 ```
 
@@ -1137,21 +1242,22 @@ curl -s http://localhost:8080/actuator/health
 - **Startup / liveness / readiness** use Spring Boot actuator probes  
   (`/actuator/health`, `/actuator/health/liveness`, `/actuator/health/readiness`) — permitted without JWT  
 - Non-root user `1001`, `readOnlyRootFilesystem`, dropped capabilities  
-- Graceful shutdown (`server.shutdown=graceful`, 45s termination grace)  
-- H2 console disabled under profile `k8s`
+- Graceful shutdown (`server.shutdown=graceful`, 45s termination grace)
 
 ### Important notes for AKS
 
-1. **H2 is in-memory** — data is lost on pod restart and is **not shared across replicas**. This sample is fine for demos; for production replace H2 with Azure Database for PostgreSQL (or similar) and a single shared schema.  
+1. **Catalog store** — set `APP_AZURE_TABLE_ENABLED=true` and a Table endpoint (or connection string). The default in-memory store is **not** shared across replicas and is lost on restart.  
 2. **Microsoft Entra ID** — pods must reach `login.microsoftonline.com` (HTTPS) to validate JWTs (JWKS / OIDC metadata).  
 3. **Ingress** — set `spec.rules[].host` and TLS; use NGINX Ingress or Azure Application Gateway (AGIC).  
 4. **Image pull** — prefer `az aks update --attach-acr` over long-lived `imagePullSecrets`.  
-5. **Secrets** — prefer Azure Key Vault Provider for Secrets Store CSI or External Secrets Operator over plain `Secret` manifests in git.
+5. **Secrets** — prefer Azure Key Vault Provider for Secrets Store CSI or External Secrets Operator over plain `Secret` manifests in git.  
+6. **Workload Identity** — grant the pod MI access to Table Storage, Graph, Blob, and Event Hubs as connectors are enabled.
 
 ---
 
 ## Notes
 
-- H2 runs in **PostgreSQL compatibility mode** for portable SQL in Flyway scripts.
+- Local/CI uses a **process-local in-memory** catalog; production should use **Azure Table Storage**.
 - CORS origins are configurable via `APP_CORS_ALLOWED_ORIGINS` (comma-separated).
 - Errors use Spring’s `ProblemDetail` (RFC 7807).
+- Entitlement **check** is cache-first after the datasource-loading connector has run; list/CRUD read the durable store.

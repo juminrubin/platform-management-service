@@ -18,9 +18,9 @@ import org.springframework.test.web.servlet.get
  * at the HTTP filter layer **and** the appropriate app role for method security.
  */
 @SpringBootTest
+@Import(TestJwtDecoderConfig::class)
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
-@Import(TestJwtDecoderConfig::class)
 @TestPropertySource(
     properties = [
         "app.security.permit-all=false",

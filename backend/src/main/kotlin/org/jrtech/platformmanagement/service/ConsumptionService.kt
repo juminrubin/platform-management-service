@@ -7,9 +7,7 @@ import org.jrtech.platformmanagement.dto.CreateConsumptionRequest
 import org.jrtech.platformmanagement.exception.ResourceNotFoundException
 import org.jrtech.platformmanagement.logging.logger
 import org.jrtech.platformmanagement.repository.ParticipantCallConsumptionRepository
-import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
-import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
 
 @Service
@@ -19,8 +17,6 @@ class ConsumptionService(
     private val serviceOfferingService: ServiceOfferingService
 ) {
     private val log = logger()
-
-    @Transactional(readOnly = true)
     fun findAll(
         callerId: String?,
         serviceOfferingId: String?
@@ -39,16 +35,12 @@ class ConsumptionService(
         }
         return entities.map(ConsumptionResponse::from)
     }
-
-    @Transactional(readOnly = true)
     fun findById(id: UUID): ConsumptionResponse {
         log.debug("Fetching consumption id={}", id)
         val entity = consumptionRepository.findByIdWithRelations(id)
             ?: throw ResourceNotFoundException("Consumption record not found: $id")
         return ConsumptionResponse.from(entity)
     }
-
-    @Transactional
     fun create(request: CreateConsumptionRequest): ConsumptionResponse {
         return createFromImport(request, externalId = null).response
     }
@@ -64,7 +56,6 @@ class ConsumptionService(
      * caller+offering+captured_at) re-read the existing row and return [ImportCreateResult.created]=false
      * instead of failing the caller.
      */
-    @Transactional
     fun createFromImport(
         request: CreateConsumptionRequest,
         externalId: UUID?
@@ -88,37 +79,28 @@ class ConsumptionService(
         val capturedAt = request.capturedAt ?: now
         val id = externalId ?: UUID.randomUUID()
 
-        return try {
-            val saved = consumptionRepository.saveAndFlush(
-                ParticipantCallConsumption(
-                    id = id,
-                    callerRegistration = callerRegistration,
-                    serviceOffering = offering,
-                    sourceRefId = sourceRefId,
-                    consumptionData = request.consumptionData.trim().ifEmpty { "{}" },
-                    capturedAt = capturedAt,
-                    createdAt = now
-                )
+        // Re-check under concurrent load (Table / in-memory have no SQL unique race exception).
+        findExistingDuplicate(externalId, sourceRefId)?.let { return it }
+
+        val saved = consumptionRepository.save(
+            ParticipantCallConsumption(
+                id = id,
+                callerRegistration = callerRegistration,
+                serviceOffering = offering,
+                sourceRefId = sourceRefId,
+                consumptionData = request.consumptionData.trim().ifEmpty { "{}" },
+                capturedAt = capturedAt,
+                createdAt = now
             )
-            log.info(
-                "Created consumption id={} sourceRefId={} capturedAt={} createdAt={}",
-                saved.id,
-                saved.sourceRefId,
-                saved.capturedAt,
-                saved.createdAt
-            )
-            ImportCreateResult(created = true, response = findById(saved.id))
-        } catch (ex: DataIntegrityViolationException) {
-            log.info(
-                "Consumption insert raced on unique constraint; treating as duplicate " +
-                    "sourceRefId={} externalId={} cause={}",
-                sourceRefId,
-                externalId,
-                ex.mostSpecificCause.message
-            )
-            findExistingDuplicate(externalId, sourceRefId)
-                ?: throw ex
-        }
+        )
+        log.info(
+            "Created consumption id={} sourceRefId={} capturedAt={} createdAt={}",
+            saved.id,
+            saved.sourceRefId,
+            saved.capturedAt,
+            saved.createdAt
+        )
+        return ImportCreateResult(created = true, response = findById(saved.id))
     }
 
     private fun findExistingDuplicate(
@@ -150,8 +132,6 @@ class ConsumptionService(
         val created: Boolean,
         val response: ConsumptionResponse
     )
-
-    @Transactional
     fun delete(id: UUID) {
         log.info("Deleting consumption id={}", id)
         if (!consumptionRepository.existsById(id)) {

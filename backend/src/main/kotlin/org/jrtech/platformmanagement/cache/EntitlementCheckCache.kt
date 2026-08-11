@@ -7,14 +7,8 @@ import org.jrtech.platformmanagement.logging.logger
 import org.jrtech.platformmanagement.repository.ParticipantCallerRegistrationRepository
 import org.jrtech.platformmanagement.repository.ParticipantServiceEntitlementRepository
 import org.jrtech.platformmanagement.repository.ServiceOfferingRepository
-import org.springframework.boot.context.event.ApplicationReadyEvent
 import org.springframework.boot.context.properties.EnableConfigurationProperties
-import org.springframework.context.event.EventListener
-import org.springframework.core.Ordered
-import org.springframework.core.annotation.Order
-import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
-import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
@@ -30,10 +24,9 @@ import java.util.concurrent.atomic.AtomicReference
  * - (participantId, serviceOfferingId) → [CachedEntitlement]
  *   (only [EntitlementStatus.ACTIVE] rows whose validity covers "today" UTC at refresh)
  *
- * Lifecycle:
- * - Startup ([ApplicationReadyEvent], after seed loader)
- * - Hourly scheduled reload ([EntitlementCheckCacheProperties.refreshIntervalMs])
- * - Manual `POST /api/v1/entitlements/cache/refresh`
+ * Lifecycle is owned by
+ * [org.jrtech.platformmanagement.connectors.datasource.DatasourceLoadingConnector]
+ * (start / hourly schedule / stop) and `POST /api/v1/entitlements/cache/refresh`.
  */
 @Service
 @EnableConfigurationProperties(EntitlementCheckCacheProperties::class)
@@ -98,7 +91,6 @@ class EntitlementCheckCache(
      * Entitlements are limited to **ACTIVE** rows whose inclusive validity window covers
      * today (UTC calendar day) at refresh time — keeps the index small for hourly reloads.
      */
-    @Transactional(readOnly = true)
     fun refresh(triggeredBy: String = AuditActors.SYSTEM): EntitlementCheckCacheStatusResponse {
         synchronized(refreshLock) {
             refreshInProgress.set(true)
@@ -175,48 +167,6 @@ class EntitlementCheckCache(
                 refreshInProgress.set(false)
             }
             return status()
-        }
-    }
-
-    @EventListener(ApplicationReadyEvent::class)
-    @Order(Ordered.LOWEST_PRECEDENCE)
-    fun loadOnStartup() {
-        if (!properties.enabled || !properties.loadOnStartup) {
-            log.info(
-                "Entitlement check cache startup load skipped (enabled={}, loadOnStartup={})",
-                properties.enabled,
-                properties.loadOnStartup
-            )
-            return
-        }
-        try {
-            refresh(triggeredBy = "${AuditActors.SYSTEM}-startup")
-        } catch (ex: Exception) {
-            // Keep app up; checks fall back to DB until a successful refresh
-            log.error(
-                "Entitlement check cache failed to load on startup: {}",
-                ex.message ?: ex.javaClass.simpleName,
-                ex
-            )
-        }
-    }
-
-    /**
-     * Fixed delay after each completed run. Default 1 hour.
-     * No-ops when the cache or scheduled refresh is disabled.
-     */
-    @Scheduled(
-        fixedDelayString = "\${app.entitlement-check-cache.refresh-interval-ms:3600000}",
-        initialDelayString = "\${app.entitlement-check-cache.refresh-interval-ms:3600000}"
-    )
-    fun scheduledRefresh() {
-        if (!properties.enabled || !properties.scheduledRefreshEnabled) {
-            return
-        }
-        try {
-            refresh(triggeredBy = "${AuditActors.SYSTEM}-schedule")
-        } catch (_: Exception) {
-            // Already logged in refresh(); next schedule will retry
         }
     }
 }

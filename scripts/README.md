@@ -1,6 +1,6 @@
-# Scripts — human JWT helpers
+# Scripts — tokens, API helpers, and catalog seed
 
-Shell utilities to obtain and use a **delegated Microsoft Entra access token** for a human user against the Platform Management API.
+Shell utilities to obtain and use a **delegated Microsoft Entra access token** for a human user against the Platform Management API, plus a **Python seed script** for catalog data.
 
 | Script | Purpose |
 |--------|---------|
@@ -8,9 +8,84 @@ Shell utilities to obtain and use a **delegated Microsoft Entra access token** f
 | [`print-jwt-claims.sh`](print-jwt-claims.sh) | Decode JWT payload (claims) |
 | [`with-human-token.sh`](with-human-token.sh) | Fetch token, then run a command with `TOKEN` set |
 | [`curl-api.sh`](curl-api.sh) | Convenience curl against the local API with Bearer token |
+| [`seed-datasource.py`](seed-datasource.py) | Seed catalog from JSON → **Azure Table** or **REST API** |
+| [`fixtures/datasource.json`](fixtures/datasource.json) | Sample catalog document |
+| [`requirements-seed.txt`](requirements-seed.txt) | Python deps for table-mode seed |
 | [`lib/token-common.sh`](lib/token-common.sh) | Shared helpers |
 
 > Technical / Managed Identity tokens remain under [`backend/scripts/get-token-mi.sh`](../backend/scripts/get-token-mi.sh).
+
+The backend **does not** load `datasource.json` on startup. Use `seed-datasource.py` (or your own tooling) to populate the store, then refresh the check cache if needed.
+
+---
+
+## Catalog seed (`seed-datasource.py`)
+
+Writes **services → participants → callers → entitlements** from a JSON file matching `fixtures/datasource.json`.
+
+### Install (Azure Table mode)
+
+```bash
+python3 -m venv .venv-seed
+source .venv-seed/bin/activate
+pip install -r scripts/requirements-seed.txt
+```
+
+### Azure Table (production multi-node)
+
+Table names and property names match the backend (`app.azure-table.table-prefix`, default `pms`).
+
+```bash
+# Connection string (Azurite / account key)
+export AZURE_STORAGE_CONNECTION_STRING='DefaultEndpointsProtocol=...'
+./scripts/seed-datasource.py --mode table --file scripts/fixtures/datasource.json
+
+# Or account endpoint + DefaultAzureCredential (az login / MI env)
+export APP_AZURE_TABLE_ENDPOINT=https://<account>.table.core.windows.net
+./scripts/seed-datasource.py --mode table --file scripts/fixtures/datasource.json
+
+# Optional: match app.azure-table.table-prefix
+./scripts/seed-datasource.py --mode table --table-prefix pms --file scripts/fixtures/datasource.json
+
+# Dry-run
+./scripts/seed-datasource.py --mode table --file scripts/fixtures/datasource.json --dry-run
+```
+
+Idempotent by default (`--skip-existing`): existing partition/row keys are left unchanged.  
+Use `--no-skip-existing` to upsert (merge) entities.
+
+After table seed, either wait for the **datasource-loading** connector hourly tick or:
+
+```bash
+eval "$(./scripts/get-token-human.sh --export)"
+./scripts/curl-api.sh POST /api/v1/entitlements/cache/refresh
+```
+
+### REST API (local backend / in-memory store)
+
+Requires a running API and a **System.Maintainer** token. Also triggers cache refresh at the end.
+
+```bash
+eval "$(./scripts/get-token-human.sh --export)"
+./scripts/seed-datasource.py --mode api \
+  --file scripts/fixtures/datasource.json \
+  --base-url http://localhost:8080 \
+  --token "$TOKEN"
+```
+
+| Flag | Description |
+|------|-------------|
+| `--file`, `-f` | JSON path (default: `scripts/fixtures/datasource.json`) |
+| `--mode table\|api` | Azure Table or REST API |
+| `--skip-existing` / `--no-skip-existing` | Skip existing keys (default: skip) |
+| `--dry-run` | Parse and print plan only |
+| `--connection-string` | Table mode connection string |
+| `--endpoint` | Table mode account URL |
+| `--table-prefix` | Same as `APP_AZURE_TABLE_PREFIX` (default `pms`) |
+| `--base-url` | API mode base (default `http://localhost:8080`) |
+| `--token` | API mode Bearer token (or `TOKEN`) |
+
+---
 
 ## Prerequisites
 

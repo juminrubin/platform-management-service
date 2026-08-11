@@ -17,9 +17,10 @@ data class EntitlementCheckCacheProperties(
     val enabled: Boolean = true,
 
     /**
-     * Load the index once the application is ready (after seed / Flyway).
+     * Reserved / unused by default — cache lifecycle is owned by the
+     * datasource-loading connector.
      */
-    val loadOnStartup: Boolean = true,
+    val loadOnStartup: Boolean = false,
 
     /**
      * When true, a fixed-delay scheduled task reloads the index periodically.

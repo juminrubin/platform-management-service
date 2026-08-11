@@ -1,25 +1,25 @@
 package org.jrtech.platformmanagement.domain
 
-import jakarta.persistence.AttributeConverter
-import jakarta.persistence.Converter
+/** Helpers for status enums stored as strings in Azure Table / JSON. */
+object StatusParsing {
+    fun participantStatus(raw: String?, default: ParticipantStatus = ParticipantStatus.ACTIVE): ParticipantStatus =
+        parse(raw, default)
 
-@Converter(autoApply = true)
-class ParticipantStatusConverter : AttributeConverter<ParticipantStatus, String> {
-    override fun convertToDatabaseColumn(attribute: ParticipantStatus?): String? = attribute?.name
-    override fun convertToEntityAttribute(dbData: String?): ParticipantStatus? =
-        dbData?.let { ParticipantStatus.valueOf(it) }
-}
+    fun entitlementStatus(raw: String?, default: EntitlementStatus = EntitlementStatus.PENDING): EntitlementStatus =
+        parse(raw, default)
 
-@Converter(autoApply = true)
-class EntitlementStatusConverter : AttributeConverter<EntitlementStatus, String> {
-    override fun convertToDatabaseColumn(attribute: EntitlementStatus?): String? = attribute?.name
-    override fun convertToEntityAttribute(dbData: String?): EntitlementStatus? =
-        dbData?.let { EntitlementStatus.valueOf(it) }
-}
+    fun callerRegistrationStatus(
+        raw: String?,
+        default: CallerRegistrationStatus = CallerRegistrationStatus.ACTIVE
+    ): CallerRegistrationStatus = parse(raw, default)
 
-@Converter(autoApply = true)
-class CallerRegistrationStatusConverter : AttributeConverter<CallerRegistrationStatus, String> {
-    override fun convertToDatabaseColumn(attribute: CallerRegistrationStatus?): String? = attribute?.name
-    override fun convertToEntityAttribute(dbData: String?): CallerRegistrationStatus? =
-        dbData?.let { CallerRegistrationStatus.valueOf(it) }
+    private inline fun <reified E : Enum<E>> parse(raw: String?, default: E): E {
+        val value = raw?.trim()?.uppercase().orEmpty()
+        if (value.isEmpty()) return default
+        return try {
+            java.lang.Enum.valueOf(E::class.java, value)
+        } catch (_: IllegalArgumentException) {
+            default
+        }
+    }
 }

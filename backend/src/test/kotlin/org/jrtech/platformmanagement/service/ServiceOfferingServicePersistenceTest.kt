@@ -1,5 +1,7 @@
 package org.jrtech.platformmanagement.service
 
+import org.springframework.boot.test.context.SpringBootTest
+
 import org.jrtech.platformmanagement.dto.CreateServiceOfferingRequest
 import org.jrtech.platformmanagement.dto.UpdateServiceOfferingRequest
 import org.jrtech.platformmanagement.exception.ConflictException
@@ -8,13 +10,10 @@ import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
-import org.springframework.context.annotation.Import
 import org.springframework.test.context.ActiveProfiles
 import java.util.UUID
 
-@DataJpaTest
-@Import(ServiceOfferingService::class)
+@SpringBootTest
 @ActiveProfiles("test")
 class ServiceOfferingServicePersistenceTest @Autowired constructor(
     private val serviceOfferingService: ServiceOfferingService,
@@ -53,7 +52,7 @@ class ServiceOfferingServicePersistenceTest @Autowired constructor(
         assertThat(updated.provider).isEqualTo("AZURE")
 
         serviceOfferingService.delete(id)
-        assertThat(serviceOfferingRepository.findById(id)).isEmpty
+        assertThat(serviceOfferingRepository.findById(id)).isNull()
     }
 
     @Test

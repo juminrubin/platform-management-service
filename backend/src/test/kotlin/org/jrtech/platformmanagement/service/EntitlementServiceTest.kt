@@ -310,7 +310,7 @@ class EntitlementServiceTest {
                 )
             )
         }.isInstanceOf(BadRequestException::class.java)
-        verify(entitlementRepository, never()).save(any())
+        verify(entitlementRepository, never()).save(org.mockito.kotlin.anyOrNull())
     }
 
     @Test
@@ -332,7 +332,7 @@ class EntitlementServiceTest {
         whenever(participantService.getEntity("p1")).thenReturn(participant("p1"))
         whenever(serviceOfferingService.getEntity("gpt")).thenReturn(offering("gpt"))
         whenever(entitlementRepository.existsByParticipantIdAndServiceOfferingId("p1", "gpt")).thenReturn(false)
-        whenever(entitlementRepository.save(any(ParticipantServiceEntitlement::class.java))).thenAnswer { inv ->
+        whenever(entitlementRepository.save(org.mockito.kotlin.anyOrNull())).thenAnswer { inv ->
             inv.getArgument<ParticipantServiceEntitlement>(0).also { it.id = savedId }
         }
         whenever(entitlementRepository.findByIdWithRelations(savedId)).thenReturn(entitlement(id = savedId))
@@ -355,7 +355,7 @@ class EntitlementServiceTest {
         val id = UUID.randomUUID()
         val existing = entitlement(id = id, status = EntitlementStatus.PENDING)
         whenever(entitlementRepository.findByIdWithRelations(id)).thenReturn(existing)
-        whenever(entitlementRepository.save(any(ParticipantServiceEntitlement::class.java))).thenAnswer { it.getArgument(0) }
+        whenever(entitlementRepository.save(org.mockito.kotlin.anyOrNull())).thenAnswer { it.getArgument(0) }
 
         val result = entitlementService.update(
             id,

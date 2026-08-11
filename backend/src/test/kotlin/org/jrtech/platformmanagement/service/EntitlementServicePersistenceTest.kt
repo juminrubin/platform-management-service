@@ -1,5 +1,7 @@
 package org.jrtech.platformmanagement.service
 
+import org.springframework.boot.test.context.SpringBootTest
+
 import org.jrtech.platformmanagement.domain.EntitlementStatus
 import org.jrtech.platformmanagement.domain.Participant
 import org.jrtech.platformmanagement.domain.ParticipantStatus
@@ -16,20 +18,12 @@ import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
-import org.springframework.context.annotation.Import
 import org.springframework.test.context.ActiveProfiles
 import java.time.LocalDate
 import java.util.UUID
 import org.jrtech.platformmanagement.TestAudit
 
-@DataJpaTest
-@Import(
-    EntitlementService::class,
-    ParticipantService::class,
-    ServiceOfferingService::class,
-    org.jrtech.platformmanagement.cache.EntitlementCheckCache::class
-)
+@SpringBootTest
 @ActiveProfiles("test")
 class EntitlementServicePersistenceTest @Autowired constructor(
     private val entitlementService: EntitlementService,

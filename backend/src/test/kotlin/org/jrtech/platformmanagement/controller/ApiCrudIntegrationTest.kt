@@ -1,6 +1,13 @@
 package org.jrtech.platformmanagement.controller
 
 import org.hamcrest.Matchers.hasSize
+import org.jrtech.platformmanagement.TestCatalogFixtures
+import org.jrtech.platformmanagement.cache.EntitlementCheckCache
+import org.jrtech.platformmanagement.repository.ParticipantCallerRegistrationRepository
+import org.jrtech.platformmanagement.repository.ParticipantRepository
+import org.jrtech.platformmanagement.repository.ParticipantServiceEntitlementRepository
+import org.jrtech.platformmanagement.repository.ServiceOfferingRepository
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -25,6 +32,32 @@ class ApiCrudIntegrationTest {
 
     @Autowired
     private lateinit var mockMvc: MockMvc
+
+    @Autowired
+    private lateinit var participantRepository: ParticipantRepository
+
+    @Autowired
+    private lateinit var serviceOfferingRepository: ServiceOfferingRepository
+
+    @Autowired
+    private lateinit var callerRegistrationRepository: ParticipantCallerRegistrationRepository
+
+    @Autowired
+    private lateinit var entitlementRepository: ParticipantServiceEntitlementRepository
+
+    @Autowired
+    private lateinit var entitlementCheckCache: EntitlementCheckCache
+
+    @BeforeEach
+    fun seedCatalogForConflictChecks() {
+        TestCatalogFixtures.ensureMinimalCatalog(
+            participants = participantRepository,
+            services = serviceOfferingRepository,
+            callers = callerRegistrationRepository,
+            entitlements = entitlementRepository,
+            cache = entitlementCheckCache
+        )
+    }
 
     @Test
     fun `participants CRUD filter validation and not found`() {
@@ -293,7 +326,7 @@ class ApiCrudIntegrationTest {
 
     @Test
     fun `conflict and bad request map through exception handler`() {
-        // P001 is seeded from classpath:datasource.json at startup
+        // P001 inserted by TestCatalogFixtures
         mockMvc.post("/api/v1/participants") {
             contentType = MediaType.APPLICATION_JSON
             content = """{"id":"P001","name":"Duplicate Marketing","status":"ACTIVE"}"""

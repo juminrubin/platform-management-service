@@ -17,7 +17,6 @@ import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
-import java.util.Optional
 import org.jrtech.platformmanagement.TestAudit
 
 @ExtendWith(MockitoExtension::class)
@@ -49,13 +48,13 @@ class ServiceOfferingServiceTest {
 
     @Test
     fun `findById returns offering`() {
-        whenever(serviceOfferingRepository.findById("gpt")).thenReturn(Optional.of(offering("gpt")))
+        whenever(serviceOfferingRepository.findById("gpt")).thenReturn(offering("gpt"))
         assertThat(serviceOfferingService.findById("gpt").id).isEqualTo("gpt")
     }
 
     @Test
     fun `findById throws when missing`() {
-        whenever(serviceOfferingRepository.findById("missing")).thenReturn(Optional.empty())
+        whenever(serviceOfferingRepository.findById("missing")).thenReturn(null)
         assertThatThrownBy { serviceOfferingService.findById("missing") }
             .isInstanceOf(ResourceNotFoundException::class.java)
     }
@@ -70,7 +69,7 @@ class ServiceOfferingServiceTest {
     @Test
     fun `create uppercases category and keeps id`() {
         whenever(serviceOfferingRepository.existsById("gpt-5.1")).thenReturn(false)
-        whenever(serviceOfferingRepository.save(any(ServiceOffering::class.java))).thenAnswer { it.getArgument(0) }
+        whenever(serviceOfferingRepository.save(org.mockito.kotlin.anyOrNull())).thenAnswer { it.getArgument(0) }
 
         val result = serviceOfferingService.create(
             CreateServiceOfferingRequest(
@@ -90,7 +89,7 @@ class ServiceOfferingServiceTest {
     @Test
     fun `create defaults blank provider to SYSTEM and uppercases provider`() {
         whenever(serviceOfferingRepository.existsById("m1")).thenReturn(false)
-        whenever(serviceOfferingRepository.save(any(ServiceOffering::class.java))).thenAnswer { it.getArgument(0) }
+        whenever(serviceOfferingRepository.save(org.mockito.kotlin.anyOrNull())).thenAnswer { it.getArgument(0) }
 
         val blank = serviceOfferingService.create(
             CreateServiceOfferingRequest(id = "m1", name = "M", category = "LLM", provider = "  ")
@@ -110,13 +109,13 @@ class ServiceOfferingServiceTest {
         assertThatThrownBy {
             serviceOfferingService.create(CreateServiceOfferingRequest(id = "dup", name = "X", category = "LLM"))
         }.isInstanceOf(ConflictException::class.java)
-        verify(serviceOfferingRepository, never()).save(any())
+        verify(serviceOfferingRepository, never()).save(org.mockito.kotlin.anyOrNull())
     }
 
     @Test
     fun `update modifies offering`() {
-        whenever(serviceOfferingRepository.findById("gpt")).thenReturn(Optional.of(offering("gpt")))
-        whenever(serviceOfferingRepository.save(any(ServiceOffering::class.java))).thenAnswer { it.getArgument(0) }
+        whenever(serviceOfferingRepository.findById("gpt")).thenReturn(offering("gpt"))
+        whenever(serviceOfferingRepository.save(org.mockito.kotlin.anyOrNull())).thenAnswer { it.getArgument(0) }
 
         val result = serviceOfferingService.update(
             "gpt",

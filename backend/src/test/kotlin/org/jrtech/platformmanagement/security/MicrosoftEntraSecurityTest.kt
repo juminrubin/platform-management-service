@@ -21,9 +21,9 @@ import org.springframework.test.web.servlet.get
  * Profile: test + secure-like properties (permit-all=false).
  */
 @SpringBootTest
+@Import(TestJwtDecoderConfig::class)
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
-@Import(TestJwtDecoderConfig::class)
 @TestPropertySource(
     properties = [
         "app.security.permit-all=false",

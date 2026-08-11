@@ -19,7 +19,6 @@ import org.mockito.Mock
 import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
-import org.springframework.dao.DataIntegrityViolationException
 import java.util.UUID
 import org.jrtech.platformmanagement.TestAudit
 
@@ -85,7 +84,7 @@ class ConsumptionServiceTest {
         whenever(callerRegistrationService.getEntity("u@x.com")).thenReturn(callerRegistration)
         whenever(serviceOfferingService.getEntity("gpt-5.1")).thenReturn(offering)
         whenever(consumptionRepository.findBySourceRefIdWithRelations("req-abc")).thenReturn(null)
-        whenever(consumptionRepository.saveAndFlush(any(ParticipantCallConsumption::class.java))).thenAnswer { inv ->
+        whenever(consumptionRepository.save(org.mockito.kotlin.anyOrNull())).thenAnswer { inv ->
             inv.getArgument<ParticipantCallConsumption>(0)
         }
         whenever(consumptionRepository.findByIdWithRelations(org.mockito.kotlin.any())).thenAnswer { inv ->
@@ -114,7 +113,7 @@ class ConsumptionServiceTest {
     }
 
     @Test
-    fun `createFromImport treats unique constraint race as duplicate`() {
+    fun `createFromImport returns existing when sourceRef appears before save`() {
         val participant = Participant(
             id = "acme",
             name = "Acme",
@@ -148,11 +147,10 @@ class ConsumptionServiceTest {
 
         whenever(callerRegistrationService.getEntity("u@x.com")).thenReturn(callerRegistration)
         whenever(serviceOfferingService.getEntity("gpt-5.1")).thenReturn(offering)
+        // First probe null, second re-check before save finds the concurrent insert
         whenever(consumptionRepository.findBySourceRefIdWithRelations("req-race"))
             .thenReturn(null)
             .thenReturn(existing)
-        whenever(consumptionRepository.saveAndFlush(any(ParticipantCallConsumption::class.java)))
-            .thenThrow(DataIntegrityViolationException("unique"))
 
         val result = consumptionService.createFromImport(
             CreateConsumptionRequest(
@@ -211,7 +209,7 @@ class ConsumptionServiceTest {
         )
         assertThat(result.created).isFalse()
         assertThat(result.response.id).isEqualTo(existingId)
-        verify(consumptionRepository, org.mockito.kotlin.never()).save(any())
+        verify(consumptionRepository, org.mockito.kotlin.never()).save(org.mockito.kotlin.anyOrNull())
     }
 
     @Test
@@ -251,7 +249,7 @@ class ConsumptionServiceTest {
         assertThat(result.created).isFalse()
         assertThat(result.response.id).isEqualTo(existingId)
         assertThat(result.response.sourceRefId).isEqualTo("req-dup")
-        verify(consumptionRepository, org.mockito.kotlin.never()).save(any())
+        verify(consumptionRepository, org.mockito.kotlin.never()).save(org.mockito.kotlin.anyOrNull())
     }
 
     @Test

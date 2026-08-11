@@ -1,15 +1,16 @@
 package org.jrtech.platformmanagement.repository
 
+import org.springframework.boot.test.context.SpringBootTest
+
 import org.jrtech.platformmanagement.domain.ServiceOffering
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
 import org.springframework.test.context.ActiveProfiles
 import java.util.UUID
 import org.jrtech.platformmanagement.TestAudit
 
-@DataJpaTest
+@SpringBootTest
 @ActiveProfiles("test")
 class ServiceOfferingRepositoryTest @Autowired constructor(
     private val serviceOfferingRepository: ServiceOfferingRepository
@@ -30,7 +31,7 @@ class ServiceOfferingRepositoryTest @Autowired constructor(
             updatedBy = TestAudit.BY)
         )
 
-        val found = serviceOfferingRepository.findById(id).orElseThrow()
+        val found = serviceOfferingRepository.findById(id)!!
         assertThat(found.name).isEqualTo("Test Model")
         assertThat(found.provider).isEqualTo("SYSTEM")
         assertThat(found.config).contains("default_max_tpm")

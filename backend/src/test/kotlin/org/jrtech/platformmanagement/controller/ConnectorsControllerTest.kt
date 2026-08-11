@@ -3,8 +3,8 @@ package org.jrtech.platformmanagement.controller
 import org.jrtech.platformmanagement.connectors.ConnectorId
 import org.jrtech.platformmanagement.connectors.consumption.blob.ConsumptionBlobContainerConnector
 import org.jrtech.platformmanagement.connectors.consumption.eventhub.ConsumptionEventHubConnector
+import org.jrtech.platformmanagement.connectors.datasource.DatasourceLoadingConnector
 import org.jrtech.platformmanagement.connectors.entra.EntraDirectoryConnector
-import org.jrtech.platformmanagement.connectors.runtime.ManagedConnector
 import org.jrtech.platformmanagement.dto.ConnectorInfoResponse
 import org.jrtech.platformmanagement.dto.ConnectorLogSnapshotResponse
 import org.jrtech.platformmanagement.dto.ConnectorConfigureRequest
@@ -22,13 +22,15 @@ class ConnectorsControllerTest {
     private val eventHub = mock<ConsumptionEventHubConnector>()
     private val blob = mock<ConsumptionBlobContainerConnector>()
     private val entra = mock<EntraDirectoryConnector>()
+    private val datasource = mock<DatasourceLoadingConnector>()
     private val audit = mock<AuditPrincipalResolver>()
 
     private val controller = ConnectorsController(
-        managedConnectors = listOf(eventHub, blob, entra),
+        managedConnectors = listOf(eventHub, blob, entra, datasource),
         eventHubConnector = eventHub,
         blobConnector = blob,
         entraDirectoryConnector = entra,
+        datasourceLoadingConnector = datasource,
         auditPrincipalResolver = audit
     )
 
@@ -36,6 +38,7 @@ class ConnectorsControllerTest {
         whenever(eventHub.id).thenReturn(ConnectorId.CONSUMPTION_EVENT_HUB)
         whenever(blob.id).thenReturn(ConnectorId.CONSUMPTION_BLOB_AVRO)
         whenever(entra.id).thenReturn(ConnectorId.ENTRA_DIRECTORY)
+        whenever(datasource.id).thenReturn(ConnectorId.DATASOURCE_LOADING)
     }
 
     @Test
@@ -43,13 +46,15 @@ class ConnectorsControllerTest {
         whenever(eventHub.info()).thenReturn(sampleInfo("consumption-eventhub", running = false))
         whenever(blob.info()).thenReturn(sampleInfo("consumption-storage", running = false))
         whenever(entra.info()).thenReturn(sampleInfo("entra-directory", running = true))
+        whenever(datasource.info()).thenReturn(sampleInfo("datasource-loading", running = true))
 
         val list = controller.listConnectors()
-        assertThat(list.connectors).hasSize(3)
+        assertThat(list.connectors).hasSize(4)
         assertThat(list.connectors.map { it.id }).containsExactly(
             "consumption-eventhub",
             "consumption-storage",
-            "entra-directory"
+            "entra-directory",
+            "datasource-loading"
         )
         assertThat(list.connectors[2].running).isTrue()
         assertThat(list.connectors[2].status).isEqualTo("RUNNING")

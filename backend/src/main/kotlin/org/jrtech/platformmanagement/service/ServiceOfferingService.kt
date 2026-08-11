@@ -10,15 +10,12 @@ import org.jrtech.platformmanagement.exception.ResourceNotFoundException
 import org.jrtech.platformmanagement.logging.logger
 import org.jrtech.platformmanagement.repository.ServiceOfferingRepository
 import org.springframework.stereotype.Service
-import org.springframework.transaction.annotation.Transactional
 
 @Service
 class ServiceOfferingService(
     private val serviceOfferingRepository: ServiceOfferingRepository
 ) {
     private val log = logger()
-
-    @Transactional(readOnly = true)
     fun findAll(activeOnly: Boolean, category: String?): List<ServiceOfferingResponse> {
         log.debug("Listing service offerings activeOnly={} category={}", activeOnly, category)
         var entities = if (activeOnly) {
@@ -32,14 +29,10 @@ class ServiceOfferingService(
         log.debug("Found {} service offering(s)", entities.size)
         return entities.map(ServiceOfferingResponse::from)
     }
-
-    @Transactional(readOnly = true)
     fun findById(id: String): ServiceOfferingResponse {
         log.debug("Fetching service offering id={}", id)
         return ServiceOfferingResponse.from(getEntity(id))
     }
-
-    @Transactional
     fun create(request: CreateServiceOfferingRequest): ServiceOfferingResponse {
         val id = request.id.trim()
         log.info("Creating service offering id={}", id)
@@ -63,8 +56,6 @@ class ServiceOfferingService(
         log.info("Created service offering id={} provider={} createdBy={}", saved.id, saved.provider, saved.createdBy)
         return ServiceOfferingResponse.from(saved)
     }
-
-    @Transactional
     fun update(id: String, request: UpdateServiceOfferingRequest): ServiceOfferingResponse {
         log.info("Updating service offering id={}", id)
         val entity = getEntity(id)
@@ -85,8 +76,6 @@ class ServiceOfferingService(
         )
         return ServiceOfferingResponse.from(saved)
     }
-
-    @Transactional
     fun delete(id: String) {
         log.info("Deleting service offering id={}", id)
         if (!serviceOfferingRepository.existsById(id)) {
@@ -97,11 +86,14 @@ class ServiceOfferingService(
         log.info("Deleted service offering id={}", id)
     }
 
-    fun getEntity(id: String): ServiceOffering =
-        serviceOfferingRepository.findById(id).orElseThrow {
+    fun getEntity(id: String): ServiceOffering {
+        val entity = serviceOfferingRepository.findById(id)
+        if (entity == null) {
             log.warn("Service offering not found id={}", id)
-            ResourceNotFoundException("Service offering not found: $id")
+            throw ResourceNotFoundException("Service offering not found: $id")
         }
+        return entity
+    }
 
     /** Trim, uppercase; null/blank values fall back to [ServiceOffering.DEFAULT_PROVIDER]. */
     private fun normalizeProvider(provider: String?): String =
