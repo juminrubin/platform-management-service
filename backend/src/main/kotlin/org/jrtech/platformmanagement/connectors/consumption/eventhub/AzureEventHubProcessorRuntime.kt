@@ -1,12 +1,6 @@
 package org.jrtech.platformmanagement.connectors.consumption.eventhub
 
-import org.jrtech.platformmanagement.connectors.config.ConsumptionEventHubProperties
-import org.jrtech.platformmanagement.connectors.consumption.BusinessBodyDecoder
-import org.jrtech.platformmanagement.exception.BadRequestException
-import org.jrtech.platformmanagement.exception.ResourceNotFoundException
-import org.jrtech.platformmanagement.logging.logger
-import org.jrtech.platformmanagement.service.ConsumptionService
-import com.azure.identity.DefaultAzureCredentialBuilder
+import com.azure.core.credential.TokenCredential
 import com.azure.messaging.eventhubs.EventProcessorClient
 import com.azure.messaging.eventhubs.EventProcessorClientBuilder
 import com.azure.messaging.eventhubs.checkpointstore.blob.BlobCheckpointStore
@@ -14,17 +8,24 @@ import com.azure.messaging.eventhubs.models.ErrorContext
 import com.azure.messaging.eventhubs.models.EventContext
 import com.azure.storage.blob.BlobContainerAsyncClient
 import com.azure.storage.blob.BlobServiceClientBuilder
+import org.jrtech.platformmanagement.connectors.config.ConsumptionEventHubProperties
+import org.jrtech.platformmanagement.connectors.consumption.BusinessBodyDecoder
+import org.jrtech.platformmanagement.exception.BadRequestException
+import org.jrtech.platformmanagement.exception.ResourceNotFoundException
+import org.jrtech.platformmanagement.logging.logger
+import org.jrtech.platformmanagement.service.ConsumptionService
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
 
 /**
- * Azure Event Processor Client runtime using Managed Identity
- * ([DefaultAzureCredentialBuilder]) and Blob checkpoint store.
+ * Azure Event Processor Client runtime using a shared [TokenCredential]
+ * (UAMI / service principal / SAMI) and Blob checkpoint store.
  */
 class AzureEventHubProcessorRuntime(
     private val properties: ConsumptionEventHubProperties,
     private val bodyDecoder: BusinessBodyDecoder,
-    private val consumptionService: ConsumptionService
+    private val consumptionService: ConsumptionService,
+    private val tokenCredential: TokenCredential
 ) : EventHubProcessorRuntime {
 
     private val log = logger()
@@ -75,7 +76,7 @@ class AzureEventHubProcessorRuntime(
             "cg=${properties.consumerGroup} running=${isRunning()}"
 
     private fun buildClient(): EventProcessorClient {
-        val credential = DefaultAzureCredentialBuilder().build()
+        val credential = tokenCredential
         val checkpointContainer: BlobContainerAsyncClient =
             BlobServiceClientBuilder()
                 .endpoint(properties.checkpointStorageAccountUrl.trim().removeSuffix("/"))

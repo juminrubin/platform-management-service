@@ -14,7 +14,7 @@ External systems are integrated as **connectors** (directory, historical Blob Ca
 | Database (production) | **Azure Database for PostgreSQL Flexible Server** |
 | Schema | Flyway (PostgreSQL-compatible) |
 | Auth | Microsoft Entra ID (Azure AD) JWT resource server |
-| Azure data plane (Blob / Event Hubs) | **Managed Identity** (Workload Identity / `DefaultAzureCredential`) |
+| Azure data plane (Blob / Event Hubs / Graph) | **SP / UAMI / SAMI** from one `client-id` (inferred by `AzureCredentialFactory`) |
 | Packaging | Docker multi-stage image |
 | Deploy | Kubernetes manifests for Azure Kubernetes Service (AKS) |
 
@@ -24,16 +24,17 @@ External systems are integrated as **connectors** (directory, historical Blob Ca
 
 ```
 src/main/kotlin/org/jrtech/platformmanagement/
-  config/          # Security (Microsoft JWT), CORS, app / Entra directory properties
-  controller/      # REST endpoints (domain + Entra + future connector control plane)
+  config/          # Security (Microsoft JWT), CORS, Entra directory, Azure credential factory
+  config/azure/    # AzureCredentialFactory (SP / UAMI / SAMI from client-id + secret)
+  connectors/      # Blob Capture, Event Hub, Entra directory runtime adapters
+  controller/      # REST endpoints (domain + Entra + connector control plane)
   domain/          # JPA entities & enums (audit: createdBy / updatedBy set in services)
   dto/             # Request/response models
-  entra/           # Entra directory connector (Microsoft Graph group/member cache)
+  entra/           # Entra directory Graph client + models
   exception/       # API errors (RFC 7807 ProblemDetail)
   repository/      # Spring Data JPA
   security/        # Authz, JWT mapping, group → permission scope table
   service/         # Domain business logic (pure; connectors call into services)
-  # connectors/    # (planned) Blob Capture backfill, Event Hub continuous — see design doc
 src/main/resources/
   application.yml              # App + Microsoft Entra ID JWT (always on)
   application-k8s.yml          # Container / AKS runtime extras
@@ -54,7 +55,7 @@ Requires **JDK 21+**, **Maven 3.9+**, and Entra app settings:
 
 ```bash
 export APP_AZURE_TENANT_ID=<tenant-guid>
-export APP_AZURE_API_CLIENT_ID=<api-app-client-id>
+export APP_API_CLIENT_ID=<api-app-client-id>
 # optional: export APP_AZURE_REQUIRED_SCOPE=access_as_user
 
 cd backend
@@ -263,20 +264,44 @@ Technical users (MI / SP) continue to use app roles on the token only.
 
 ```bash
 export APP_ENTRA_DIRECTORY_ENABLED=true
-export APP_AZURE_TENANT_ID=<tenant>
-# Client credentials (recommended for daemons) — Graph **application** permissions + admin consent:
+
+# Shared Azure credential (Graph + Blob + Event Hub).
+# One client-id field: APP_UAMI_CLIENT_ID or AZURE_CLIENT_ID.
+#   1. client-id + AZURE_CLIENT_SECRET → service principal (username + password)
+#   2. client-id only                  → UAMI
+#   3. neither                         → SAMI
+#
+# UAMI:
+# export APP_UAMI_CLIENT_ID=<uami-client-id>
+#   # or: export AZURE_CLIENT_ID=<uami-client-id>   (no secret)
+#
+# Service principal:
+export AZURE_TENANT_ID=<tenant>
+export AZURE_CLIENT_ID=<app-client-id>
+export AZURE_CLIENT_SECRET=<secret>
+#
+# SAMI: leave client-id empty (host must have a system-assigned identity)
+
+# Graph needs application permissions + admin consent on the credential principal:
 #   Group.Read.All, GroupMember.Read.All, User.Read.All
 #   (or Directory.Read.All alone)
-# User.Read.All is required so member displayName / UPN / mail resolve (cast + optional GET /users/{id}).
-export APP_AZURE_GRAPH_CLIENT_ID=<app-client-id>
-export APP_AZURE_GRAPH_CLIENT_SECRET=<secret>
-# Or omit secret and use managed identity / DefaultAzureCredential
 
 # Optional:
 # export APP_ENTRA_GROUP_NAME_PREFIX=Platform-System-
 # export APP_ENTRA_INCLUDE_TRANSITIVE_MEMBERS=true
 # export APP_ENTRA_DIRECTORY_REFRESH_MS=900000   # 15 minutes (default)
 ```
+
+### Azure credential (`app.azure.credential`)
+
+One **`client-id`** is bound from `APP_UAMI_CLIENT_ID` (preferred) or `AZURE_CLIENT_ID`.
+Mode is **inferred**:
+
+| Condition | Mode |
+|-----------|------|
+| `client-id` + `client-secret` both set | **Service principal** (needs `AZURE_TENANT_ID`) |
+| `client-id` only | **UAMI** |
+| neither | **SAMI** |
 
 Seed data (from Flyway `V1.1__seed_data.sql`) is loaded on startup so list endpoints return sample rows immediately.
 
@@ -446,7 +471,7 @@ curl -s -X POST http://localhost:8080/api/v1/connectors/consumption-eventhub/sto
 
 | Runtime behaviour | |
 |-------------------|--|
-| Auth | **Managed Identity** (`DefaultAzureCredential`) — no EH connection string |
+| Auth | **SP / UAMI / SAMI** via `app.azure.credential` (one `client-id`) — no EH connection string |
 | Checkpoint store | **Separate** Blob container (not Capture) |
 | Delivery | At-least-once; domain dedup via race-safe `createFromImport` + `source_ref_id` |
 | Trust | Hub **senders** ≈ registrator trust boundary; this service’s MI is **receiver only** |
@@ -463,7 +488,7 @@ Prefer **no connection strings** for Blob or Event Hubs in production.
 | Event Hub | **Azure Event Hubs Data Receiver** |
 | Event Hub (producers) | **Azure Event Hubs Data Sender** on **producer** identities only |
 
-Local: `DefaultAzureCredential` (`az login`) or test mocks.
+Local: set `AZURE_CLIENT_ID` + `AZURE_CLIENT_SECRET` (+ `AZURE_TENANT_ID`) for a service principal, or use test mocks.
 
 ### Config direction
 
@@ -471,13 +496,18 @@ Legacy keys under `app.consumption-import.*` may remain as a temporary bridge. T
 
 ```yaml
 app:
+  azure:
+    credential:
+      # APP_UAMI_CLIENT_ID (UAMI) or AZURE_CLIENT_ID (SP / WI UAMI)
+      client-id: ${APP_UAMI_CLIENT_ID:${AZURE_CLIENT_ID:}}
+      client-secret: ${AZURE_CLIENT_SECRET:}   # with client-id → service principal
+      tenant-id: ${AZURE_TENANT_ID:}
   connectors:
     consumption-blob:
       enabled: false          # default off
       runner-enabled: false   # default off (fail-closed)
       storage-account-url: https://<account>.blob.core.windows.net
       container: consumption-capture
-      # auth: Managed Identity / DefaultAzureCredential
     consumption-eventhub:
       enabled: false
       fully-qualified-namespace: <ns>.servicebus.windows.net
@@ -520,7 +550,7 @@ Implementation touchpoints:
 | SpEL helper (`@authz.hasAnyRole(...)`) | `security/Authz.kt` |
 | Method security on controllers | `@PreAuthorize` on controller methods |
 | Permit-all / optional scope gate / CORS / group maps | `config/AppSecurityProperties.kt` + `app.security.*` |
-| Issuer + audiences | `application.yml` (`APP_AZURE_TENANT_ID`, `APP_AZURE_API_CLIENT_ID`) |
+| Issuer + audiences | `application.yml` (`APP_AZURE_TENANT_ID`, `APP_API_CLIENT_ID`) |
 | Authenticated principal probe | `GET /api/v1/auth/me` |
 | K8s env (`SPRING_PROFILES_ACTIVE=k8s`) | `k8s/configmap.yaml` + secrets |
 
@@ -540,10 +570,10 @@ app:
 
     # Per Application Registration (matched against token azp / appid / aud)
     application-registrations:
-      - client-id: ${APP_AZURE_API_CLIENT_ID}
+      - client-id: ${APP_API_CLIENT_ID}
         oauth-scopes:
           - access_as_user
-          - api://${APP_AZURE_API_CLIENT_ID}/access_as_user
+          - api://${APP_API_CLIENT_ID}/access_as_user
         group-role-mappings:
           "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee":
             - System.Maintainer
@@ -654,14 +684,14 @@ Use **one mechanism for both humans and technical accounts: Entra app roles** em
 1. Azure Portal → **Microsoft Entra ID** → **App registrations** → **New registration**  
    Name e.g. `platform-management-service`. Account type: single tenant (or as required).
 2. Note:
-   - **Application (client) ID** → `APP_AZURE_API_CLIENT_ID`
+   - **Application (client) ID** → `APP_API_CLIENT_ID`
    - **Directory (tenant) ID** → `APP_AZURE_TENANT_ID`
 3. **Expose an API**
-   - Application ID URI: `api://<APP_AZURE_API_CLIENT_ID>` (or a verified custom URI)
+   - Application ID URI: `api://<APP_API_CLIENT_ID>` (or a verified custom URI)
    - Add a **delegated** scope for human clients, e.g.:
      - Scope name: `access_as_user`
      - Who can consent: Admins only (or admins + users)
-     - Full scope: `api://<APP_AZURE_API_CLIENT_ID>/access_as_user`
+     - Full scope: `api://<APP_API_CLIENT_ID>/access_as_user`
 4. **App roles** → *Create app role* (or edit Manifest). Values must match the table below **exactly**:
 
    | Display name | Value | Allowed member types | Description |
@@ -697,7 +727,7 @@ When a member of that group signs in and requests a token **for this API**, Entr
 
 ```json
 {
-  "aud": "<APP_AZURE_API_CLIENT_ID>",
+  "aud": "<APP_API_CLIENT_ID>",
   "iss": "https://login.microsoftonline.com/<tenant>/v2.0",
   "oid": "<user-object-id>",
   "preferred_username": "alice@contoso.com",
@@ -736,7 +766,7 @@ Humans still receive **app roles** from group assignments on the **API** enterpr
 
 ```bash
 # IDs
-API_APP_ID="<APP_AZURE_API_CLIENT_ID>"                 # API app registration client id
+API_APP_ID="<APP_API_CLIENT_ID>"                 # API app registration client id
 API_SP_OBJECT_ID=$(az ad sp show --id "$API_APP_ID" --query id -o tsv)
 
 MI_PRINCIPAL_ID="<managed-identity-principal-object-id>"
@@ -760,7 +790,7 @@ Application tokens look like:
 
 ```json
 {
-  "aud": "<APP_AZURE_API_CLIENT_ID>",
+  "aud": "<APP_API_CLIENT_ID>",
   "iss": "https://login.microsoftonline.com/<tenant>/v2.0",
   "oid": "<mi-principal-object-id>",
   "appid": "<mi-client-id>",
@@ -784,7 +814,7 @@ Prerequisites: user is in a group that has an app role on the API (step 2); huma
 chmod +x scripts/*.sh scripts/lib/*.sh
 
 export APP_AZURE_TENANT_ID="<tenant-guid>"
-export APP_AZURE_API_CLIENT_ID="<api-app-client-id>"
+export APP_API_CLIENT_ID="<api-app-client-id>"
 
 # Azure CLI interactive login (default) — user must be in the Entra group
 TOKEN=$(./scripts/get-token-human.sh)
@@ -810,13 +840,13 @@ Common flags: `--print-claims` (JWT payload on stderr), `--export` (prints `expo
 ```bash
 az login --tenant "$APP_AZURE_TENANT_ID"
 TOKEN=$(az account get-access-token \
-  --resource "api://${APP_AZURE_API_CLIENT_ID}" \
+  --resource "api://${APP_API_CLIENT_ID}" \
   --query accessToken -o tsv)
 # Expect roles: System.Maintainer or Entitlement.Reader; often scp: access_as_user
 ```
 
 **Authorization code + PKCE (SPA)** — use **MSAL** with scope  
-`api://${APP_AZURE_API_CLIENT_ID}/access_as_user`. Do **not** use ROPC in production.
+`api://${APP_API_CLIENT_ID}/access_as_user`. Do **not** use ROPC in production.
 
 #### Call the API as a human
 
@@ -841,7 +871,7 @@ Prerequisites: MI has app role assignment on the API (step 4). Scope for applica
 #### Scripts (recommended)
 
 ```bash
-export APP_AZURE_API_CLIENT_ID="<api-app-client-id>"
+export APP_API_CLIENT_ID="<api-app-client-id>"
 
 # On Azure compute with system-assigned MI (auto-detects IMDS when available)
 TOKEN=$(./scripts/get-token-mi.sh --print-claims)
@@ -867,7 +897,7 @@ If `--method` is omitted, the script chooses: **imds** (if reachable) → **clie
 **IMDS (system-assigned MI)**
 
 ```bash
-MI_RESOURCE="api://${APP_AZURE_API_CLIENT_ID}"
+MI_RESOURCE="api://${APP_API_CLIENT_ID}"
 TOKEN=$(curl -s "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2019-08-01&resource=${MI_RESOURCE}" \
   -H "Metadata: true" | jq -r .access_token)
 ```
@@ -911,7 +941,7 @@ For **historical Capture** or **continuous Event Hub** ingest, see [Connectors](
 
 ```bash
 export APP_AZURE_TENANT_ID=<tenant-guid>
-export APP_AZURE_API_CLIENT_ID=<api-app-client-id>
+export APP_API_CLIENT_ID=<api-app-client-id>
 # Leave empty: authorize only via app roles (recommended for human + MI)
 # export APP_AZURE_REQUIRED_SCOPE=access_as_user
 
@@ -957,12 +987,12 @@ Docker and AKS use profile `k8s` plus the same Entra env vars from secrets.
 | Symptom | Likely cause |
 |---------|----------------|
 | 401 always | Wrong issuer/audience; token not for this API; missing `Authorization` header |
-| App fails to start | `APP_AZURE_TENANT_ID` / `APP_AZURE_API_CLIENT_ID` not set |
+| App fails to start | `APP_AZURE_TENANT_ID` / `APP_API_CLIENT_ID` not set |
 | 403 with valid login | App role missing on token — check group→role assignment (human) or MI app role assignment (tech) |
 | Token has `groups` but no `roles` | You assigned the group as a member without selecting an **app role**, or token was requested for the wrong resource (e.g. Graph / ARM) |
 | MI token has no `roles` | App role not assigned to MI principal, or scope was not `api://…/.default` |
 | Human token has `scp` but empty `roles` | User not in a group that has an app role on the **API** enterprise application |
-| `aud` mismatch | Request token with resource/scope for **this** API (`api://{APP_AZURE_API_CLIENT_ID}/…`) |
+| `aud` mismatch | Request token with resource/scope for **this** API (`api://{APP_API_CLIENT_ID}/…`) |
 
 ---
 
@@ -973,7 +1003,7 @@ mvn clean verify
 mvn package
 
 export APP_AZURE_TENANT_ID=<tenant-guid>
-export APP_AZURE_API_CLIENT_ID=<api-app-client-id>
+export APP_API_CLIENT_ID=<api-app-client-id>
 java -jar target/platform-management-service-1.0.0-SNAPSHOT.jar
 ```
 
@@ -995,7 +1025,7 @@ docker build -t platform-management-service:1.0.0 .
 docker run --rm -p 8080:8080 \
   -e SPRING_PROFILES_ACTIVE=k8s \
   -e APP_AZURE_TENANT_ID=<tenant-guid> \
-  -e APP_AZURE_API_CLIENT_ID=<api-app-client-id> \
+  -e APP_API_CLIENT_ID=<api-app-client-id> \
   platform-management-service:1.0.0
 ```
 
@@ -1029,7 +1059,7 @@ validate → test → package (Kaniko) → security (Trivy) → deploy staging /
 | **deploy:staging** | Auto on default branch → AKS |
 | **deploy:production** | Manual on tags `v1.2.3` → AKS |
 
-Configure at least these CI/CD variables: `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID` (deploy SP login), plus `APP_AZURE_TENANT_ID`, `APP_AZURE_API_CLIENT_ID` (injected into the app), `AKS_RESOURCE_GROUP`, `AKS_CLUSTER_NAME`. Set `ACR_NAME` to also publish to Azure Container Registry.
+Configure at least these CI/CD variables: `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID` (deploy SP login), plus `APP_AZURE_TENANT_ID`, `APP_API_CLIENT_ID` (injected into the app), `AKS_RESOURCE_GROUP`, `AKS_CLUSTER_NAME`. Set `ACR_NAME` to also publish to Azure Container Registry.
 
 ---
 
@@ -1042,7 +1072,7 @@ Manifests live under `k8s/` and are managed with **Kustomize**.
 | `namespace.yaml` | `platform-management` namespace |
 | `serviceaccount.yaml` | Workload identity-ready SA |
 | `configmap.yaml` | Non-secret env (`SPRING_PROFILES_ACTIVE`, CORS, …) |
-| `secret.yaml` | Template for `APP_AZURE_TENANT_ID` / `APP_AZURE_API_CLIENT_ID` |
+| `secret.yaml` | Template for `APP_AZURE_TENANT_ID` / `APP_API_CLIENT_ID` |
 | `deployment.yaml` | 2 replicas, probes, resources, read-only root FS |
 | `service.yaml` | ClusterIP → port 80 → container 8080 |
 | `ingress.yaml` | Host-based Ingress (NGINX / AGIC annotations) |
@@ -1069,7 +1099,7 @@ kubectl apply -f k8s/namespace.yaml
 kubectl create secret generic platform-management-service-secrets \
   --namespace platform-management \
   --from-literal=APP_AZURE_TENANT_ID='<tenant-guid>' \
-  --from-literal=APP_AZURE_API_CLIENT_ID='<api-app-client-id>'
+  --from-literal=APP_API_CLIENT_ID='<api-app-client-id>'
 ```
 
 ### 3. Apply the stack
@@ -1087,7 +1117,7 @@ Helper script (creates secret from env and rolls out):
 
 ```bash
 export APP_AZURE_TENANT_ID=<tenant-guid>
-export APP_AZURE_API_CLIENT_ID=<api-app-client-id>
+export APP_API_CLIENT_ID=<api-app-client-id>
 ./scripts/deploy-aks.sh mycompanyacr.azurecr.io 1.0.0
 ```
 

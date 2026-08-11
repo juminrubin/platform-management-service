@@ -5,7 +5,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties
 /**
  * Root configuration for `app.connectors.*`.
  *
- * Blob/EH use Managed Identity in production (account URL / namespace + credential chain).
+ * Blob/EH use [org.jrtech.platformmanagement.config.azure.AzureCredentialFactory]
+ * (shared `app.azure.credential`: UAMI → service principal → SAMI).
  */
 @ConfigurationProperties(prefix = "app.connectors")
 data class ConnectorsProperties(
@@ -48,8 +49,8 @@ data class ConsumptionEventHubProperties(
  * {prefix}/yyyy/MM/dd/HH_mm_ss.avro
  * ```
  *
- * Auth: [storageAccountUrl] + Managed Identity ([DefaultAzureCredential]), or optional
- * [connectionString] for local only.
+ * Auth: [storageAccountUrl] + shared Azure credential (UAMI / SP / SAMI),
+ * or optional [connectionString] for local only.
  */
 data class ConsumptionBlobProperties(
     val enabled: Boolean = false,

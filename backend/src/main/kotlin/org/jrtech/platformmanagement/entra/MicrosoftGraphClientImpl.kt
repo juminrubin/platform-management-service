@@ -14,7 +14,8 @@ import tools.jackson.databind.JsonNode
 import java.net.URI
 
 /**
- * Microsoft Graph HTTP client using [TokenCredential] (client secret or DefaultAzureCredential).
+ * Microsoft Graph HTTP client using [TokenCredential]
+ * (UAMI, service principal, or SAMI via AzureCredentialFactory).
  *
  * Uses advanced query headers for `startswith` group filters
  * (`ConsistencyLevel: eventual` + `$count=true`).

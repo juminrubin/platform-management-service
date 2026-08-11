@@ -1,6 +1,7 @@
 package org.jrtech.platformmanagement.connectors.entra
 
 import org.jrtech.platformmanagement.config.EntraDirectoryProperties
+import org.jrtech.platformmanagement.config.azure.AzureCredentialProperties
 import org.jrtech.platformmanagement.entra.EntraDirectoryMember
 import org.jrtech.platformmanagement.entra.EntraDirectorySnapshot
 import org.jrtech.platformmanagement.entra.EntraGroup
@@ -185,6 +186,7 @@ class EntraDirectoryConnectorTest {
     private fun connector(properties: EntraDirectoryProperties) =
         EntraDirectoryConnector(
             properties = properties,
+            azureCredential = AzureCredentialProperties(),
             directoryService = directoryService,
             taskScheduler = taskScheduler
         )

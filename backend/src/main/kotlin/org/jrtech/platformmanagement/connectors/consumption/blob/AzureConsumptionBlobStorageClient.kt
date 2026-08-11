@@ -1,22 +1,24 @@
 package org.jrtech.platformmanagement.connectors.consumption.blob
 
-import org.jrtech.platformmanagement.connectors.config.ConsumptionBlobProperties
-import org.jrtech.platformmanagement.logging.logger
-import com.azure.identity.DefaultAzureCredentialBuilder
+import com.azure.core.credential.TokenCredential
 import com.azure.storage.blob.BlobContainerClient
 import com.azure.storage.blob.BlobServiceClientBuilder
 import com.azure.storage.blob.models.BlobListDetails
 import com.azure.storage.blob.models.ListBlobsOptions
+import org.jrtech.platformmanagement.connectors.config.ConsumptionBlobProperties
+import org.jrtech.platformmanagement.logging.logger
 import java.io.InputStream
 import java.time.Duration
 
 /**
  * Azure Blob client for hierarchical consumption Avro paths.
- * Uses Managed Identity ([DefaultAzureCredentialBuilder]) when [ConsumptionBlobProperties.connectionString]
- * is empty; otherwise connection string (local only).
+ *
+ * Uses shared [TokenCredential] (UAMI / service principal / SAMI) when
+ * [ConsumptionBlobProperties.connectionString] is empty; otherwise connection string (local only).
  */
 class AzureConsumptionBlobStorageClient(
-    private val properties: ConsumptionBlobProperties
+    private val properties: ConsumptionBlobProperties,
+    private val tokenCredential: TokenCredential? = null
 ) : ConsumptionBlobStorageClient {
 
     private val log = logger()
@@ -66,8 +68,12 @@ class AzureConsumptionBlobStorageClient(
             require(url.isNotEmpty()) {
                 "app.connectors.consumption-blob.storage-account-url is required when connection-string is empty"
             }
-            log.info("Consumption blob client: Managed Identity / DefaultAzureCredential (url={})", url)
-            builder.endpoint(url).credential(DefaultAzureCredentialBuilder().build())
+            val credential = requireNotNull(tokenCredential) {
+                "TokenCredential is required when connection-string is empty " +
+                    "(configure app.azure.credential.client-id / client-secret)"
+            }
+            log.info("Consumption blob client: TokenCredential auth (url={})", url)
+            builder.endpoint(url).credential(credential)
         }
         return builder.buildClient().getBlobContainerClient(container)
     }

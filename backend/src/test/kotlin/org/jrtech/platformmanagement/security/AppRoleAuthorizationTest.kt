@@ -43,6 +43,73 @@ class AppRoleAuthorizationTest {
     }
 
     @Test
+    fun `System Maintainer can create a new participant`() {
+        val participantId = "authz-p-${java.util.UUID.randomUUID().toString().take(8)}"
+        mockMvc.post("/api/v1/participants") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """
+                {
+                  "id": "$participantId",
+                  "name": "Authz Maintainer Participant",
+                  "contact": "maintainer@example.com",
+                  "status": "ACTIVE"
+                }
+            """.trimIndent()
+            with(jwtWithRoles(AppRoles.SYSTEM_MAINTAINER))
+        }.andExpect {
+            status { isCreated() }
+            jsonPath("$.id") { value(participantId) }
+            jsonPath("$.name") { value("Authz Maintainer Participant") }
+            jsonPath("$.status") { value("ACTIVE") }
+        }
+    }
+
+    @Test
+    fun `System Maintainer can assign a new entitlement`() {
+        val suffix = java.util.UUID.randomUUID().toString().take(8)
+        val participantId = "authz-ent-p-$suffix"
+
+        // Entitlements require an existing participant; create one first as Maintainer
+        mockMvc.post("/api/v1/participants") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """
+                {
+                  "id": "$participantId",
+                  "name": "Authz Entitlement Participant $suffix",
+                  "status": "ACTIVE"
+                }
+            """.trimIndent()
+            with(jwtWithRoles(AppRoles.SYSTEM_MAINTAINER))
+        }.andExpect {
+            status { isCreated() }
+        }
+
+        mockMvc.post("/api/v1/entitlements") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """
+                {
+                  "participantId": "$participantId",
+                  "serviceOfferingId": "gpt-5.1",
+                  "status": "ACTIVE",
+                  "validFrom": "2024-01-01",
+                  "validTo": "2030-12-31",
+                  "config": "{}",
+                  "notes": "assigned by System.Maintainer authz test"
+                }
+            """.trimIndent()
+            with(jwtWithRoles(AppRoles.SYSTEM_MAINTAINER))
+        }.andExpect {
+            status { isCreated() }
+            jsonPath("$.participantId") { value(participantId) }
+            jsonPath("$.serviceOfferingId") { value("gpt-5.1") }
+            jsonPath("$.status") { value("ACTIVE") }
+            jsonPath("$.validFrom") { value("2024-01-01") }
+            jsonPath("$.validTo") { value("2030-12-31") }
+            jsonPath("$.id") { exists() }
+        }
+    }
+
+    @Test
     fun `System Reader can list participants`() {
         mockMvc.get("/api/v1/participants") {
             accept = MediaType.APPLICATION_JSON

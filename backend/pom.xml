@@ -4,16 +4,14 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <parent>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-parent</artifactId>
-        <version>4.1.0</version>
-        <relativePath/>
-    </parent>
-
+    <!--
+      Standalone POM: Spring Boot versions come from the BOM import below
+      (spring-boot-dependencies), not from spring-boot-starter-parent.
+    -->
     <groupId>org.jrtech</groupId>
     <artifactId>platform-management-service</artifactId>
     <version>1.0.0-SNAPSHOT</version>
+    <packaging>jar</packaging>
     <name>Platform Management Service</name>
     <description>Platform Management Service — REST API for Participants, Service Offerings and Entitlements secured with Microsoft Entra ID</description>
 
@@ -26,9 +24,21 @@
     </licenses>
 
     <properties>
-        <!-- Spring Boot 4.x: Java 21+; Kotlin 2.3.x (Boot 4.1 BOM manages 2.3.21) -->
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+        <!-- Spring Boot 4.x: Java 21+; Kotlin 2.3.x -->
         <java.version>21</java.version>
+        <maven.compiler.release>${java.version}</maven.compiler.release>
+        <spring-boot.version>4.1.0</spring-boot.version>
         <kotlin.version>2.3.0</kotlin.version>
+
+        <!-- Plugin versions (normally inherited from spring-boot-starter-parent) -->
+        <maven-compiler-plugin.version>3.15.0</maven-compiler-plugin.version>
+        <maven-surefire-plugin.version>3.5.6</maven-surefire-plugin.version>
+        <maven-failsafe-plugin.version>3.5.6</maven-failsafe-plugin.version>
+        <maven-resources-plugin.version>3.3.1</maven-resources-plugin.version>
+        <maven-jar-plugin.version>3.4.2</maven-jar-plugin.version>
         <jacoco.version>0.8.13</jacoco.version>
         <!-- Industry common gate: ≥80% line coverage on production code -->
         <jacoco.line.coverage.minimum>0.80</jacoco.line.coverage.minimum>
@@ -52,6 +62,38 @@
         <azure-messaging-eventhubs.version>5.21.5</azure-messaging-eventhubs.version>
         <azure-messaging-eventhubs-checkpointstore-blob.version>1.21.7</azure-messaging-eventhubs-checkpointstore-blob.version>
     </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <!-- Spring Boot BOM: dependency versions only (no parent plugin defaults) -->
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>${spring-boot.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <!--
+              BOM import does not apply project property overrides the way starter-parent does.
+              Re-declare managed versions here so ${flyway.version} / ${h2.version} still win.
+            -->
+            <dependency>
+                <groupId>org.flywaydb</groupId>
+                <artifactId>flyway-core</artifactId>
+                <version>${flyway.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.flywaydb</groupId>
+                <artifactId>flyway-database-postgresql</artifactId>
+                <version>${flyway.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.h2database</groupId>
+                <artifactId>h2</artifactId>
+                <version>${h2.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <dependencies>
         <!-- Web MVC (Spring Boot 4 modular starter; replaces spring-boot-starter-web) -->
@@ -98,7 +140,7 @@
             <artifactId>kotlin-stdlib</artifactId>
         </dependency>
 
-        <!-- H2: version via h2.version (latest 2.4.240; Boot BOM already aligned) -->
+        <!-- H2: version via h2.version (BOM-aligned / project override) -->
         <dependency>
             <groupId>com.h2database</groupId>
             <artifactId>h2</artifactId>
@@ -177,16 +219,74 @@
     <build>
         <sourceDirectory>${project.basedir}/src/main/kotlin</sourceDirectory>
         <testSourceDirectory>${project.basedir}/src/test/kotlin</testSourceDirectory>
+
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-maven-plugin</artifactId>
+                    <version>${spring-boot.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.jetbrains.kotlin</groupId>
+                    <artifactId>kotlin-maven-plugin</artifactId>
+                    <version>${kotlin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>${maven-compiler-plugin.version}</version>
+                    <configuration>
+                        <release>${maven.compiler.release}</release>
+                        <parameters>true</parameters>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <version>${maven-surefire-plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-failsafe-plugin</artifactId>
+                    <version>${maven-failsafe-plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-resources-plugin</artifactId>
+                    <version>${maven-resources-plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-jar-plugin</artifactId>
+                    <version>${maven-jar-plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.jacoco</groupId>
+                    <artifactId>jacoco-maven-plugin</artifactId>
+                    <version>${jacoco.version}</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+
         <plugins>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <executions>
+                    <!-- Executable fat JAR (repackage) — provided by parent when using starter-parent -->
+                    <execution>
+                        <id>repackage</id>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                    </execution>
                     <!--
                       Generates META-INF/build-info.properties (version + build.time Instant).
                       Consumed by BuildProperties, /actuator/info, Swagger UI, and startup logs.
                     -->
                     <execution>
+                        <id>build-info</id>
                         <goals>
                             <goal>build-info</goal>
                         </goals>
@@ -198,11 +298,29 @@
                     </execution>
                 </executions>
             </plugin>
+
             <plugin>
                 <groupId>org.jetbrains.kotlin</groupId>
                 <artifactId>kotlin-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>compile</id>
+                        <phase>compile</phase>
+                        <goals>
+                            <goal>compile</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>test-compile</id>
+                        <phase>test-compile</phase>
+                        <goals>
+                            <goal>test-compile</goal>
+                        </goals>
+                    </execution>
+                </executions>
                 <configuration>
                     <jvmTarget>${java.version}</jvmTarget>
+                    <javaParameters>true</javaParameters>
                     <args>
                         <arg>-Xjsr305=strict</arg>
                     </args>
@@ -230,10 +348,20 @@
                     </dependency>
                 </dependencies>
             </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+            </plugin>
+
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
-                <version>${jacoco.version}</version>
                 <executions>
                     <execution>
                         <id>prepare-agent</id>
@@ -261,7 +389,7 @@
                         <!-- Boot entrypoint / pure config wiring -->
                         <exclude>org/jrtech/platformmanagement/PlatformManagementServiceApplication*</exclude>
                         <exclude>org/jrtech/platformmanagement/config/UtcTimeConfig*</exclude>
-                                        <!-- Thin Azure SDK adapter; integration requires live storage account -->
+                        <!-- Thin Azure SDK adapter; integration requires live storage account -->
                         <exclude>org/jrtech/platformmanagement/ingestion/AzureBlobStorageClientImpl*</exclude>
                         <exclude>org/jrtech/platformmanagement/ingestion/ConsumptionImportConfig*</exclude>
                         <!-- Live Microsoft Graph / credential wiring -->

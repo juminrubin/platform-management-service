@@ -2,7 +2,7 @@
 #
 # Required environment:
 #   APP_AZURE_TENANT_ID       Entra directory (tenant) GUID
-#   APP_AZURE_API_CLIENT_ID   API app registration application (client) ID
+#   APP_API_CLIENT_ID   API app registration application (client) ID
 #
 # Optional:
 #   APP_AZURE_REQUIRED_SCOPE  Extra filter-layer gate (e.g. access_as_user); leave empty to
@@ -11,12 +11,16 @@
 #   app.security.group-role-mappings / application-registrations — map Entra groups
 #     and OAuth scopes from Application Registration IDs (see comments near app.security)
 #   APP_ENTRA_DIRECTORY_ENABLED=true — load members of groups named Platform-System-* via Graph
-#   APP_AZURE_GRAPH_CLIENT_ID / APP_AZURE_GRAPH_CLIENT_SECRET — optional Graph credential
-#     (else DefaultAzureCredential / managed identity)
+#   Azure credential (shared by Graph / Blob / Event Hub) — inferred from fields:
+#     client-id  ← APP_UAMI_CLIENT_ID or AZURE_CLIENT_ID
+#     1. client-id + AZURE_CLIENT_SECRET → service principal (username + password)
+#     2. client-id only → UAMI
+#     3. otherwise → SAMI
+#     AZURE_TENANT_ID required for service principal
 #
 # Run:
 #   export APP_AZURE_TENANT_ID=...
-#   export APP_AZURE_API_CLIENT_ID=...
+#   export APP_API_CLIENT_ID=...
 #   mvn spring-boot:run
 #
 # Tokens: scripts/get-token-human.sh | scripts/get-token-mi.sh
@@ -69,8 +73,8 @@ spring:
           issuer-uri: https://login.microsoftonline.com/${APP_AZURE_TENANT_ID}/v2.0
           # Entra may issue aud as the bare client id or as api://<client-id>
           audiences:
-            - ${APP_AZURE_API_CLIENT_ID}
-            - api://${APP_AZURE_API_CLIENT_ID}
+            - ${APP_API_CLIENT_ID}
+            - api://${APP_API_CLIENT_ID}
 
 server:
   port: 8080
@@ -147,12 +151,12 @@ app:
     #
     # Per Application Registration (client) ID: expected OAuth scopes + group→role map.
     # Matched against token azp / appid / aud. Defaults include the API app registration
-    # with the common delegated scope when APP_AZURE_API_CLIENT_ID is set.
+    # with the common delegated scope when APP_API_CLIENT_ID is set.
     application-registrations:
-      - client-id: ${APP_AZURE_API_CLIENT_ID:}
+      - client-id: ${APP_API_CLIENT_ID:}
         oauth-scopes:
           - access_as_user
-          - api://${APP_AZURE_API_CLIENT_ID:}/access_as_user
+          - api://${APP_API_CLIENT_ID:}/access_as_user
         # group-role-mappings:
         #   "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee":
         #     - System.Maintainer
@@ -172,7 +176,7 @@ app:
   #   Group.Read.All + GroupMember.Read.All + User.Read.All
   #   (or Directory.Read.All alone — covers user profile attributes on members)
   # Members are loaded via /members/microsoft.graph.user and may hydrate via GET /users/{id}.
-  # Auth: client secret (APP_AZURE_GRAPH_CLIENT_ID/SECRET) or DefaultAzureCredential (MI).
+  # Auth: app.azure.credential (UAMI → service principal → SAMI).
   entra-directory:
     enabled: ${APP_ENTRA_DIRECTORY_ENABLED:true}
     group-name-prefix: ${APP_ENTRA_GROUP_NAME_PREFIX:Platform-System-}
@@ -182,13 +186,19 @@ app:
     # Arm connector on boot (initial load + schedule). Prefer true so auth has a warm cache.
     auto-start: ${APP_ENTRA_DIRECTORY_AUTO_START:true}
     graph-base-url: ${APP_ENTRA_GRAPH_BASE_URL:https://graph.microsoft.com/v1.0}
-    tenant-id: ${AZURE_TENANT_ID}
-    client-id: ${AZURE_CLIENT_ID:}
-    client-secret: ${AZURE_CLIENT_SECRET:}
+
+  # Shared Azure TokenCredential (Graph, Blob, Event Hub).
+  # client-id is shared: APP_UAMI_CLIENT_ID (UAMI) or AZURE_CLIENT_ID (SP / WI UAMI).
+  # Mode: client-id+secret → SP; client-id only → UAMI; else → SAMI.
+  azure:
+    credential:
+      client-id: ${APP_UAMI_CLIENT_ID:${AZURE_CLIENT_ID:}}
+      client-secret: ${AZURE_CLIENT_SECRET:}
+      tenant-id: ${AZURE_TENANT_ID:}
 
   # Background import of consumption Avro files from Azure Blob Storage (legacy keys).
   # Prefer app.connectors.consumption-blob.* going forward (see design doc).
-  # Auth: Managed Identity via account URL (prod); connection string optional for local only.
+  # Auth: app.azure.credential (UAMI/SP/SAMI); connection string optional for local only.
   consumption-import:
     enabled: ${APP_CONSUMPTION_IMPORT_ENABLED:false}
     connection-string: ${APP_AZURE_STORAGE_CONNECTION_STRING:}
@@ -199,7 +209,7 @@ app:
     max-blobs-per-run: ${APP_CONSUMPTION_IMPORT_MAX_BLOBS:20}
     require-avro-extension: true
 
-  # Connectors (integrations). Defaults off; Blob/EH use Managed Identity in production.
+  # Connectors (integrations). Defaults off; Blob/EH use app.azure.credential in production.
   # Unified control plane (System.Maintainer):
   #   GET  /api/v1/connectors
   #   GET  /api/v1/connectors/{id}           # runtime info + log snapshot (≤32KB)
@@ -228,7 +238,7 @@ app:
       enabled: ${APP_CONNECTOR_BLOB_ENABLED:false}
       runner-enabled: ${APP_CONNECTOR_BLOB_RUNNER_ENABLED:false}
       storage-account-url: ${APP_CONNECTOR_BLOB_ACCOUNT_URL:}
-      # Optional local-only override; prefer Managed Identity + storage-account-url in prod
+      # Optional local-only override; prefer TokenCredential + storage-account-url in prod
       connection-string: ${APP_CONNECTOR_BLOB_CONNECTION_STRING:${APP_AZURE_STORAGE_CONNECTION_STRING:}}
       container: ${APP_CONNECTOR_BLOB_CONTAINER:}
       # Prefer list form (YAML) or APP_CONNECTOR_BLOB_PREFIXES_0 / _1 / …

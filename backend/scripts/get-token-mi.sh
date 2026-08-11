@@ -3,16 +3,16 @@
 # Managed Identity (IMDS / az identity) or a local service principal (client credentials).
 #
 # The identity must have an API app role assigned (e.g. Consumption.Registrator).
-# Application tokens use scope api://{APP_AZURE_API_CLIENT_ID}/.default and carry `roles`.
+# Application tokens use scope api://{APP_API_CLIENT_ID}/.default and carry `roles`.
 #
 # Prerequisites:
-#   - APP_AZURE_API_CLIENT_ID
+#   - APP_API_CLIENT_ID
 #   - APP_AZURE_TENANT_ID (client-credentials method)
 #   - On Azure: managed identity enabled (imds / az-identity)
 #   - Local stand-in: AZURE_TECH_CLIENT_ID + AZURE_TECH_CLIENT_SECRET
 #
 # Usage:
-#   export APP_AZURE_API_CLIENT_ID=...
+#   export APP_API_CLIENT_ID=...
 #   ./scripts/get-token-mi.sh [--method imds|az-identity|client-credentials] [options]
 #
 # Examples:
@@ -51,13 +51,13 @@ Usage: $(basename "$0") [options]
 Obtain an application access token (Managed Identity or service principal).
 
 Environment:
-  APP_AZURE_API_CLIENT_ID        API app registration client ID (required)
+  APP_API_CLIENT_ID        API app registration client ID (required)
   APP_AZURE_TENANT_ID            Tenant GUID (required for client-credentials)
   AZURE_MI_CLIENT_ID         User-assigned MI client id (optional; imds / az-identity)
   AZURE_TECH_CLIENT_ID       Service principal client id (client-credentials)
   AZURE_TECH_CLIENT_SECRET   Service principal secret (client-credentials)
-  MI_RESOURCE                Override resource (default: api://\$APP_AZURE_API_CLIENT_ID)
-  MI_SCOPE                   Override scope (default: api://\$APP_AZURE_API_CLIENT_ID/.default)
+  MI_RESOURCE                Override resource (default: api://\$APP_API_CLIENT_ID)
+  MI_SCOPE                   Override scope (default: api://\$APP_API_CLIENT_ID/.default)
 
 Options:
   --method imds              Azure Instance Metadata Service (default on Azure hosts)
@@ -99,10 +99,10 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-token_require_env APP_AZURE_API_CLIENT_ID
+token_require_env APP_API_CLIENT_ID
 
-MI_RESOURCE="${MI_RESOURCE:-api://${APP_AZURE_API_CLIENT_ID}}"
-MI_SCOPE="${MI_SCOPE:-api://${APP_AZURE_API_CLIENT_ID}/.default}"
+MI_RESOURCE="${MI_RESOURCE:-api://${APP_API_CLIENT_ID}}"
+MI_SCOPE="${MI_SCOPE:-api://${APP_API_CLIENT_ID}/.default}"
 
 imds_reachable() {
   curl -sS -m 1 -o /dev/null -w '' \

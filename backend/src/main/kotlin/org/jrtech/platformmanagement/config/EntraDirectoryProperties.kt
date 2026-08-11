@@ -13,9 +13,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties
  * User profile fields on members require `User.Read.All` (or Directory.Read.All).
  * The client also casts members to `microsoft.graph.user` and may hydrate via `GET /users/{id}`.
  *
- * Auth (in order of preference when [enabled] is true):
- * 1. Client secret: [clientId] + [clientSecret] + [tenantId]
- * 2. Otherwise [DefaultAzureCredential] (managed identity, `az login`, …)
+ * Auth uses shared [org.jrtech.platformmanagement.config.azure.AzureCredentialFactory]
+ * (`app.azure.credential`: UAMI → service principal → SAMI).
  *
  * Lifecycle (connector `entra-directory`):
  * - [autoStart] arms the connector on application ready (initial Graph load + schedule)
@@ -53,20 +52,5 @@ data class EntraDirectoryProperties(
      */
     val autoStart: Boolean = true,
 
-    val graphBaseUrl: String = "https://graph.microsoft.com/v1.0",
-
-    /** Entra tenant for client-credentials Graph tokens. Defaults from APP_AZURE_TENANT_ID. */
-    val tenantId: String = "",
-
-    /**
-     * App registration / managed identity client id used to call Graph.
-     * Defaults from APP_AZURE_GRAPH_CLIENT_ID or APP_AZURE_API_CLIENT_ID.
-     */
-    val clientId: String = "",
-
-    /**
-     * Optional client secret for confidential client credentials.
-     * Leave empty to use DefaultAzureCredential (MI / developer login).
-     */
-    val clientSecret: String = "",
+    val graphBaseUrl: String = "https://graph.microsoft.com/v1.0"
 )

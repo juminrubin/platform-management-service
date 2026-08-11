@@ -1,6 +1,8 @@
 package org.jrtech.platformmanagement.connectors.entra
 
 import org.jrtech.platformmanagement.config.EntraDirectoryProperties
+import org.jrtech.platformmanagement.config.azure.AzureCredentialFactory
+import org.jrtech.platformmanagement.config.azure.AzureCredentialProperties
 import org.jrtech.platformmanagement.connectors.ConnectorHealthView
 import org.jrtech.platformmanagement.connectors.ConnectorId
 import org.jrtech.platformmanagement.connectors.runtime.ConnectorConfigSupport
@@ -34,6 +36,7 @@ import java.util.concurrent.atomic.AtomicReference
 @Service
 class EntraDirectoryConnector(
     private val properties: EntraDirectoryProperties,
+    private val azureCredential: AzureCredentialProperties,
     private val directoryService: EntraGroupDirectoryService,
     private val taskScheduler: TaskScheduler
 ) : ManagedConnector {
@@ -158,9 +161,10 @@ class EntraDirectoryConnector(
         "groupNamePrefix" to properties.groupNamePrefix,
         "includeTransitiveMembers" to properties.includeTransitiveMembers,
         "refreshIntervalMs" to effectiveRefreshIntervalMs(),
-        "tenantIdConfigured" to properties.tenantId.isNotBlank(),
-        "clientIdConfigured" to properties.clientId.isNotBlank(),
-        "clientSecretConfigured" to properties.clientSecret.isNotBlank(),
+        "azureCredentialMode" to AzureCredentialFactory.resolve(azureCredential).name,
+        "clientIdConfigured" to azureCredential.hasClientId(),
+        "servicePrincipalConfigured" to azureCredential.hasServicePrincipalPair(),
+        "tenantIdConfigured" to azureCredential.tenantIdOrEmpty().isNotEmpty(),
         "dataPlane" to listOf("/api/v1/entra/groups", "/api/v1/entra/members")
     )
 

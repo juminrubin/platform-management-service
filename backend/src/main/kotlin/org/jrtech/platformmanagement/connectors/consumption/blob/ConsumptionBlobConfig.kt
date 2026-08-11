@@ -1,5 +1,7 @@
 package org.jrtech.platformmanagement.connectors.consumption.blob
 
+import org.jrtech.platformmanagement.config.azure.AzureCredentialFactory
+import org.jrtech.platformmanagement.config.azure.AzureCredentialProperties
 import org.jrtech.platformmanagement.connectors.config.ConnectorsProperties
 import org.jrtech.platformmanagement.logging.logger
 import org.springframework.context.annotation.Bean
@@ -12,7 +14,8 @@ class ConsumptionBlobConfig {
 
     @Bean
     fun consumptionBlobStorageClient(
-        connectorsProperties: ConnectorsProperties
+        connectorsProperties: ConnectorsProperties,
+        sharedCredential: AzureCredentialProperties
     ): ConsumptionBlobStorageClient? {
         val props = connectorsProperties.consumptionBlob
         if (!props.enabled || !props.isConfigured()) {
@@ -23,6 +26,11 @@ class ConsumptionBlobConfig {
             )
             return null
         }
-        return AzureConsumptionBlobStorageClient(props)
+        val tokenCredential = if (props.connectionString.trim().isEmpty()) {
+            AzureCredentialFactory.create(sharedCredential, purpose = "consumption-blob")
+        } else {
+            null
+        }
+        return AzureConsumptionBlobStorageClient(props, tokenCredential)
     }
 }

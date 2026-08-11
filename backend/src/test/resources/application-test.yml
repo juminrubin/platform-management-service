@@ -43,6 +43,11 @@ app:
     # Unit / @DataJpaTest slices: no JWT required.
     # Role-based security tests set permit-all=false via @TestPropertySource.
     permit-all: true
+  azure:
+    credential:
+      client-id: ""
+      client-secret: ""
+      tenant-id: ""
   entra-directory:
     # No live Microsoft Graph calls in tests; unit tests inject mock Graph clients.
     enabled: false

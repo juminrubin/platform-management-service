@@ -38,7 +38,7 @@ import java.net.InetAddress
  * Clients obtain tokens from login.microsoftonline.com and present them as:
  * Authorization: Bearer access_token
  *
- * JWT issuer/audience come from application.yml (APP_AZURE_TENANT_ID, APP_AZURE_API_CLIENT_ID).
+ * JWT issuer/audience come from application.yml (APP_AZURE_TENANT_ID, APP_API_CLIENT_ID).
  * app.security.permit-all=true is only for automated tests, never for runtime.
  *
  * OpenAPI / Swagger UI is on a separate public filter chain (no JWT required to open docs).
