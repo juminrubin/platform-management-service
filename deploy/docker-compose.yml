@@ -2,10 +2,10 @@
 #
 # Prerequisites:
 #   export APP_AZURE_TENANT_ID=...
-#   export APP_AZURE_API_CLIENT_ID=...
+#   export APP_API_CLIENT_ID=...
 #   # UI SPA app registration (public client):
-#   export APP_AZURE_CLIENT_ID=...
-#   export APP_AZURE_API_SCOPE=api://$APP_AZURE_API_CLIENT_ID/access_as_user
+#   export APP_CLIENT_ID=...
+#   export APP_API_SCOPE=api://$APP_API_CLIENT_ID/access_as_user
 #   export APP_API_BASE_URL=http://localhost:8080
 #
 # Run from repo root:
@@ -22,7 +22,7 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: k8s
       APP_AZURE_TENANT_ID: ${APP_AZURE_TENANT_ID}
-      APP_AZURE_API_CLIENT_ID: ${APP_AZURE_API_CLIENT_ID}
+      APP_API_CLIENT_ID: ${APP_API_CLIENT_ID}
       APP_CORS_ALLOWED_ORIGINS: http://localhost:3000,http://localhost
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/actuator/health"]
@@ -39,8 +39,8 @@ services:
       - "3000:80"
     environment:
       APP_AZURE_TENANT_ID: ${APP_AZURE_TENANT_ID}
-      APP_AZURE_CLIENT_ID: ${APP_AZURE_CLIENT_ID}
-      APP_AZURE_API_SCOPE: ${APP_AZURE_API_SCOPE:-api://${APP_AZURE_API_CLIENT_ID}/access_as_user}
+      APP_CLIENT_ID: ${APP_CLIENT_ID}
+      APP_API_SCOPE: ${APP_API_SCOPE:-api://${APP_API_CLIENT_ID}/access_as_user}
       APP_API_BASE_URL: ${APP_API_BASE_URL:-http://localhost:8080}
     depends_on:
       api:

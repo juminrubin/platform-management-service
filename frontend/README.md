@@ -2,17 +2,22 @@
 
 React + TypeScript + Vite SPA using **MSAL** (Microsoft Entra ID).
 
+Monorepo overview and shared env names: [../README.md](../README.md).
+
 ## Setup
 
 ```bash
 cp .env.example .env
-# Set SPA client id, tenant, API scope (api://<API_CLIENT_ID>/access_as_user)
+# Set APP_AZURE_TENANT_ID, APP_CLIENT_ID, APP_API_SCOPE
+# APP_API_SCOPE is typically api://<APP_API_CLIENT_ID>/access_as_user
 npm install
 npm run dev
 ```
 
 Dev server: http://localhost:3000  
 Proxies `/api` and `/actuator` to `http://localhost:8080`.
+
+Signed-in Maintainers can browse domain entities and the **Connectors** pages (`/connectors`). Readers get list/detail only. Catalog seed is not a UI flow — use [`../scripts/seed-datasource.py`](../scripts/seed-datasource.py).
 
 ## Tests
 
@@ -68,13 +73,13 @@ cd dist && zip -r ../ui.zip .
 az webapp deploy --resource-group <rg> --name <app> --src-path ../ui.zip
 ```
 
-Set these **application settings** on the Web App (Linux Node 20+):
+Set these **application settings** on the Web App (Linux Node 20+). Same names as Vite `.env`, `server.mjs`, the nginx image, and `deploy/docker-compose.yml` — nothing is baked in as `VITE_*` at build time.
 
 | Variable | Purpose |
 |---|---|
 | `APP_AZURE_TENANT_ID` | Entra tenant GUID |
 | `APP_CLIENT_ID` | SPA app registration client ID |
-| `APP_API_SCOPE` | Delegated API scope (`api://<API_CLIENT_ID>/access_as_user`) |
+| `APP_API_SCOPE` | Delegated API scope (`api://<APP_API_CLIENT_ID>/access_as_user`) |
 | `APP_API_BASE_URL` | Backend origin this process proxies `/api` to (not the UI listen address) |
 | `PORT` | UI listen port (Azure sets this; locally defaults to **3000**) |
 

@@ -33,16 +33,16 @@ spec:
                 secretKeyRef:
                   name: platform-management-service-secrets
                   key: APP_AZURE_TENANT_ID
-            - name: APP_AZURE_CLIENT_ID
+            - name: APP_CLIENT_ID
               valueFrom:
                 secretKeyRef:
                   name: platform-management-service-secrets
-                  key: APP_AZURE_CLIENT_ID
-            - name: APP_AZURE_API_SCOPE
+                  key: APP_CLIENT_ID
+            - name: APP_API_SCOPE
               valueFrom:
                 secretKeyRef:
                   name: platform-management-service-secrets
-                  key: APP_AZURE_API_SCOPE
+                  key: APP_API_SCOPE
             - name: APP_API_BASE_URL
               valueFrom:
                 configMapKeyRef:

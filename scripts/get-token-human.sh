@@ -7,13 +7,13 @@
 #
 # Prerequisites:
 #   - APP_AZURE_TENANT_ID
-#   - APP_AZURE_API_CLIENT_ID   (API app registration client id)
+#   - APP_API_CLIENT_ID         (API app registration client id)
 #   - For device-code: AZURE_HUMAN_CLIENT_ID (public/SPA client with access_as_user)
 #   - Azure CLI (method az-cli) or curl + jq (method device-code)
 #
 # Usage (from monorepo root):
 #   export APP_AZURE_TENANT_ID=...
-#   export APP_AZURE_API_CLIENT_ID=...
+#   export APP_API_CLIENT_ID=...
 #   ./scripts/get-token-human.sh [--method az-cli|device-code] [--print-claims] [--export]
 #
 # Examples:
@@ -42,9 +42,9 @@ Obtain a delegated access token for a human user against the Platform Management
 
 Environment:
   APP_AZURE_TENANT_ID          Entra tenant GUID (required)
-  APP_AZURE_API_CLIENT_ID      API app registration client ID (required)
+  APP_API_CLIENT_ID            API app registration client ID (required)
   AZURE_HUMAN_CLIENT_ID        Public/SPA client ID (required for --method device-code)
-  API_SCOPE                    Override scope (default: api://\$APP_AZURE_API_CLIENT_ID/access_as_user)
+  API_SCOPE                    Override scope (default: api://\$APP_API_CLIENT_ID/access_as_user)
 
 Options:
   --method az-cli          Use Azure CLI (default). Runs az login if needed.
@@ -53,7 +53,7 @@ $(token_usage_common_flags)
 
 Examples:
   export APP_AZURE_TENANT_ID=...
-  export APP_AZURE_API_CLIENT_ID=...
+  export APP_API_CLIENT_ID=...
 
   # Interactive Azure CLI login → token on stdout
   TOKEN=\$(./scripts/get-token-human.sh)
@@ -98,10 +98,10 @@ while [[ $# -gt 0 ]]; do
 done
 
 token_require_env APP_AZURE_TENANT_ID
-token_require_env APP_AZURE_API_CLIENT_ID
+APP_API_CLIENT_ID="$(token_api_client_id)"
 
-API_SCOPE="${API_SCOPE:-api://${APP_AZURE_API_CLIENT_ID}/access_as_user}"
-API_RESOURCE="api://${APP_AZURE_API_CLIENT_ID}"
+API_SCOPE="${API_SCOPE:-api://${APP_API_CLIENT_ID}/access_as_user}"
+API_RESOURCE="api://${APP_API_CLIENT_ID}"
 
 get_token_az_cli() {
   token_require_cmd az

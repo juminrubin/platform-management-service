@@ -93,16 +93,16 @@ eval "$(./scripts/get-token-human.sh --export)"
 |-------------|--------|
 | **Azure CLI** | Default method (`az-cli`) |
 | **curl + jq** | Required for `--method device-code` |
-| Entra **API** app registration | `APP_AZURE_API_CLIENT_ID` |
+| Entra **API** app registration | `APP_API_CLIENT_ID` |
 | Entra **tenant** | `APP_AZURE_TENANT_ID` |
 | Human user in a **security group** assigned an API **app role** | e.g. `System.Maintainer` |
 | Public/SPA client (device-code only) | `AZURE_HUMAN_CLIENT_ID` with delegated scope `access_as_user` |
 
 ```bash
 export APP_AZURE_TENANT_ID=<tenant-guid>
-export APP_AZURE_API_CLIENT_ID=<api-app-client-id>
+export APP_API_CLIENT_ID=<api-app-client-id>
 # optional override:
-# export API_SCOPE=api://${APP_AZURE_API_CLIENT_ID}/access_as_user
+# export API_SCOPE=api://${APP_API_CLIENT_ID}/access_as_user
 ```
 
 ## Quick start
@@ -129,7 +129,7 @@ curl -s http://localhost:8080/api/v1/auth/me -H "Authorization: Bearer $TOKEN" |
 ### `az-cli` (default)
 
 Uses `az login` (interactive if needed) and `az account get-access-token` for scope  
-`api://{APP_AZURE_API_CLIENT_ID}/access_as_user`.
+`api://{APP_API_CLIENT_ID}/access_as_user`.
 
 ```bash
 ./scripts/get-token-human.sh --method az-cli --print-claims

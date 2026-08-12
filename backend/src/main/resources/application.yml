@@ -209,7 +209,7 @@ app:
   #   GET  /api/v1/connectors/{id}           # runtime info + log snapshot (≤32KB)
   #   GET|PUT /api/v1/connectors/{id}/config
   #   POST /api/v1/connectors/{id}/start|stop
-  # ids: consumption-storage | consumption-eventhub | entra-directory
+  # ids: datasource-loading | consumption-storage | consumption-eventhub | entra-directory
   # Data plane (not under /connectors):
   #   entra-directory → /api/v1/entra/groups|members
   #   consumption-storage → /api/v1/consumption/blob (+ domain /api/v1/consumptions)

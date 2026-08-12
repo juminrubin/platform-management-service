@@ -41,7 +41,7 @@ Token options:
   --print-claims                Show claims on stderr before running the command
 
 Environment (same as get-token-human.sh):
-  APP_AZURE_TENANT_ID, APP_AZURE_API_CLIENT_ID, optional AZURE_HUMAN_CLIENT_ID / API_SCOPE
+  APP_AZURE_TENANT_ID, APP_API_CLIENT_ID, optional AZURE_HUMAN_CLIENT_ID / API_SCOPE
 
 EOF
       exit 0

@@ -19,6 +19,17 @@ token_require_env() {
   fi
 }
 
+# Canonical: APP_API_CLIENT_ID.
+token_api_client_id() {
+  if [[ -n "${APP_API_CLIENT_ID:-}" ]]; then
+    printf '%s' "${APP_API_CLIENT_ID}"
+    return 0
+  fi
+  echo "error: environment variable APP_API_CLIENT_ID is required" >&2
+  echo "       export APP_API_CLIENT_ID=..." >&2
+  exit 1
+}
+
 # Decode JWT payload (middle segment) as JSON on stdout. Best-effort base64url.
 token_decode_jwt_payload() {
   local jwt="$1"

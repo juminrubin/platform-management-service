@@ -1,7 +1,7 @@
 # Platform Management Service — GitLab CI/CD setup
 
 Pipeline definition: [`.gitlab-ci.yml`](../../.gitlab-ci.yml)  
-Deploy script: [`scripts/ci-deploy.sh`](../../scripts/ci-deploy.sh)
+Deploy script: [`deploy/scripts/ci-deploy.sh`](../../deploy/scripts/ci-deploy.sh)
 
 ## Pipeline overview
 
@@ -37,7 +37,7 @@ validate:compile → test:unit → package:image → security:trivy → deploy:s
 | Variable | Purpose |
 |----------|---------|
 | `APP_AZURE_TENANT_ID` | Tenant ID used by Platform Management Service JWT validation |
-| `APP_AZURE_API_CLIENT_ID` | API app client ID (JWT `aud`) |
+| `APP_API_CLIENT_ID` | API app client ID (JWT `aud`) |
 
 ### Optional
 
@@ -53,16 +53,16 @@ validate:compile → test:unit → package:image → security:trivy → deploy:s
 
 ```bash
 export APP_AZURE_TENANT_ID=...
-export APP_AZURE_API_CLIENT_ID=...
+export APP_API_CLIENT_ID=...
 export DEPLOY_IMAGE=registry.example.com/platform-management-service
 export DEPLOY_IMAGE_TAG=dev
-./scripts/ci-deploy.sh
+./deploy/scripts/ci-deploy.sh
 ```
 
 Or:
 
 ```bash
 export APP_AZURE_TENANT_ID=...
-export APP_AZURE_API_CLIENT_ID=...
-./scripts/deploy-aks.sh mycompanyacr.azurecr.io 1.0.0
+export APP_API_CLIENT_ID=...
+./deploy/scripts/deploy-aks.sh mycompanyacr.azurecr.io 1.0.0
 ```

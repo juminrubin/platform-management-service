@@ -3,7 +3,7 @@
 #
 # Usage:
 #   export APP_AZURE_TENANT_ID=...
-#   export APP_AZURE_API_CLIENT_ID=...
+#   export APP_API_CLIENT_ID=...
 #   ./scripts/deploy-aks.sh [acr-login-server] [tag]
 #
 # Example:
@@ -16,8 +16,9 @@ TAG="${2:-1.0.0}"
 NAMESPACE="platform-management"
 DEPLOY_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-if [[ -z "${APP_AZURE_TENANT_ID:-}" || -z "${APP_AZURE_API_CLIENT_ID:-}" ]]; then
-  echo "Set APP_AZURE_TENANT_ID and APP_AZURE_API_CLIENT_ID before deploying." >&2
+APP_API_CLIENT_ID="${APP_API_CLIENT_ID:-}"
+if [[ -z "${APP_AZURE_TENANT_ID:-}" || -z "${APP_API_CLIENT_ID}" ]]; then
+  echo "Set APP_AZURE_TENANT_ID and APP_API_CLIENT_ID before deploying." >&2
   exit 1
 fi
 
@@ -30,7 +31,7 @@ echo "==> Creating / updating secrets"
 kubectl create secret generic platform-management-service-secrets \
   --namespace "${NAMESPACE}" \
   --from-literal=APP_AZURE_TENANT_ID="${APP_AZURE_TENANT_ID}" \
-  --from-literal=APP_AZURE_API_CLIENT_ID="${APP_AZURE_API_CLIENT_ID}" \
+  --from-literal=APP_API_CLIENT_ID="${APP_API_CLIENT_ID}" \
   --dry-run=client -o yaml | kubectl apply -f -
 
 echo "==> Deploying application image ${ACR_LOGIN_SERVER}/platform-management-service:${TAG}"

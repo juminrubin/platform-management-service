@@ -20,7 +20,7 @@
 #
 #   App secrets applied to the cluster:
 #     APP_AZURE_TENANT_ID        Tenant ID for Entra JWT (application.yml)
-#     APP_AZURE_API_CLIENT_ID    API app registration client ID (JWT audience)
+#     APP_API_CLIENT_ID          API app registration client ID (JWT audience)
 #
 #   Optional:
 #     ACR_NAME                   If set, also push image to Azure Container Registry

@@ -2,31 +2,53 @@
 
 | Field | Value |
 |-------|--------|
-| **Document** | Connector architecture (Entra, Blob Avro backfill, Event Hub live) |
+| **Document** | Connector architecture (Entra, Blob Avro backfill, Event Hub live, datasource loading) |
 | **Author** | _(TBD)_ |
-| **Date** | 2026-08-01 |
-| **Status** | Draft (rev 4 — H2 local; Azure PG Flex Server prod; MI for Blob/EH) |
+| **Date** | 2026-08-12 |
+| **Status** | Implemented (rev 5 — Azure Table catalog; connectors shipped) |
 | **Audience** | Senior engineers familiar with this codebase |
 | **Related code** | `backend/src/main/kotlin/org/jrtech/platformmanagement/` |
+| **Related** | [technology-considerations.md](./technology-considerations.md) · [backend/README.md](../../backend/README.md) · [root README](../../README.md) |
+
+---
+
+## Current implementation (rev 5)
+
+Rev 4 locked local **H2** and production **Azure PostgreSQL Flexible Server** with Flyway. That persistence decision is **superseded**.
+
+| Concern | Current (this repo) |
+|---------|---------------------|
+| Catalog / consumption store (local/CI) | **In-memory** process store (`APP_AZURE_TABLE_ENABLED=false`) |
+| Catalog / consumption store (production) | **Azure Table Storage** (`APP_AZURE_TABLE_ENABLED=true`) |
+| Schema / migrations | **No JDBC / H2 / Flyway.** `backend/src/main/resources/db/migration/` is leftover unused SQL. Uniqueness is enforced in application code. |
+| Catalog seed | **External only** — `scripts/seed-datasource.py` (Table or REST). The app never loads `datasource.json`. |
+| Entitlement check cache | **datasource-loading** connector rebuilds in-process maps from the durable store (hourly, auto-start). |
+| Entra directory | **Implemented** (`entra/` + connector `entra-directory`) |
+| Blob Capture backfill | **Implemented** (`consumption-storage`; default off) |
+| Event Hub continuous | **Implemented** (`consumption-eventhub`; default off) |
+| Control plane | `GET/POST /api/v1/connectors/{id}` — start/stop/config/health |
+| Azure data plane | **Managed Identity** (UAMI / SAMI / SP via `app.azure.credential`) |
+
+The sections below still describe the dual-path decode, producer `source_ref_id` contract, MI RBAC, and slim connector SPI — those remain valid. Treat **H2**, **PostgreSQL Flex**, **Flyway**, **job-claim SQL**, and “aspirational `ingestion/`” as **historical rev 4** unless a later note says otherwise.
 
 ---
 
 ## Overview
 
-The Platform Management Service already integrates **Microsoft Entra ID / Graph** for group-based human authorization and plans **Azure Blob Avro** import for consumption history, while live consumption is registered today only via **POST `/api/v1/consumptions`**. The configuration and domain hooks for blob import exist (`app.consumption-import.*`, `ConsumptionService.createFromImport`), but the `ingestion/` package, Avro schema file, and checkpoint table are **aspirational**—documented in `backend/README.md` and partially prepared in `pom.xml` / `application.yml`, not present as production code.
+The Platform Management Service integrates **Microsoft Entra ID / Graph** for group-based human authorization and runs a **dual-path consumption pipeline**: Event Hub for live events and Event Hub **Capture** Avro in Blob for historical backfill. Direct registration remains available via **POST `/api/v1/consumptions`**.
 
-This design delivers a **production dual-path consumption pipeline** and a **minimal shared connector pattern**:
+Connectors in process today:
 
-1. **Blob historical load** — read Event Hub **Capture** blobs (platform envelope + business body), Maintainer-triggered **async** jobs with `fromDate` / `untilDate`.
-2. **Event Hub continuous** — live stream consumer with Blob checkpoint store, at-least-once + race-safe domain idempotency.
-3. **Entra directory** — remains the Graph cache for human auth; optional thin health facade later (not a blocking rehome).
-4. **Slim SPI** — enablement + health (+ metrics hooks); not a full connector platform before value lands.
+1. **Datasource loading** — rebuild entitlement-check cache from Table / memory. No in-app JSON seed.
+2. **Blob historical load** — read Capture Avro (platform envelope + business body), Maintainer-triggered range import.
+3. **Event Hub continuous** — live stream consumer with Blob checkpoint store, at-least-once + race-safe domain idempotency.
+4. **Entra directory** — Graph cache for human auth (`Platform-System-*` groups).
 
-Domain services stay pure: ingest adapters call `ConsumptionService` (race-hardened `createFromImport`). Dual-path Azure (EH Capture → Blob + live EH consumer) is a **good, industry-standard idea** when paired with a **two-layer decode**, **race-safe upsert**, and a **producer `source_ref_id` contract**.
+Domain services stay pure: ingest adapters call `ConsumptionService` (`createFromImport`). Dual-path Azure (EH Capture → Blob + live EH consumer) is a **good, industry-standard idea** when paired with a **two-layer decode**, **race-safe upsert**, and a **producer `source_ref_id` contract**.
 
-**Database (locked):** local/dev/CI keeps **H2** (`MODE=PostgreSQL`). **Production** uses **Azure Database for PostgreSQL Flexible Server** (shared durable state — multi-replica job claim is fine). Design and implement SQL for PostgreSQL-compatible Flyway; do not block the design on H2 multi-pod quirks.
+**Catalog store (locked, rev 5):** local/dev/CI uses **in-memory** repositories. Production uses **Azure Table Storage** so every pod shares the same catalog. Do not introduce JDBC/Flyway for this service.
 
-**Azure connectivity (locked):** Blob containers and Event Hubs are authorized with **Managed Identity** (AKS Workload Identity / `DefaultAzureCredential`). Prefer **no connection strings** for Blob/EH in production.
+**Azure connectivity (locked):** Blob, Event Hubs, Graph, and Table are authorized with **Managed Identity** (AKS Workload Identity / `app.azure.credential`). Prefer **no connection strings** in production.
 
 ---
 
@@ -36,31 +58,30 @@ Domain services stay pure: ingest adapters call `ConsumptionService` (race-harde
 
 | Area | Location | Reality |
 |------|----------|---------|
-| Entra Graph directory | `entra/` — `EntraGroupDirectoryService`, `MicrosoftGraphClient`, `EntraDirectoryConfig` | **Implemented**; scheduled refresh; feeds human auth |
-| Entra config | `config/EntraDirectoryProperties.kt`, `app.entra-directory.*` | **Implemented** |
+| Entra Graph directory | `entra/` + connector `entra-directory` | **Implemented**; scheduled refresh; feeds human auth |
 | Entra HTTP | `controller/EntraDirectoryController.kt` — `/api/v1/entra/*` | **Implemented** |
+| Datasource loading | `connectors/datasource/` | **Implemented**; cache rebuild only; default auto-start |
 | Consumption domain | `domain/ParticipantCallConsumption.kt` | `sourceRefId` unique, `capturedAt` vs `createdAt` |
-| Consumption write path | `service/ConsumptionService.kt` — `create` / `createFromImport` | Check-then-insert on PK + `sourceRefId`; **not race-safe** under concurrent writers |
+| Consumption write path | `service/ConsumptionService.kt` — `create` / `createFromImport` | Idempotent on `sourceRefId`; Table-backed uniqueness |
 | Consumption HTTP | `controller/ConsumptionController.kt` | POST requires `Consumption.Registrator` or Maintainer |
-| Blob import config | `application.yml` → `app.consumption-import.*` | **Config only**; default `enabled: false` |
-| Blob import code | README: `ingestion/ConsumptionAvroImportScheduler` → … | **Missing** (empty `test/.../ingestion/`, no main package, no `.avsc`) |
-| Checkpoint table | README: `ConsumptionAvroImportCheckpoint` | **Not in Flyway** (`V1.0` / `V1.1` only) |
-| Maven deps | `pom.xml`: Avro 1.12, `azure-storage-blob`, `azure-identity` | Present; **no Event Hubs SDK** yet |
+| Blob Capture connector | `connectors/consumption/blob/` (`consumption-storage`) | **Implemented**; default off |
+| Event Hub connector | `connectors/consumption/eventhub/` (`consumption-eventhub`) | **Implemented**; default off; Blob checkpoints |
+| Connector control plane | `controller/ConnectorsController.kt` | List / get / start / stop / config |
+| Persistence | `persistence/table/` + `persistence/memory/` | **Azure Table** or in-memory; no JDBC |
+| Catalog seed | `scripts/seed-datasource.py` | External; sample `scripts/fixtures/datasource.json` |
+| Maven deps | `pom.xml`: Avro, Blob, Event Hubs, Tables, Identity | Present |
 | Security | Always-on Entra JWT; `@PreAuthorize("@authz…")`; `AppRoles` | Must preserve |
 | Deploy topology | `deploy/k8s/deployment.yaml` | **`replicas: 2`**, `terminationGracePeriodSeconds: 45`; Workload Identity SA |
-| Database (local) | H2 in-memory (`MODE=PostgreSQL`) | Dev/CI only |
-| Database (production) | **Azure PostgreSQL Flexible Server** | Shared durable DB — jobs/checkpoints/claim work multi-replica |
-| Azure data plane auth | Workload Identity / MI | **Blob + Event Hubs via Managed Identity** (no prod connection strings) |
-| Scheduling | `EntraDirectoryConfig` `@EnableScheduling` | **No** `@EnableAsync` today |
-| Actuator exposure | `application.yml` | `health,info` only (no metrics endpoint exposed) |
-| NetworkPolicy egress | `deploy/k8s/networkpolicy.yaml` | `0.0.0.0/0:443` — Graph/Blob/EH HTTPS already allowed |
+| Azure data plane auth | `AzureCredentialFactory` (SP / UAMI / SAMI) | Graph + Blob + Event Hubs + Table; no prod connection strings |
+| Actuator exposure | `application.yml` | `health,info` only |
+| NetworkPolicy egress | `deploy/k8s/networkpolicy.yaml` | `0.0.0.0/0:443` — Graph/Blob/EH/Table HTTPS already allowed |
 
 ### Pain points
 
 1. **Incomplete consumption pipeline** — docs and deps promise blob import; production has only synchronous POST registration. Historical Capture data cannot be loaded without a new path.
 2. **Live vs historical mismatch** — services emit to Event Hub; Capture lands Avro in Blob. Without both paths, the platform either misses history or requires brittle one-shot scripts outside the service.
 3. **Long-running import risk** — a Maintainer HTTP call that streams months of Avro in-request will time out and is a DoS footgun even for trusted roles.
-4. **Prod DB is Azure PG Flex** — implement job claim for a **shared** PostgreSQL; local H2 remains single-process (acceptable for dev).
+4. **Shared catalog is Azure Table** — in-memory is single-process only; production must set `APP_AZURE_TABLE_ENABLED=true`.
 5. **Entra is a solid one-off** — works well for auth; forcing a large package rehome before consumption value is low ROI (optional later facade).
 
 ### Why change now
@@ -78,7 +99,7 @@ Production-scale consumption accounting needs:
 
 ### Goals
 
-1. Implement **Blob Avro historical load** as an **async job** API: `fromDate` / `untilDate`, **System.Maintainer only**, progress/cancel, rate/range guards; job state on **shared DB in prod (Azure PG Flex)**.
+1. Implement **Blob Avro historical load** as a **Maintainer** range API: `startDate` / `endDate`, rate/range guards; catalog/consumption rows on **Azure Table** (prod) or in-memory (local).
 2. Implement **Event Hub continuous** consumer with partition-safe checkpointing, at-least-once delivery, **race-safe** domain idempotency via `sourceRefId` (+ optional event id as PK).
 3. **Two-layer decode**: Capture envelope → body → business payload; shared normalizer to `CreateConsumptionRequest` + hardened `createFromImport`.
 4. **Producer contract** for dual-path: stable `source_ref_id` in both live and Capture body; rollout gate before enabling both continuous paths.
@@ -92,9 +113,9 @@ Production-scale consumption accounting needs:
 - Replacing POST `/api/v1/consumptions` (registrator path remains for direct/push clients).
 - Multi-tenant connector marketplace or plugin classloading; integrations are in-process Spring beans.
 - Guaranteed exactly-once end-to-end (we target **at-least-once + race-safe idempotent domain**).
-- Blocking product design on H2 multi-pod limitations — **prod is Azure PG Flex**; H2 is local/CI only.
+- Reintroducing JDBC / H2 / Azure PostgreSQL Flexible Server for this service — **prod catalog is Azure Table**.
 - Building a full ETL / data-warehouse; this service stores operational consumption rows only.
-- UI for connectors (API-first; frontend can follow later).
+- Building a connector marketplace. The SPA already has a Maintainer connector list/detail UI.
 - Large Entra package rehome as a prerequisite for consumption work.
 - Connection-string-based auth to Blob/EH in production (MI only).
 
@@ -128,7 +149,7 @@ Producers → Event Hub ──┬──► Live consumer (this service: Event Hu
 | **Double ingest** live + Capture | High | Stable `source_ref_id` in **body** for both paths (K10, K16); race-safe `createFromImport` (K17) |
 | **Check-then-insert races** | High | Catch unique violations → re-read → `created=false` (K17) |
 | **Missing `source_ref_id`** | High | Connector reject/invalid; dual continuous paths gated (K16) |
-| **Multi-replica without shared DB** | Medium (local only) | Prod = Azure PG Flex (shared); local H2 = single JVM; atomic job claim in SQL |
+| **Multi-replica without shared catalog** | Medium (local only) | Prod = Azure Table (shared); local in-memory = single JVM |
 | **FK / unique business-key failures** | High | Default skip+count policies (K19); do not depend on caller-offering-ts for dual-path (K20) |
 | **Ordering / lag** | Medium | No global order required; `captured_at` is business time |
 | **Checkpoint divergence** | Medium | EH Blob checkpoint store vs job/blob tables — never share cursors |
@@ -235,9 +256,10 @@ org.jrtech.platformmanagement
 ```kotlin
 // Slim v1 — connectors/ConnectorHealthContributor.kt
 enum class ConnectorId {
-  ENTRA_DIRECTORY,
-  CONSUMPTION_BLOB_AVRO,
-  CONSUMPTION_EVENT_HUB
+  ENTRA_DIRECTORY,          // entra-directory
+  CONSUMPTION_BLOB_AVRO,    // consumption-storage
+  CONSUMPTION_EVENT_HUB,    // consumption-eventhub
+  DATASOURCE_LOADING        // datasource-loading
 }
 
 data class ConnectorHealthView(
@@ -448,16 +470,18 @@ app.connectors.consumption-blob:
 
 ---
 
-## Database & job topology (locked)
+## Catalog store & job topology (locked, rev 5)
 
-### Decision (K18)
+### Decision (K18, superseded)
 
-| Environment | Database | Job topology |
+| Environment | Store | Topology |
 |-------------|----------|--------------|
-| **Local / CI** | **H2** in-memory (`MODE=PostgreSQL`) | Single JVM: API + `@Scheduled` runner together. No multi-pod job coordination required. |
-| **Production** | **Azure Database for PostgreSQL Flexible Server** | Shared durable store. Multi-replica API (`replicas: ≥1`) with **atomic job claim** (`UPDATE … WHERE status='QUEUED'` / `FOR UPDATE SKIP LOCKED`). Optional separate runner Deployment is valid. |
+| **Local / CI** | **In-memory** repositories (`APP_AZURE_TABLE_ENABLED=false`) | Single JVM. No multi-pod coordination. |
+| **Production** | **Azure Table Storage** (`APP_AZURE_TABLE_ENABLED=true`) | Shared durable store. Multi-replica API (`replicas: ≥1`). Each pod hydrates its entitlement-check cache via **datasource-loading**. |
 
-**Product lock (2026-08-01):** Keep developing against **H2** for convenience. **Do not design around H2 multi-replica limitations** — production replaces the datasource with **Azure PG Flexible Server**. Flyway SQL stays PostgreSQL-compatible (already `MODE=PostgreSQL`).
+**Product lock (2026-08-12):** Do **not** introduce JDBC, H2, Flyway, or Azure PostgreSQL Flexible Server. Uniqueness (`sourceRefId`, business keys) is enforced in repository/service code against Table (or the in-memory maps).
+
+> Rev 4 text below (H2 / PG Flex / Flyway job tables) is **historical**. Blob backfill in the current code is a Maintainer range GET on `consumption-storage`, not a SQL job-claim runner.
 
 ### Job claim (production)
 
@@ -485,7 +509,7 @@ On H2 local, the same claim code either runs single-threaded or falls back to a 
 |-------------|----------------------------|------------------|
 | Unit tests / default `application.yml` | `false` | **`false` (default)** |
 | Local profile | `true` when developing | **`true`** |
-| AKS + Azure PG Flex | `true` when ready | **`true`** (claim-safe multi-pod) |
+| AKS + Azure Table | `true` when ready | **`true`** (shared catalog; backfill is operator-triggered) |
 
 Default **`runner-enabled: false`** remains fail-closed for accidental enablement before Azure wiring (storage/EH/MI) is ready — not because of H2.
 
@@ -952,7 +976,7 @@ fun consumptionBlobEffectiveProps(
 | **Blob (EH checkpoint write)** | Same MI | **Separate** container; contributor only on checkpoint container |
 | **Event Hubs (receive)** | Same MI | Namespace + hub + consumer group |
 | **Graph (Entra directory)** | Existing Graph path (MI or app secret) | Unchanged |
-| **PostgreSQL Flex (prod)** | Prefer MI / Entra auth to Flex Server when available; password via Key Vault if interim | Datasource swap is ops; Flyway unchanged |
+| **Azure Table (prod catalog)** | Same `app.azure.credential` (MI) or local connection string | Shared store; no JDBC |
 
 Config sketch (prod):
 
@@ -982,7 +1006,7 @@ app:
 | Event Hub | **Azure Event Hubs Data Receiver** | Same MI |
 | Event Hub (producers only) | **Azure Event Hubs Data Sender** | **Producer** identities — **not** this API MI |
 | Graph (Entra directory) | Group.Read.All + GroupMember.Read.All (or Directory.Read.All) | Existing Graph credential / MI |
-| Azure PostgreSQL Flex (prod) | Appropriate data-plane access for the app identity | App MI / connection from Key Vault |
+| Azure Table (catalog) | **Storage Table Data Contributor** | App Workload Identity / user-assigned MI |
 
 - **Require separate checkpoint container** from Capture container.
 - Private endpoints optional; NetworkPolicy already allows egress 443.
@@ -1029,7 +1053,7 @@ EH down must **not** fail API liveness. Optional readiness subgroup for ops dash
 
 1. Deploy code with blob/EH **disabled**; MI + RBAC wired but connectors off.
 2. Harden `createFromImport` (race-safe) — safe anytime.
-3. Point prod datasource at **Azure PG Flex** (ops); confirm Flyway migrations apply.
+3. Point prod at **Azure Table** (`APP_AZURE_TABLE_ENABLED=true` + endpoint); seed via `scripts/seed-datasource.py`.
 4. Enable blob connector + `runner-enabled`; dry-run 1 day; then real small range.
 5. **Producer contract checklist** (`source_ref_id` in body) before dual continuous paths.
 6. Enable EH; watch duplicate metrics near Capture overlap.
@@ -1041,14 +1065,14 @@ EH down must **not** fail API liveness. Optional readiness subgroup for ops dash
 |------|----------|
 | Race-safe `createFromImport` + concurrency test | Yes |
 | `source_ref_id` present in live + Capture samples | Yes |
-| Azure PG Flex + atomic job claim (prod) | Yes for multi-replica backfill |
+| Azure Table enabled on every replica | Yes for multi-replica catalog |
 | MI roles on Capture container, checkpoint container, Event Hub | Yes |
 | Observability decision for lag | Yes for EH prod |
 
 ### Rollback
 
 - Disable connector flags; cancel jobs; EH processor stop on restart.
-- Additive Flyway only — no down migration.
+- Disable Table only if reverting to a single-node in-memory experiment — not a production rollback.
 
 ---
 
@@ -1060,7 +1084,7 @@ Resolved into Key Decisions where blocking. Remaining product choices:
 2. **Dry-run product need** — implemented as parse-only (see above); confirm UI later.
 3. **Relax `(caller, offering, captured_at)` unique** — recommended follow-up ticket; not blocking first backfill if failure policy holds.
 4. **Confirm Capture folder layout** for the actual hub (prefix strategy tuning only; two-layer decode still required).
-5. **PG Flex auth mode** — Entra/MI to Postgres vs password from Key Vault (ops preference; app uses Spring datasource either way).
+5. **Table auth mode** — Workload Identity vs connection string (ops preference; production should be MI + account endpoint).
 
 ---
 
@@ -1070,7 +1094,7 @@ Resolved into Key Decisions where blocking. Remaining product choices:
 |----------|-------------|
 | Consumption service | `backend/src/main/kotlin/.../service/ConsumptionService.kt` |
 | Consumption entity | `domain/ParticipantCallConsumption.kt` |
-| Schema uniques | `db/migration/V1.0__init_schema.sql` |
+| Schema uniques | Application-enforced (Azure Table / in-memory). Leftover `db/migration/V1.0__init_schema.sql` is unused. |
 | Entra package | `entra/*` |
 | Authz / roles | `security/Authz.kt`, `AppRoles.kt` |
 | Auth principal claims | `controller/AuthController.kt` |
@@ -1106,7 +1130,7 @@ Resolved into Key Decisions where blocking. Remaining product choices:
 | K15 | **Two-layer decode: Capture envelope → business body (JSON v1)** | Capture ≠ `consumption-event.avsc` |
 | K16 | **Dual continuous paths gated on producer `source_ref_id` contract** | NULL unique allows multi-NULL ghosts |
 | K17 | **Race-safe `createFromImport`** (catch unique violations → re-read → duplicate) | Concurrent EH + backfill + multi-pod |
-| K18 | **Local/CI = H2 (single JVM). Production = Azure PostgreSQL Flexible Server (shared). Job claim is SQL-atomic for multi-replica. Do not block design on H2 multi-pod.** | Product lock: keep H2 for dev; prod DB swap is ops |
+| K18 | **Local/CI = in-memory (single JVM). Production = Azure Table Storage (shared). No JDBC/Flyway. Datasource-loading hydrates the check cache.** | Rev 5 product lock (supersedes H2 / Azure PG Flex) |
 | K18b | **Blob + Event Hubs data plane = Managed Identity only** (Workload Identity / `DefaultAzureCredential`). No production connection strings for Blob/EH. | Least privilege + no secrets in config |
 | K19 | **Default skip+count for invalid/FK/failed rows; do not block EH partition on permanent FK miss** | Poison / registration lag resilience |
 | K20 | **Do not rely on `(caller, offering, captured_at)` unique for dual-path; treat collisions as failed rows; prefer relax later** | Legitimate multi-call same ts |
@@ -1114,11 +1138,13 @@ Resolved into Key Decisions where blocking. Remaining product choices:
 | K22 | **EH send RBAC is trust boundary ≈ Consumption.Registrator** | Connector inserts as system |
 | K23 | **Job runner = `@Scheduled` + atomic claim; cancel only QUEUED/RUNNING; stale RUNNING re-queue** | Implementable v1; claim works on PG Flex multi-replica |
 | K24 | **Checkpoint rows always have non-null `job_id`** (poller uses system job) | Unique index correctness |
-| K25 | **PR order: race-safe import ∥ schema ∥ decoder → blob API (MI Blob client) → EH (MI) → optional health → docs** | Value first; no H2 topology gate PR |
+| K25 | **PR order: race-safe import ∥ decoder → blob API (MI Blob client) → EH (MI) → datasource-loading + Table → docs** | Value first; no SQL topology gate |
 
 ---
 
-## PR Plan
+## PR Plan (historical — rev 4)
+
+The PRs below were the original delivery sequence. **Blob, Event Hub, Entra, datasource-loading, and Azure Table are implemented.** Keep the graph for history; do not treat Flyway/H2 acceptance criteria as current work.
 
 Ordered for **value and deploy safety**. Each keeps `mvn test` green and Jacoco ≥ 80% on touched production code.
 
@@ -1182,10 +1208,10 @@ Ordered for **value and deploy safety**. Each keeps `mvn test` green and Jacoco 
 
 | Field | Content |
 |-------|---------|
-| **Title** | `docs(ops): dual-path SOP, MI RBAC checklist, Azure PG Flex notes; optional Capture poller` |
+| **Title** | `docs(ops): dual-path SOP, MI RBAC checklist, Azure Table notes; optional Capture poller` |
 | **Files** | README, runbooks, optional poller (system jobs), remove aspirational-only claims |
 | **Dependencies** | PR 4–5 |
-| **Description** | Poller default off when EH on; MI RBAC table; PG Flex datasource is ops (not a product gate). |
+| **Description** | Poller default off when EH on; MI RBAC table; Azure Table is the prod catalog (not a product gate). |
 
 ### Dependency graph
 
@@ -1223,8 +1249,8 @@ flowchart TD
 | MI mis-RBAC (can't read Capture / can't write checkpoints) | High | K18b checklist; separate containers |
 | Jacoco on Azure SDK code | Medium | Mock clients; fixture decode tests |
 | Entra move regression | Low | K9/K13 — no move in v1 |
-| H2 local vs PG prod drift | Low | `MODE=PostgreSQL`; claim SQL portable; optional Testcontainers PG |
+| In-memory local vs Table prod drift | Low | Same repository interfaces; seed script + integration tests cover both |
 
 ---
 
-*End of design document (rev 4).*
+*End of design document (rev 5).*

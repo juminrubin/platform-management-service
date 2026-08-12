@@ -24,6 +24,6 @@ compose-down:
 	docker compose -f deploy/docker-compose.yml down
 
 tokens-help:
-	@echo "From backend/: APP_AZURE_TENANT_ID + APP_AZURE_API_CLIENT_ID"
+	@echo "From repo root: APP_AZURE_TENANT_ID + APP_API_CLIENT_ID"
 	@echo "  ./scripts/get-token-human.sh"
-	@echo "  ./scripts/get-token-mi.sh"
+	@echo "  ./backend/scripts/get-token-mi.sh"

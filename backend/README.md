@@ -2,7 +2,8 @@
 
 Kotlin + Spring Boot REST API (**Platform Management Service**) for **Participants**, **Service Offerings**, **Entitlements**, **Caller Registrations**, and **Consumptions** — secured with Microsoft Entra ID.
 
-External systems are integrated as **connectors** (datasource loading, directory, historical Blob Capture, live Event Hub). Architecture: [docs/design/connectors-entra-blob-eventhub.md](../docs/design/connectors-entra-blob-eventhub.md).
+External systems are integrated as **connectors** (datasource loading, directory, historical Blob Capture, live Event Hub). Architecture: [docs/design/connectors-entra-blob-eventhub.md](../docs/design/connectors-entra-blob-eventhub.md).  
+Framework choice: [docs/design/technology-considerations.md](../docs/design/technology-considerations.md).
 
 | Concern | Choice |
 |--------|--------|
@@ -58,7 +59,7 @@ Requires **JDK 21+**, **Maven 3.9+**, and Entra app settings:
 ```bash
 export APP_AZURE_TENANT_ID=<tenant-guid>
 export APP_API_CLIENT_ID=<api-app-client-id>
-# optional: export APP_AZURE_REQUIRED_SCOPE=access_as_user
+# optional: export APP_REQUIRED_SCOPE=access_as_user
 # Catalog: in-memory by default (no Azure Table required for local)
 
 cd backend
@@ -75,8 +76,9 @@ Security is **always on** (configured in `application.yml`). Every `/api/**` cal
 Authorization: Bearer <entra-access-token>
 ```
 
-Obtain a human token from the monorepo root: `../scripts/get-token-human.sh`  
-(see [scripts/README.md](../scripts/README.md)). Technical / MI: `./scripts/get-token-mi.sh`.  
+Obtain a human token from the monorepo root: `../scripts/get-token-human.sh`
+(`APP_AZURE_TENANT_ID` + `APP_API_CLIENT_ID`; see [scripts/README.md](../scripts/README.md)).
+Technical / MI: `./scripts/get-token-mi.sh`.  
 See [Microsoft Entra ID authentication](#microsoft-entra-id-authentication--authorization).
 
 Optional verbose logging profile (security unchanged):
@@ -580,6 +582,7 @@ Prefer **no connection strings** for Blob or Event Hubs in production.
 
 | Azure resource | Role on workload MI |
 |----------------|---------------------|
+| Azure Table (catalog) | **Storage Table Data Contributor** |
 | Capture storage container | **Storage Blob Data Reader** |
 | EH checkpoint container (separate) | **Storage Blob Data Contributor** |
 | Event Hub | **Azure Event Hubs Data Receiver** |
@@ -656,7 +659,7 @@ Implementation touchpoints:
 | Permit-all / optional scope gate / CORS / group maps | `config/AppSecurityProperties.kt` + `app.security.*` |
 | Issuer + audiences | `application.yml` (`APP_AZURE_TENANT_ID`, `APP_API_CLIENT_ID`) |
 | Authenticated principal probe | `GET /api/v1/auth/me` |
-| K8s env (`SPRING_PROFILES_ACTIVE=k8s`) | `k8s/configmap.yaml` + secrets |
+| K8s env (`SPRING_PROFILES_ACTIVE=k8s`) | `deploy/k8s/configmap.yaml` + secrets |
 
 ### Group object IDs and OAuth scopes from Application Registration ID
 
@@ -1048,7 +1051,7 @@ For **historical Capture** or **continuous Event Hub** ingest, see [Connectors](
 export APP_AZURE_TENANT_ID=<tenant-guid>
 export APP_API_CLIENT_ID=<api-app-client-id>
 # Leave empty: authorize only via app roles (recommended for human + MI)
-# export APP_AZURE_REQUIRED_SCOPE=access_as_user
+# export APP_REQUIRED_SCOPE=access_as_user
 
 mvn spring-boot:run
 ```
@@ -1116,10 +1119,10 @@ java -jar target/platform-management-service-1.0.0-SNAPSHOT.jar
 
 ## Container image
 
-Multi-stage `Dockerfile`:
+Multi-stage `Dockerfile` (project **bytecode is Java 21**):
 
-1. **Build** — `maven:3.9.9-eclipse-temurin-17` packages the fat JAR  
-2. **Runtime** — `eclipse-temurin:17-jre-jammy`, non-root UID `1001`, port `8080`  
+1. **Build** — Maven packages the fat JAR  
+2. **Runtime** — Eclipse Temurin JRE, non-root UID `1001`, port `8080`  
 3. Default profile: `SPRING_PROFILES_ACTIVE=k8s` (Entra JWT always on via `application.yml`)
 
 ### Local build & run
@@ -1140,17 +1143,17 @@ docker run --rm -p 8080:8080 \
 # One-time: attach ACR pull rights to AKS (recommended)
 # az aks update -n <aks-name> -g <rg> --attach-acr <acr-name>
 
-chmod +x scripts/*.sh
-./scripts/build-and-push-acr.sh <acr-name> 1.0.0
+chmod +x ../deploy/scripts/*.sh
+../deploy/scripts/build-and-push-acr.sh <acr-name> 1.0.0
 ```
 
-Or use the GitHub Actions workflow in `.github/workflows/build-push-acr.yml` (OIDC + ACR).
+GitHub Actions CI (`.github/workflows/ci.yml`) compiles and tests only; the ACR push workflow is disabled. Use `../deploy/scripts/build-and-push-acr.sh` to publish an image.
 
 ---
 
 ## GitLab CI/CD
 
-Full pipeline in [`.gitlab-ci.yml`](.gitlab-ci.yml). Setup details: [`.gitlab/ci/README.md`](.gitlab/ci/README.md).
+Full pipeline in [`../.gitlab-ci.yml`](../.gitlab-ci.yml). Setup details: [`../.gitlab/ci/README.md`](../.gitlab/ci/README.md).
 
 ```
 validate → test → package (Kaniko) → security (Trivy) → deploy staging / production
@@ -1164,30 +1167,31 @@ validate → test → package (Kaniko) → security (Trivy) → deploy staging /
 | **deploy:staging** | Auto on default branch → AKS |
 | **deploy:production** | Manual on tags `v1.2.3` → AKS |
 
-Configure at least these CI/CD variables: `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID` (deploy SP login), plus `APP_AZURE_TENANT_ID`, `APP_API_CLIENT_ID` (injected into the app), `AKS_RESOURCE_GROUP`, `AKS_CLUSTER_NAME`. Set `ACR_NAME` to also publish to Azure Container Registry.
+Configure at least these CI/CD variables: `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID` (deploy SP login), plus `APP_AZURE_TENANT_ID`, `APP_API_CLIENT_ID` (JWT audience injected into the app), `AKS_RESOURCE_GROUP`, `AKS_CLUSTER_NAME`. Set `ACR_NAME` to also publish to Azure Container Registry.
 
 ---
 
 ## Deploy to Azure Kubernetes Service (AKS)
 
-Manifests live under `k8s/` and are managed with **Kustomize**.
+Manifests live under [`../deploy/k8s/`](../deploy/k8s/) and are managed with **Kustomize**.
 
-| File | Purpose |
+| File (under `deploy/k8s/`) | Purpose |
 |------|---------|
 | `namespace.yaml` | `platform-management` namespace |
 | `serviceaccount.yaml` | Workload identity-ready SA |
 | `configmap.yaml` | Non-secret env (`SPRING_PROFILES_ACTIVE`, CORS, …) |
-| `secret.yaml` | Template for `APP_AZURE_TENANT_ID` / `APP_API_CLIENT_ID` |
+| `secret.yaml` | Template for `APP_AZURE_TENANT_ID` / `APP_API_CLIENT_ID` / SPA `APP_CLIENT_ID` |
 | `deployment.yaml` | 2 replicas, probes, resources, read-only root FS |
 | `service.yaml` | ClusterIP → port 80 → container 8080 |
 | `ingress.yaml` | Host-based Ingress (NGINX / AGIC annotations) |
 | `hpa.yaml` | CPU/memory HPA (2–8 pods) |
 | `networkpolicy.yaml` | Optional ingress/egress restrictions |
+| `ui-deployment.yaml` | Optional UI; runtime `APP_*` (not build-args) |
 | `kustomization.yaml` | Image name/tag + resource list |
 
 ### 1. Point Kustomize at your ACR image
 
-Edit `k8s/kustomization.yaml`:
+Edit `../deploy/k8s/kustomization.yaml`:
 
 ```yaml
 images:
@@ -1199,7 +1203,7 @@ images:
 ### 2. Create Entra ID secret (do not commit real values)
 
 ```bash
-kubectl apply -f k8s/namespace.yaml
+kubectl apply -f ../deploy/k8s/namespace.yaml
 
 kubectl create secret generic platform-management-service-secrets \
   --namespace platform-management \
@@ -1211,11 +1215,11 @@ kubectl create secret generic platform-management-service-secrets \
 
 ```bash
 # Preview
-kubectl kustomize k8s/
+kubectl kustomize ../deploy/k8s/
 
 # Apply (skip secret.yaml if you created the secret above — remove it from
 # kustomization resources, or use the helper script)
-kubectl apply -k k8s/
+kubectl apply -k ../deploy/k8s/
 ```
 
 Helper script (creates secret from env and rolls out):
@@ -1223,7 +1227,7 @@ Helper script (creates secret from env and rolls out):
 ```bash
 export APP_AZURE_TENANT_ID=<tenant-guid>
 export APP_API_CLIENT_ID=<api-app-client-id>
-./scripts/deploy-aks.sh mycompanyacr.azurecr.io 1.0.0
+../deploy/scripts/deploy-aks.sh mycompanyacr.azurecr.io 1.0.0
 ```
 
 ### 4. Verify

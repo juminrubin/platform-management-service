@@ -13,7 +13,7 @@
 #   TOKEN                    Optional pre-fetched JWT
 #   API_BASE                 Default http://localhost:8080
 #   APP_AZURE_TENANT_ID      Used when TOKEN is missing
-#   APP_AZURE_API_CLIENT_ID  Used when TOKEN is missing
+#   APP_API_CLIENT_ID        Used when TOKEN is missing
 
 set -euo pipefail
 

@@ -14,6 +14,10 @@ data:
   # Browser API origin for the UI (empty = same host as the SPA)
   APP_API_BASE_URL: ""
   # Optional: require a specific Entra ID scope/role (leave empty to authorize via app roles only)
-  APP_AZURE_REQUIRED_SCOPE: ""
+  APP_REQUIRED_SCOPE: ""
+  # Production multi-replica: set enabled=true and the Table endpoint (MI via workload identity)
+  APP_AZURE_TABLE_ENABLED: "false"
+  APP_AZURE_TABLE_ENDPOINT: ""
+  APP_AZURE_TABLE_PREFIX: "pms"
   # Logging
   LOGGING_LEVEL_COM_EXAMPLE_PLATFORMMANAGEMENT: "INFO"

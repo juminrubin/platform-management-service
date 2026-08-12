@@ -7,7 +7,7 @@
 #   KUBE_NAMESPACE        Kubernetes namespace (default: platform-management)
 #   DEPLOY_ENV            staging | production | review
 #   APP_AZURE_TENANT_ID   Entra tenant for the Spring app
-#   APP_AZURE_API_CLIENT_ID  API app client id (JWT audience)
+#   APP_API_CLIENT_ID     API app client id (JWT audience)
 #   DEPLOY_HOST           optional Ingress host override
 #   CI_PROJECT_DIR        repo root (GitLab sets this)
 
@@ -21,10 +21,10 @@ DEPLOY_ENV="${DEPLOY_ENV:-staging}"
 IMAGE_REPO="${DEPLOY_IMAGE:?DEPLOY_IMAGE is required (from package:image dotenv)}"
 IMAGE_TAG="${DEPLOY_IMAGE_TAG:?DEPLOY_IMAGE_TAG is required}"
 APP_TENANT="${APP_AZURE_TENANT_ID:-}"
-APP_CLIENT="${APP_AZURE_API_CLIENT_ID:-}"
+APP_CLIENT="${APP_API_CLIENT_ID:-${APP_API_CLIENT_ID:-}}"
 
 if [[ -z "${APP_TENANT}" || -z "${APP_CLIENT}" ]]; then
-  echo "ERROR: Set APP_AZURE_TENANT_ID and APP_AZURE_API_CLIENT_ID (Spring app JWT settings)." >&2
+  echo "ERROR: Set APP_AZURE_TENANT_ID and APP_API_CLIENT_ID (Spring app JWT settings)." >&2
   exit 1
 fi
 
@@ -95,7 +95,7 @@ echo "==> Upserting application secrets (Entra ID → APP_* env)"
 kubectl create secret generic platform-management-service-secrets \
   --namespace "${NAMESPACE}" \
   --from-literal=APP_AZURE_TENANT_ID="${APP_TENANT}" \
-  --from-literal=APP_AZURE_API_CLIENT_ID="${APP_CLIENT}" \
+  --from-literal=APP_API_CLIENT_ID="${APP_CLIENT}" \
   --dry-run=client -o yaml | kubectl apply -f -
 
 # If the image is on GitLab Registry, ensure a pull secret exists (optional)
