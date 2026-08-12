@@ -8,24 +8,24 @@ import type {
   SilentRequest,
 } from '@azure/msal-browser'
 import { LogLevel, PublicClientApplication } from '@azure/msal-browser'
+import { getRuntimeConfig } from '../runtimeConfig'
 
-const tenantId = String(import.meta.env.APP_AZURE_TENANT_ID ?? '').trim()
-const clientId = String(import.meta.env.APP_AZURE_CLIENT_ID ?? '').trim()
-const apiScope = String(import.meta.env.APP_AZURE_API_SCOPE ?? '').trim()
+const { APP_AZURE_TENANT_ID: tenantId, APP_CLIENT_ID: clientId, APP_API_SCOPE: apiScope } =
+  getRuntimeConfig()
 
 function requireConfig(name: string, value: string): string {
   if (!value) {
     throw new Error(
-      `Missing ${name}. Copy frontend/.env.example to frontend/.env and set Entra values. ` +
-        `Vite must expose APP_* vars (see envPrefix in vite.config.ts).`,
+      `Missing ${name}. Provide it as a system environment variable ` +
+        `(Azure App Service application setting, container env, or frontend/.env for local Vite).`,
     )
   }
   return value
 }
 
 const resolvedTenantId = requireConfig('APP_AZURE_TENANT_ID', tenantId)
-const resolvedClientId = requireConfig('APP_AZURE_CLIENT_ID', clientId)
-const resolvedApiScope = requireConfig('APP_AZURE_API_SCOPE', apiScope)
+const resolvedClientId = requireConfig('APP_CLIENT_ID', clientId)
+const resolvedApiScope = requireConfig('APP_API_SCOPE', apiScope)
 
 export const apiScopes = [resolvedApiScope]
 

@@ -725,7 +725,7 @@ Use **one mechanism for both humans and technical accounts: Entra app roles** em
 | Different rules for user vs app tokens | Duplicated policy, harder to test |
 | Client id allow-lists only | No least privilege, no group-based admin model |
 
-**Optional outer gate:** `APP_AZURE_REQUIRED_SCOPE=access_as_user` requires a delegated scope (or matching app role name) on every `/api/**` call. Prefer **app roles for authorization** and keep `required-scope` empty unless you need an extra tenant-wide gate.
+**Optional outer gate:** `APP_REQUIRED_SCOPE=access_as_user` requires a delegated scope (or matching app role name) on every `/api/**` call. Prefer **app roles for authorization** and keep `required-scope` empty unless you need an extra tenant-wide gate.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐

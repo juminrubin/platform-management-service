@@ -2,11 +2,13 @@ import '@testing-library/jest-dom/vitest'
 import { afterEach, vi } from 'vitest'
 import { cleanup } from '@testing-library/react'
 
-// Defaults for modules that read import.meta.env.APP_* at load time
-vi.stubEnv('APP_AZURE_TENANT_ID', 'test-tenant')
-vi.stubEnv('APP_AZURE_CLIENT_ID', 'test-spa-client')
-vi.stubEnv('APP_AZURE_API_SCOPE', 'api://test-api/access_as_user')
-vi.stubEnv('APP_API_BASE_URL', '')
+// Defaults for modules that read window.__APP_CONFIG__ / build stamps at load time
+window.__APP_CONFIG__ = {
+  APP_AZURE_TENANT_ID: 'test-tenant',
+  APP_CLIENT_ID: 'test-spa-client',
+  APP_API_SCOPE: 'api://test-api/access_as_user',
+  APP_API_BASE_URL: '',
+}
 vi.stubEnv('APP_BUILD_VERSION', '0.1.0-test')
 vi.stubEnv('APP_BUILD_TIMESTAMP', '2026-01-01T00:00:00.000Z')
 

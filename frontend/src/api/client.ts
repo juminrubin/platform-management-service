@@ -4,6 +4,7 @@ import {
   type SilentRequest,
 } from '@azure/msal-browser'
 import { getAccount, msalInstance, setActiveAccountFromResult, tokenRequest } from '../auth/msalConfig'
+import { getRuntimeConfig } from '../runtimeConfig'
 import type {
   AuthenticatedUser,
   CallerRegistration,
@@ -26,7 +27,7 @@ import type {
   UpdateServiceOffering,
 } from './types'
 
-const baseUrl = (import.meta.env.APP_API_BASE_URL as string | undefined) || ''
+const baseUrl = getRuntimeConfig().APP_API_BASE_URL
 
 function isInteractionRequired(error: unknown): boolean {
   if (error instanceof InteractionRequiredAuthError) return true

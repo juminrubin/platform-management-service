@@ -54,16 +54,51 @@ Register both SPA redirect URIs in Entra (login + logout):
 - `http://localhost:3000`
 - `http://localhost:3000/auth-redirect.html`
 
-## Production image
+## Production build (portable)
+
+`npm run build` emits `dist/` that can be zipped and deployed as-is. Entra / API
+settings are **not** baked into the JS bundle. The included `server.mjs` reads
+system environment variables at process start, serves them as `/config.js`,
+and reverse-proxies `/api` and `/actuator` to `APP_API_BASE_URL`.
+The UI listens on `PORT` (default **3000**), never on the API origin.
 
 ```bash
-docker build -t platform-management-service-ui:local \
-  --build-arg APP_AZURE_TENANT_ID=... \
-  --build-arg APP_AZURE_CLIENT_ID=... \
-  --build-arg APP_AZURE_API_CLIENT_ID=... \
-  --build-arg APP_AZURE_API_SCOPE=api://.../access_as_user \
-  --build-arg APP_API_BASE_URL=https://api.example.com \
-  .
+npm run build
+cd dist && zip -r ../ui.zip .
+az webapp deploy --resource-group <rg> --name <app> --src-path ../ui.zip
+```
+
+Set these **application settings** on the Web App (Linux Node 20+):
+
+| Variable | Purpose |
+|---|---|
+| `APP_AZURE_TENANT_ID` | Entra tenant GUID |
+| `APP_CLIENT_ID` | SPA app registration client ID |
+| `APP_API_SCOPE` | Delegated API scope (`api://<API_CLIENT_ID>/access_as_user`) |
+| `APP_API_BASE_URL` | Backend origin this process proxies `/api` to (not the UI listen address) |
+| `PORT` | UI listen port (Azure sets this; locally defaults to **3000**) |
+
+Startup command (if not detected): `node server.mjs`. Azure supplies `PORT`.
+
+Local check of the same artifact:
+
+```bash
+# after npm run build, from frontend/
+APP_AZURE_TENANT_ID=... APP_CLIENT_ID=... APP_API_SCOPE=... npm start
+```
+
+## Production image
+
+Build once; pass `APP_*` at **container start**:
+
+```bash
+docker build -t platform-management-service-ui:local .
+docker run --rm -p 3000:80 \
+  -e APP_AZURE_TENANT_ID=... \
+  -e APP_CLIENT_ID=... \
+  -e APP_API_SCOPE=api://.../access_as_user \
+  -e APP_API_BASE_URL=https://api.example.com \
+  platform-management-service-ui:local
 ```
 
 Or use `deploy/docker-compose.yml` from the repo root.

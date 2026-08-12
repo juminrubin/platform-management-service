@@ -115,8 +115,9 @@ Open http://localhost:3000 — Vite proxies `/api` → http://localhost:8080.
 ```bash
 export APP_AZURE_TENANT_ID=...
 export APP_API_CLIENT_ID=...
-export VITE_AZURE_CLIENT_ID=<spa-client-id>
-export VITE_AZURE_API_SCOPE=api://$APP_API_CLIENT_ID/access_as_user
+export APP_AZURE_CLIENT_ID=<spa-client-id>
+export APP_AZURE_API_SCOPE=api://$APP_API_CLIENT_ID/access_as_user
+export APP_API_BASE_URL=http://localhost:8080
 
 docker compose -f deploy/docker-compose.yml up --build
 ```

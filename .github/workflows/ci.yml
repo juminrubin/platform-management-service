@@ -68,22 +68,9 @@ jobs:
 
       - name: Unit tests with coverage gate
         # Thresholds in vite.config.ts (lines/statements/functions ≥80%, branches ≥75%)
-        env:
-          APP_AZURE_TENANT_ID: "00000000-0000-0000-0000-000000000000"
-          APP_AZURE_CLIENT_ID: "00000000-0000-0000-0000-000000000000"
-          APP_AZURE_API_CLIENT_ID: "00000000-0000-0000-0000-000000000000"
-          APP_AZURE_API_SCOPE: "api://00000000-0000-0000-0000-000000000000/access_as_user"
-          APP_API_BASE_URL: ""
         run: npm run test:coverage
 
       - name: Production build
-        # Placeholder Entra values — only needed so Vite can bundle msalConfig (not a live login).
-        env:
-          APP_AZURE_TENANT_ID: "00000000-0000-0000-0000-000000000000"
-          APP_AZURE_CLIENT_ID: "00000000-0000-0000-0000-000000000000"
-          APP_AZURE_API_CLIENT_ID: "00000000-0000-0000-0000-000000000000"
-          APP_AZURE_API_SCOPE: "api://00000000-0000-0000-0000-000000000000/access_as_user"
-          APP_API_BASE_URL: ""
         run: npm run build
 
       - name: Upload frontend dist

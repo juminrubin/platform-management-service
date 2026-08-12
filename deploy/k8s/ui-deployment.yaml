@@ -1,5 +1,5 @@
 # Optional UI deployment (static SPA behind nginx).
-# Image must be built with VITE_* build-args matching your Entra SPA registration.
+# APP_* Entra/API settings are read from the process environment at container start.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -27,6 +27,27 @@ spec:
           ports:
             - name: http
               containerPort: 80
+          env:
+            - name: APP_AZURE_TENANT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: platform-management-service-secrets
+                  key: APP_AZURE_TENANT_ID
+            - name: APP_AZURE_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: platform-management-service-secrets
+                  key: APP_AZURE_CLIENT_ID
+            - name: APP_AZURE_API_SCOPE
+              valueFrom:
+                secretKeyRef:
+                  name: platform-management-service-secrets
+                  key: APP_AZURE_API_SCOPE
+            - name: APP_API_BASE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: platform-management-service-config
+                  key: APP_API_BASE_URL
           resources:
             requests:
               cpu: 50m

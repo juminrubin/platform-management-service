@@ -28,3 +28,4 @@ logs/
 .env.*
 !.env.example
 !**/.env.example
+.venv*/*

@@ -5,7 +5,7 @@
 #   APP_API_CLIENT_ID   API app registration application (client) ID
 #
 # Optional:
-#   APP_AZURE_REQUIRED_SCOPE  Extra filter-layer gate (e.g. access_as_user); leave empty to
+#   APP_REQUIRED_SCOPE  Extra filter-layer gate (e.g. access_as_user); leave empty to
 #                             authorize only via app roles (System.Maintainer, …)
 #   APP_CORS_ALLOWED_ORIGINS  Comma-separated browser origins
 #   app.security.group-role-mappings / application-registrations — map Entra groups
@@ -49,6 +49,7 @@ spring:
           audiences:
             - ${APP_API_CLIENT_ID}
             - api://${APP_API_CLIENT_ID}
+            - ${APP_REQUIRED_SCOPE}
 
 server:
   port: 8080
@@ -113,7 +114,7 @@ app:
     permit-all: false
     # Optional extra gate: SCOPE_<name> or ROLE_<name> on /api/** except /api/v1/auth/**
     # (auth/me stays open to any authenticated JWT).
-    required-scope: ${APP_AZURE_REQUIRED_SCOPE:}
+    required-scope: ${APP_REQUIRED_SCOPE:}
     cors-allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:3000}
     # Global group object-id → app role values (defaults to empty; omit if unused).
     # Example (uncomment and replace GUIDs):
@@ -131,6 +132,7 @@ app:
         oauth-scopes:
           - access_as_user
           - api://${APP_API_CLIENT_ID:}/access_as_user
+
         # group-role-mappings:
         #   "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee":
         #     - System.Maintainer
@@ -184,7 +186,7 @@ app:
   # Mode: client-id+secret → SP; client-id only → UAMI; else → SAMI.
   azure:
     credential:
-      client-id: ${APP_UAMI_CLIENT_ID:${AZURE_CLIENT_ID:}}
+      client-id: ${AZURE_CLIENT_ID:${APP_UAMI_CLIENT_ID:}}
       client-secret: ${AZURE_CLIENT_SECRET:}
       tenant-id: ${AZURE_TENANT_ID:}
 

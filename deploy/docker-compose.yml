@@ -4,10 +4,9 @@
 #   export APP_AZURE_TENANT_ID=...
 #   export APP_AZURE_API_CLIENT_ID=...
 #   # UI SPA app registration (public client):
-#   export VITE_AZURE_TENANT_ID=$APP_AZURE_TENANT_ID
-#   export VITE_AZURE_CLIENT_ID=...
-#   export VITE_AZURE_API_CLIENT_ID=$APP_AZURE_API_CLIENT_ID
-#   export VITE_AZURE_API_SCOPE=api://$APP_AZURE_API_CLIENT_ID/access_as_user
+#   export APP_AZURE_CLIENT_ID=...
+#   export APP_AZURE_API_SCOPE=api://$APP_AZURE_API_CLIENT_ID/access_as_user
+#   export APP_API_BASE_URL=http://localhost:8080
 #
 # Run from repo root:
 #   docker compose -f deploy/docker-compose.yml up --build
@@ -35,16 +34,14 @@ services:
     build:
       context: ../frontend
       dockerfile: Dockerfile
-      args:
-        VITE_AZURE_TENANT_ID: ${VITE_AZURE_TENANT_ID:-${APP_AZURE_TENANT_ID}}
-        VITE_AZURE_CLIENT_ID: ${VITE_AZURE_CLIENT_ID}
-        VITE_AZURE_API_CLIENT_ID: ${VITE_AZURE_API_CLIENT_ID:-${APP_AZURE_API_CLIENT_ID}}
-        VITE_AZURE_API_SCOPE: ${VITE_AZURE_API_SCOPE:-api://${APP_AZURE_API_CLIENT_ID}/access_as_user}
-        # Browser calls API on host port 8080
-        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8080}
     image: platform-management-service-ui:local
     ports:
       - "3000:80"
+    environment:
+      APP_AZURE_TENANT_ID: ${APP_AZURE_TENANT_ID}
+      APP_AZURE_CLIENT_ID: ${APP_AZURE_CLIENT_ID}
+      APP_AZURE_API_SCOPE: ${APP_AZURE_API_SCOPE:-api://${APP_AZURE_API_CLIENT_ID}/access_as_user}
+      APP_API_BASE_URL: ${APP_API_BASE_URL:-http://localhost:8080}
     depends_on:
       api:
         condition: service_healthy
