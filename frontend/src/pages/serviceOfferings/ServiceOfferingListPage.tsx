@@ -5,6 +5,7 @@ import { deleteServiceOffering, listServiceOfferings } from '../../api/client'
 import type { ServiceOffering } from '../../api/types'
 import { useAuthorization } from '../../auth/AuthorizationContext'
 import { EmptyState, ErrorBox, Field, FilterBar, Loading, PageHeader, formatDateTime } from '../../components/ui'
+import { serviceOfferingDetailPath, serviceOfferingEditPath } from '../../routing/resourcePath'
 
 export function ServiceOfferingListPage() {
   const { canMaintain } = useAuthorization()
@@ -119,7 +120,7 @@ export function ServiceOfferingListPage() {
             {filtered.map((o) => (
               <tr key={o.id}>
                 <td>
-                  <Link to={`/service-offerings/${encodeURIComponent(o.id)}`}>
+                  <Link to={serviceOfferingDetailPath(o.id)}>
                     <code>{o.id}</code>
                   </Link>
                 </td>
@@ -129,12 +130,12 @@ export function ServiceOfferingListPage() {
                 <td>{o.active ? 'Yes' : 'No'}</td>
                 <td className="nowrap">{formatDateTime(o.updatedAt)}</td>
                 <td className="row gap">
-                  <Link className="button" to={`/service-offerings/${encodeURIComponent(o.id)}`}>
+                  <Link className="button" to={serviceOfferingDetailPath(o.id)}>
                     View
                   </Link>
                   {canMaintain && (
                     <>
-                      <Link className="button" to={`/service-offerings/${encodeURIComponent(o.id)}/edit`}>
+                      <Link className="button" to={serviceOfferingEditPath(o.id)}>
                         Edit
                       </Link>
                       <button type="button" onClick={() => void onDelete(o.id)}>

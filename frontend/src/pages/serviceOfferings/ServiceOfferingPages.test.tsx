@@ -65,7 +65,7 @@ describe('Service offering pages', () => {
     renderWithRouter(
       <Routes>
         <Route path="/service-offerings/new" element={<ServiceOfferingFormPage />} />
-        <Route path="/service-offerings/:id" element={<div>detail</div>} />
+        <Route path="/service-offerings/*" element={<div>detail</div>} />
       </Routes>,
       { route: '/service-offerings/new' },
     )
@@ -92,8 +92,7 @@ describe('Service offering pages', () => {
     const user = userEvent.setup()
     renderWithRouter(
       <Routes>
-        <Route path="/service-offerings/:id/edit" element={<ServiceOfferingFormPage />} />
-        <Route path="/service-offerings/:id" element={<div>detail</div>} />
+        <Route path="/service-offerings/*" element={<ServiceOfferingFormPage />} />
       </Routes>,
       { route: '/service-offerings/gpt-5.1/edit' },
     )
@@ -212,7 +211,7 @@ describe('Service offering pages', () => {
     vi.mocked(api.getServiceOffering).mockRejectedValue(new Error('load failed'))
     renderWithRouter(
       <Routes>
-        <Route path="/service-offerings/:id/edit" element={<ServiceOfferingFormPage />} />
+        <Route path="/service-offerings/*" element={<ServiceOfferingFormPage />} />
       </Routes>,
       { route: '/service-offerings/gpt-5.1/edit' },
     )
@@ -224,12 +223,44 @@ describe('Service offering pages', () => {
     const user = userEvent.setup()
     renderWithRouter(
       <Routes>
-        <Route path="/service-offerings/:id/edit" element={<ServiceOfferingFormPage />} />
+        <Route path="/service-offerings/*" element={<ServiceOfferingFormPage />} />
       </Routes>,
       { route: '/service-offerings/gpt-5.1/edit' },
     )
     expect(await screen.findByDisplayValue('GPT 5.1')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /save changes/i }))
     expect(await screen.findByText(/update failed/)).toBeInTheDocument()
+  })
+
+  it('shows detail after creating an offering whose id contains a slash', async () => {
+    const created = {
+      ...serviceOfferingGpt,
+      id: 'Group1/Service1a',
+      name: 'Grouped service',
+    }
+    vi.mocked(api.createServiceOffering).mockResolvedValue(created)
+    vi.mocked(api.getServiceOffering).mockImplementation(async (id) => {
+      if (id === 'Group1/Service1a') return created
+      throw new Error(`unexpected id ${id}`)
+    })
+    const user = userEvent.setup()
+    renderWithRouter(
+      <Routes>
+        <Route path="/service-offerings/new" element={<ServiceOfferingFormPage />} />
+        <Route path="/service-offerings/*" element={<ServiceOfferingDetailPage />} />
+      </Routes>,
+      { route: '/service-offerings/new' },
+    )
+
+    await user.type(screen.getByLabelText(/^ID/), 'Group1/Service1a')
+    await user.type(screen.getByLabelText(/^Name/), 'Grouped service')
+    await user.clear(screen.getByLabelText(/^Category/))
+    await user.type(screen.getByLabelText(/^Category/), 'LLM')
+    await user.click(screen.getByRole('button', { name: /^Create$/i }))
+
+    expect(await screen.findByText('Grouped service')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(api.getServiceOffering).toHaveBeenCalledWith('Group1/Service1a')
+    })
   })
 })

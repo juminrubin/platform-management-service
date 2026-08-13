@@ -1,12 +1,12 @@
 import type { FormEvent } from 'react'
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { createServiceOffering, getServiceOffering, updateServiceOffering } from '../../api/client'
 import { ErrorBox, Field, Loading, PageHeader } from '../../components/ui'
+import { serviceOfferingDetailPath, serviceOfferingIdFromPath } from '../../routing/resourcePath'
 
 export function ServiceOfferingFormPage() {
-  const { id } = useParams()
-  const isEdit = Boolean(id)
+  const { id, isEdit } = serviceOfferingIdFromPath(useLocation().pathname)
   const navigate = useNavigate()
 
   const [formId, setFormId] = useState('')
@@ -55,7 +55,7 @@ export function ServiceOfferingFormPage() {
           config: config.trim() || '{}',
           active,
         })
-        navigate(`/service-offerings/${encodeURIComponent(id)}`)
+        navigate(serviceOfferingDetailPath(id))
       } else {
         const created = await createServiceOffering({
           id: formId.trim(),
@@ -66,7 +66,7 @@ export function ServiceOfferingFormPage() {
           config: config.trim() || '{}',
           active,
         })
-        navigate(`/service-offerings/${encodeURIComponent(created.id)}`)
+        navigate(serviceOfferingDetailPath(created.id))
       }
     } catch (err) {
       setError((err as Error).message)
@@ -88,7 +88,7 @@ export function ServiceOfferingFormPage() {
         actions={
           <Link
             className="button"
-            to={isEdit && id ? `/service-offerings/${encodeURIComponent(id)}` : '/service-offerings'}
+            to={isEdit && id ? serviceOfferingDetailPath(id) : '/service-offerings'}
           >
             Cancel
           </Link>

@@ -70,6 +70,13 @@ class AzureTableSupportTest {
     }
 
     @Test
+    fun `encode and decode Azure Table keys that contain slashes`() {
+        assertThat(AzureTableKeys.encode("Group1/Service1a")).isEqualTo("Group1%2FService1a")
+        assertThat(AzureTableKeys.decode("Group1%2FService1a")).isEqualTo("Group1/Service1a")
+        assertThat(AzureTableKeys.decode(AzureTableKeys.encode("gpt-5.1"))).isEqualTo("gpt-5.1")
+    }
+
+    @Test
     fun `getOrNull returns null on 404 and rethrows other errors`() {
         val client = mock<TableClient>()
         val notFound = tableServiceException(404)

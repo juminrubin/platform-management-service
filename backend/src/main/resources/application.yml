@@ -55,6 +55,9 @@ server:
   port: 8080
   error:
     include-message: always
+  tomcat:
+    # Service offering ids may contain `/`; the UI encodes them as %2F.
+    encoded-solidus-handling: decode
 
 management:
   endpoints:

@@ -4,6 +4,7 @@ import { deleteEntitlement, getEntitlement } from '../../api/client'
 import type { Entitlement } from '../../api/types'
 import { useAuthorization } from '../../auth/AuthorizationContext'
 import { CodeBlock, DetailGrid, ErrorBox, Loading, PageHeader, formatDateTime } from '../../components/ui'
+import { serviceOfferingDetailPath } from '../../routing/resourcePath'
 
 export function EntitlementDetailPage() {
   const { id = '' } = useParams()
@@ -68,7 +69,7 @@ export function EntitlementDetailPage() {
               {
                 label: 'Service offering',
                 value: (
-                  <Link to={`/service-offerings/${encodeURIComponent(item.serviceOfferingId)}`}>
+                  <Link to={serviceOfferingDetailPath(item.serviceOfferingId)}>
                     {item.serviceOfferingName} ({item.serviceOfferingId})
                   </Link>
                 ),

@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { deleteServiceOffering, getServiceOffering } from '../../api/client'
 import type { ServiceOffering } from '../../api/types'
 import { useAuthorization } from '../../auth/AuthorizationContext'
 import { CodeBlock, DetailGrid, ErrorBox, Loading, PageHeader, formatDateTime } from '../../components/ui'
+import { serviceOfferingEditPath, serviceOfferingIdFromPath } from '../../routing/resourcePath'
 
 export function ServiceOfferingDetailPage() {
-  const { id = '' } = useParams()
+  const { id } = serviceOfferingIdFromPath(useLocation().pathname)
   const navigate = useNavigate()
   const { canMaintain } = useAuthorization()
   const [item, setItem] = useState<ServiceOffering | null>(null)
@@ -40,7 +41,7 @@ export function ServiceOfferingDetailPage() {
             </Link>
             {canMaintain && (
               <>
-                <Link className="button primary" to={`/service-offerings/${encodeURIComponent(id)}/edit`}>
+                <Link className="button primary" to={serviceOfferingEditPath(id)}>
                   Edit
                 </Link>
                 <button type="button" onClick={() => void onDelete()}>

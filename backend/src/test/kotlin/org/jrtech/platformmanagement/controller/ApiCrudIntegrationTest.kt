@@ -177,6 +177,30 @@ class ApiCrudIntegrationTest {
             param("category", "SPEECH")
         }.andExpect { status { isOk() } }
 
+        val slashId = "Group1/Service1a-$suffix"
+        mockMvc.post("/api/v1/service-offerings") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """
+                {
+                  "id":"$slashId",
+                  "name":"Slash $suffix",
+                  "category":"LLM",
+                  "config":"{}",
+                  "active":true
+                }
+            """.trimIndent()
+        }.andExpect {
+            status { isCreated() }
+            jsonPath("$.id") { value(slashId) }
+        }
+        mockMvc.get("/api/v1/service-offerings/$slashId") {
+            accept = MediaType.APPLICATION_JSON
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.id") { value(slashId) }
+            jsonPath("$.name") { value("Slash $suffix") }
+        }
+
         val callerId = "user-$suffix@example.com"
         mockMvc.post("/api/v1/caller-registrations") {
             contentType = MediaType.APPLICATION_JSON

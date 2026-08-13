@@ -39,10 +39,10 @@ class ServiceOfferingController(
         @RequestParam(required = false) category: String?
     ): List<ServiceOfferingResponse> = serviceOfferingService.findAll(activeOnly, category)
 
-    @GetMapping("/{id}")
+    @GetMapping("/{*id}")
     @PreAuthorize("@authz.canRead()")
     fun get(@PathVariable id: String): ServiceOfferingResponse =
-        serviceOfferingService.findById(id)
+        serviceOfferingService.findById(PathVariables.fromRemaining(id))
 
     @PostMapping
     @PreAuthorize("@authz.canMaintain()")
@@ -51,10 +51,10 @@ class ServiceOfferingController(
     ): ResponseEntity<ServiceOfferingResponse> =
         ResponseEntity.status(HttpStatus.CREATED).body(serviceOfferingService.create(request))
 
-    @PutMapping("/{id}")
+    @PutMapping("/{*id}")
     @PreAuthorize("@authz.canMaintain()")
     fun update(
         @PathVariable id: String,
         @Valid @RequestBody request: UpdateServiceOfferingRequest
-    ): ServiceOfferingResponse = serviceOfferingService.update(id, request)
+    ): ServiceOfferingResponse = serviceOfferingService.update(PathVariables.fromRemaining(id), request)
 }

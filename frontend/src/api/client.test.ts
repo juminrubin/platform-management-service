@@ -216,6 +216,12 @@ describe('api client', () => {
 
       stubFetchJson({ id: 'gpt-5.1' })
       await getServiceOffering('gpt-5.1')
+      expect(fetch).toHaveBeenLastCalledWith('/api/v1/service-offerings/gpt-5.1', expect.anything())
+      await getServiceOffering('Group1/Service1a')
+      expect(fetch).toHaveBeenLastCalledWith(
+        '/api/v1/service-offerings/Group1%2FService1a',
+        expect.anything(),
+      )
       await createServiceOffering({ id: 'm', name: 'M', category: 'LLM' })
       await updateServiceOffering('m', {
         name: 'M',

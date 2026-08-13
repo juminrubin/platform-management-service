@@ -20,6 +20,15 @@ object AzureTableKeys {
     const val PK_PARTICIPANT = "participant"
     const val PK_CALLER = "caller"
     const val PK_SOURCE_REF = "sourceRef"
+
+    /**
+     * Azure Table keys cannot contain `/ \ # ?`. Service offering ids may include `/`.
+     */
+    fun encode(raw: String): String =
+        java.net.URLEncoder.encode(raw.trim(), java.nio.charset.StandardCharsets.UTF_8).replace("+", "%20")
+
+    fun decode(raw: String): String =
+        java.net.URLDecoder.decode(raw, java.nio.charset.StandardCharsets.UTF_8)
 }
 
 fun TableEntity.stringProp(name: String): String? =

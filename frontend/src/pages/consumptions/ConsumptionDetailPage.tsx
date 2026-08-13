@@ -4,6 +4,7 @@ import { deleteConsumption, getConsumption } from '../../api/client'
 import type { Consumption } from '../../api/types'
 import { useAuthorization } from '../../auth/AuthorizationContext'
 import { CodeBlock, DetailGrid, ErrorBox, Loading, PageHeader, formatDateTime } from '../../components/ui'
+import { serviceOfferingDetailPath } from '../../routing/resourcePath'
 
 export function ConsumptionDetailPage() {
   const { id = '' } = useParams()
@@ -78,7 +79,7 @@ export function ConsumptionDetailPage() {
               {
                 label: 'Service offering',
                 value: (
-                  <Link to={`/service-offerings/${encodeURIComponent(item.serviceOfferingId)}`}>
+                  <Link to={serviceOfferingDetailPath(item.serviceOfferingId)}>
                     {item.serviceOfferingName} ({item.serviceOfferingId})
                   </Link>
                 ),

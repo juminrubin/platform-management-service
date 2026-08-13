@@ -1,5 +1,9 @@
 # Test profile: in-memory store, open security for unit/persistence tests.
 # Security integration tests override app.security.permit-all=false and import TestJwtDecoderConfig.
+server:
+  tomcat:
+    encoded-solidus-handling: decode
+
 spring:
   jackson:
     time-zone: UTC

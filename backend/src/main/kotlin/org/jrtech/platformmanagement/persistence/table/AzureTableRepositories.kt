@@ -65,7 +65,7 @@ class AzureTableServiceOfferingRepository(
     private val table: TableClient
 ) : ServiceOfferingRepository {
     override fun findById(id: String): ServiceOffering? =
-        table.getOrNull(AzureTableKeys.PK_SERVICE, id.trim())?.toServiceOffering()
+        table.getOrNull(AzureTableKeys.PK_SERVICE, AzureTableKeys.encode(id))?.toServiceOffering()
     override fun findAll(): List<ServiceOffering> = table.listAll().map { it.toServiceOffering() }
     override fun findByActiveTrue(): List<ServiceOffering> = findAll().filter { it.active }
     override fun findByCategory(category: String): List<ServiceOffering> =
@@ -82,7 +82,7 @@ class AzureTableServiceOfferingRepository(
         return toSave
     }
     override fun deleteById(id: String) {
-        table.deleteIfExists(AzureTableKeys.PK_SERVICE, id.trim())
+        table.deleteIfExists(AzureTableKeys.PK_SERVICE, AzureTableKeys.encode(id))
     }
     override fun count(): Long = table.listAll().size.toLong()
 }
@@ -257,7 +257,7 @@ private fun TableEntity.toParticipant(): Participant =
     )
 
 private fun ServiceOffering.toEntity(): TableEntity {
-    val e = TableEntity(AzureTableKeys.PK_SERVICE, id)
+    val e = TableEntity(AzureTableKeys.PK_SERVICE, AzureTableKeys.encode(id))
     e.addProperty("name", name)
     e.addProperty("description", description)
     e.addProperty("category", category)
@@ -273,7 +273,7 @@ private fun ServiceOffering.toEntity(): TableEntity {
 
 private fun TableEntity.toServiceOffering(): ServiceOffering =
     ServiceOffering(
-        id = rowKey,
+        id = AzureTableKeys.decode(rowKey),
         name = requireString("name"),
         description = stringProp("description"),
         category = requireString("category"),
@@ -319,7 +319,7 @@ private fun TableEntity.toCaller(
 }
 
 private fun ParticipantServiceEntitlement.toEntity(): TableEntity {
-    val e = TableEntity(participant.id, serviceOffering.id)
+    val e = TableEntity(participant.id, AzureTableKeys.encode(serviceOffering.id))
     e.addProperty("id", id.toString())
     e.addProperty("status", status.name)
     e.addProperty("validFrom", validFrom.toString())
@@ -338,7 +338,7 @@ private fun TableEntity.toEntitlement(
     services: ServiceOfferingRepository
 ): ParticipantServiceEntitlement? {
     val participant = participants.findById(partitionKey) ?: return null
-    val offering = services.findById(rowKey) ?: return null
+    val offering = services.findById(AzureTableKeys.decode(rowKey)) ?: return null
     return ParticipantServiceEntitlement(
         id = uuidProp("id") ?: UUID.randomUUID(),
         participant = participant,

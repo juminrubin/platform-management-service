@@ -102,6 +102,27 @@ class AzureTableRepositoriesTest {
     }
 
     @Test
+    fun `service offering repository stores slash ids as encoded row keys`() {
+        val table = mockTableClient()
+        val store = mutableMapOf<String, TableEntity>()
+        stubTableMap(table, store)
+        val repo = AzureTableServiceOfferingRepository(table)
+
+        repo.save(
+            ServiceOffering(
+                id = "Group1/Service1a",
+                name = "Grouped",
+                category = "LLM",
+                createdBy = TestAudit.BY,
+                updatedBy = TestAudit.BY
+            )
+        )
+        assertThat(store.keys.single()).isEqualTo("service|Group1%2FService1a")
+        assertThat(repo.findById("Group1/Service1a")?.name).isEqualTo("Grouped")
+        assertThat(repo.findAll().single().id).isEqualTo("Group1/Service1a")
+    }
+
+    @Test
     fun `caller repository save and find with participant lookup`() {
         val table = mockTableClient()
         val store = mutableMapOf<String, TableEntity>()

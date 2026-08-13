@@ -13,8 +13,8 @@ import { CallerRegistrationListPage } from './pages/callerRegistrations/CallerRe
 import { CallerRegistrationDetailPage } from './pages/callerRegistrations/CallerRegistrationDetailPage'
 import { CallerRegistrationFormPage } from './pages/callerRegistrations/CallerRegistrationFormPage'
 import { ServiceOfferingListPage } from './pages/serviceOfferings/ServiceOfferingListPage'
-import { ServiceOfferingDetailPage } from './pages/serviceOfferings/ServiceOfferingDetailPage'
 import { ServiceOfferingFormPage } from './pages/serviceOfferings/ServiceOfferingFormPage'
+import { ServiceOfferingResourcePage } from './pages/serviceOfferings/ServiceOfferingResourcePage'
 import { EntitlementListPage } from './pages/entitlements/EntitlementListPage'
 import { EntitlementDetailPage } from './pages/entitlements/EntitlementDetailPage'
 import { EntitlementFormPage } from './pages/entitlements/EntitlementFormPage'
@@ -151,19 +151,11 @@ function AppRoutes() {
             }
           />
           <Route
-            path="/service-offerings/:id"
+            path="/service-offerings/*"
             element={
               <RequireAuth>
-                <ServiceOfferingDetailPage />
+                <ServiceOfferingResourcePage />
               </RequireAuth>
-            }
-          />
-          <Route
-            path="/service-offerings/:id/edit"
-            element={
-              <RequireMaintain fallback="/service-offerings">
-                <ServiceOfferingFormPage />
-              </RequireMaintain>
             }
           />
 
