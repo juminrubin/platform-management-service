@@ -113,7 +113,8 @@ class AzureTableClientFactory(
             properties.tableName(properties.callersTable),
             properties.tableName(properties.entitlementsTable),
             properties.tableName(properties.consumptionsTable),
-            properties.tableName(properties.consumptionSourceRefTable)
+            properties.tableName(properties.consumptionSourceRefTable),
+            properties.tableName(properties.consumptionBlobTable)
         ).forEach { name ->
             try {
                 service.createTableIfNotExists(name)

@@ -2,12 +2,13 @@
 
 | Field | Value |
 |-------|--------|
-| **Document** | Backend framework comparison (JVM/Kotlin vs Python) |
-| **Date** | 2026-08-12 |
-| **Status** | Decision record (rev 2 — concurrent users) |
-| **Audience** | Engineers evaluating a rewrite or a second implementation |
+| **Document** | Backend framework comparison (JVM/Kotlin vs Python) and in-process background work |
+| **Date** | 2026-08-13 |
+| **Status** | Decision record (rev 3 — JobExecutor; not Akka) |
+| **Audience** | Engineers evaluating a rewrite, a second implementation, or a background-runtime change |
 | **Related** | Current backend: Kotlin 2.3 + Spring Boot 4.1 (`backend/`) |
 | **Related design** | [connectors-entra-blob-eventhub.md](./connectors-entra-blob-eventhub.md) |
+| **Related code** | `backend/src/main/kotlin/org/jrtech/platformmanagement/jobs/JobExecutor.kt` |
 
 ---
 
@@ -17,6 +18,8 @@ This note records why the Platform Management Service API is implemented in **Ko
 
 - other **Java / Kotlin** frameworks (Quarkus, Micronaut, Ktor);
 - a **Python / FastAPI** implementation, with emphasis on **security**, **latency**, **scalability**, and **concurrent users**.
+
+Rev 3 also records how **in-process background work** is scheduled: a process-wide [`JobExecutor`](../../backend/src/main/kotlin/org/jrtech/platformmanagement/jobs/JobExecutor.kt), Spring `TaskScheduler` for periodic ticks, and the Azure Event Hub processor for live ingest — **not** Akka / Pekko.
 
 It is not a proposal to rewrite the service.
 
@@ -47,6 +50,8 @@ The architecture assumes **one process per pod**: one entitlement/group cache, o
 **Keep Kotlin + Spring Boot 4.**
 
 A rewrite (JVM or Python) would re-implement the resource-server contract, connector lifecycle, and in-process cache for little product gain. Invest in domain, connectors, and Azure Table — not a framework change.
+
+In-process background work: **`JobExecutor` + `TaskScheduler` + Azure Event Hub processor — not Akka.** See §7.
 
 ---
 
@@ -212,7 +217,89 @@ A single slow `PUT` that waits on Table should not freeze entitlement checks.
 
 ---
 
-## 7. Summary
+## 7. In-process background work (JobExecutor vs Akka)
+
+Connectors share the **same JVM** as the HTTP API (one process per pod). Background work must not invent a second runtime, clone the entitlement cache, or fight Event Hub partition leases.
+
+### 7.1 What actually runs in the background
+
+| Work | Shape | Runtime in this repo |
+|------|--------|----------------------|
+| Avro → Parquet per input file | Discrete, parallel, finite | [`JobExecutor`](../../backend/src/main/kotlin/org/jrtech/platformmanagement/jobs/JobExecutor.kt) — one `ConsumptionBlobFilePipeline` per file (not a Spring bean) |
+| Entra Graph group/member refresh | Fixed-delay tick | Spring `TaskScheduler` (`EntraDirectoryConnector`) |
+| Datasource / entitlement-check cache rebuild | Fixed-delay tick | Spring `TaskScheduler` (`DatasourceLoadingConnector`) |
+| Event Hub live ingest | Long-lived partition consumer | Azure Event Hubs processor + blob checkpoint store |
+
+Two different clocks: **ticks** (run every *N* minutes) and **jobs** (run this file / this chunk, then finish). Mixing them onto one abstraction (actors, or a single scheduler) hides that split.
+
+### 7.2 Decision
+
+**Keep a process-wide `JobExecutor` for discrete parallel work. Keep `TaskScheduler` for periodic connector ticks. Keep the Azure Event Hub processor for streaming. Do not introduce Akka / Pekko.**
+
+`JobExecutor` lives in `org.jrtech.platformmanagement.jobs`. It is a JVM singleton `object`, not a Spring bean. Callers construct their own job/pipeline and `JobExecutor.submit { … }`. Spring only **starts** the pool (`app.jobs.pool-size`, env `APP_JOBS_POOL_SIZE`, default 8) and **stops** it on context shutdown (`JobExecutorConfig`).
+
+A blob job still caps itself with `app.connectors.consumption-blob.max-concurrent-pipelines` (default 4) so one large date range cannot fill the shared pool by itself. Waves of submits stay at that cap; other connectors can still use remaining workers.
+
+### 7.3 Why a shared pool (not a pool per job)
+
+The blob runner originally created `Executors.newFixedThreadPool` for each start and shut it down when the batch finished. That works for one connector. It does not scale as a pattern:
+
+| | Per-job pool | Process-wide `JobExecutor` |
+|--|--------------|----------------------------|
+| Threads | New set of OS threads every start | One pool for the JVM |
+| Other connectors | Each would grow its own pool | Same workers, queue behind in-flight work |
+| Shutdown | Easy to leak if a job forgets `shutdown` | One `@PreDestroy` |
+| Fairness | A 500-file job can spawn 500 threads if uncapped | Pool size is a process limit; blob adds its own submit cap |
+| Tests / ops | Pool identity is per call | `JobExecutor.isRunning()` / `poolSize()` are process facts |
+
+A shared pool matches “one process per pod”: one heap, one cache, one Event Hub consumer, **one** background worker set.
+
+### 7.4 Why not Akka / Pekko
+
+Akka Typed (or Pekko) is a strong fit for **many long-lived entities**, mailbox isolation, supervision trees, and cluster/sharding. This process does not have that shape.
+
+| Need in *this* service | `JobExecutor` + `TaskScheduler` + Azure EH | Akka / Pekko |
+|------------------------|---------------------------------------------|--------------|
+| Run *N* Avro files in parallel | Submit *N* callables; join | Actor per file, then still wait |
+| Cancel a blob job | Cooperative flag between files | Poison / stop messages; extra protocol |
+| Hourly Graph / cache refresh | `TaskScheduler` fixed delay | Scheduler + actor; no extra safety |
+| Event Hub partitions | Azure processor already owns leases and checkpoints | Actor in front of the SDK is a second runtime |
+| Entitlement check hot path | In-process map; no mailbox | Irrelevant |
+| Supervision / restart | Connector `start` / `stop` + last-error | Actor supervisor; overkill for four connectors |
+| Tests | Submit + assert; JaCoCo already gates this | TestKit, actor system lifecycle next to Spring |
+| Dependencies | `java.util.concurrent` | Pekko artifacts, dispatcher config, another mental model |
+
+A stuck Azure Blob or Graph call is still stuck inside an actor. Isolation does not make Table/Blob/Graph faster or safer here.
+
+**Cost of switching:** new dependency, actor-system lifecycle beside Spring Boot, harder connector tests, and no change to JWT, cache, or Event Hub lease semantics.
+
+**When Akka would become relevant:** thousands of **per-tenant or per-partition stateful** processors, with supervision and possibly clustering — not “one Avro file in, one Parquet file out” and not “refresh Graph every 15 minutes.” That is not this API.
+
+### 7.5 Alternatives considered (and left)
+
+| Option | Why not here |
+|--------|----------------|
+| Spring `@Async` / `ThreadPoolTaskExecutor` bean | Fine for `@Service` methods. Blob pipelines are deliberately **not** Spring beans so a runner can `new` them per file. |
+| Java 21 virtual-thread-per-task executor | Good for many blocking I/O tasks. A small **fixed** pool is the better default until we measure Blob/Parquet CPU vs I/O; unbounded VT submit of 500 Avro jobs can still stampede Azure. Revisit if jobs are clearly I/O-wait and the cap is enforced **before** submit. |
+| Quartz / ShedLock | Job *scheduling* and cluster locks. We have at most a handful of ticks per process; Spring `TaskScheduler` is enough. Multi-pod coordination for blob is “don’t run the same range twice,” which is an operator/config problem, not a distributed scheduler. |
+| WebFlux / Reactor | Event-loop for HTTP. Does not replace a job pool (see §6.2: the hot path is JWT + cache). Not a background-runtime upgrade. |
+
+### 7.6 Verdict (background work)
+
+| Axis | Choice |
+|------|--------|
+| Discrete parallel jobs | **`JobExecutor`** (`org.jrtech.platformmanagement.jobs`) |
+| Periodic connector ticks | **Spring `TaskScheduler`** |
+| Live Event Hub | **Azure Event Hubs processor** |
+| Actor system (Akka / Pekko) | **Do not add** |
+| Pool lifetime | One per JVM; Spring starts/stops only |
+| Job / pipeline types | Plain objects; not Spring beans |
+
+**Verdict:** a common `JobExecutor` is the right centralization. Akka would be a new framework for a workload that is already “submit, run, finish” or “tick on a schedule.”
+
+---
+
+## 8. Summary
 
 | Axis | Spring Boot (current) | Other JVM (Quarkus / Micronaut / Ktor) | FastAPI |
 |------|------------------------|----------------------------------------|---------|
@@ -224,23 +311,31 @@ A single slow `PUT` that waits on Table should not freeze entitlement checks.
 | Concurrent users (stateless JWT) | Many overlapping requests, one cache; JWT in parallel | Event-loop / VT: high in-flight count, same cache | Great at I/O wait; JWT/sync I/O can stall a worker; more workers ⇒ more caches |
 | Idle memory / startup | Heavier | Quarkus/Micronaut better | Lighter process; multiplied by workers |
 | Fit for this repo | **Chosen** | No rewrite payoff | No rewrite payoff unless the team constraint is Python |
+| Background jobs | `JobExecutor` + `TaskScheduler` + Azure EH processor (see §7) | Same split if rewritten | `asyncio` tasks / workers; do not put blocking ingest on the API loop |
 
 ---
 
-## 8. Key decisions
+## 9. Key decisions
 
 1. **Stay on Kotlin + Spring Boot 4.** The service is already a resource server with in-process cache and long-lived Azure connectors — Boot’s model.
 2. **Do not treat FastAPI as a security, latency, or concurrency upgrade.** It can be correct and fast enough for modest SPA concurrency; it does not improve Entra validation or the cached check, and many overlapping JWT callers plus workers complicate scale-out.
 3. **Do not treat Quarkus/Micronaut/Ktor as required.** They are valid JVM alternatives for greenfield or extreme density; they are not justified mid-flight.
 4. **Keep one process per pod** for entitlement cache and Event Hub consumers, regardless of language. Concurrent users share that process; do not multiply workers to absorb them if it clones cache and Event Hub consumers.
 5. **Audience remains a framework-level JWT decoder rule** (`APP_API_CLIENT_ID` / `api://…`), not ad-hoc controller code — any alternative must preserve that.
+6. **Use a process-wide `JobExecutor`** (`org.jrtech.platformmanagement.jobs`) for discrete parallel work (one Avro file → one Parquet file). It is a JVM singleton, not a Spring bean. Spring only starts (`app.jobs.pool-size`) and stops the pool. Callers `new` the job and `submit`.
+7. **Keep Spring `TaskScheduler` for periodic ticks** (Entra Graph, datasource cache). Do not move those onto `JobExecutor` or Akka.
+8. **Do not introduce Akka / Pekko.** This workload is submit-run-finish and scheduled ticks, not thousands of long-lived supervised entities. An actor system would add a second runtime next to Spring without changing JWT, cache, or Event Hub leases.
+9. **Cap a single blob job** with `app.connectors.consumption-blob.max-concurrent-pipelines` so one date range cannot occupy the entire shared pool.
 
 ---
 
-## 9. Implications
+## 10. Implications
 
-No implementation work follows from this note. A future Python or alternate-JVM service would be a **new** codebase that must re-specify:
+No implementation work follows from the framework comparison. Background work already follows §7 (`JobExecutor`, `TaskScheduler`, Azure Event Hub processor).
+
+A future Python or alternate-JVM service would be a **new** codebase that must re-specify:
 
 - JWT `iss` / `aud` / JWKS parity with `application.yml`;
 - global (not opt-in) authentication on `/api/**`;
-- single worker/process per replica if the in-process cache and Event Hub consumer are retained.
+- single worker/process per replica if the in-process cache and Event Hub consumer are retained;
+- the same background split: one process-wide job pool for discrete work, a scheduler for ticks, and the Event Hub SDK for live ingest — not an actor system unless the product becomes many long-lived stateful processors.

@@ -18,12 +18,8 @@ class ConsumptionBlobConfig {
         sharedCredential: AzureCredentialProperties
     ): ConsumptionBlobStorageClient? {
         val props = connectorsProperties.consumptionBlob
-        if (!props.enabled || !props.isConfigured()) {
-            log.info(
-                "Consumption blob storage client not created (enabled={}, configured={})",
-                props.enabled,
-                props.isConfigured()
-            )
+        if (!props.isConfigured()) {
+            log.info("Consumption blob storage client not created (not configured)")
             return null
         }
         val tokenCredential = if (props.connectionString.trim().isEmpty()) {

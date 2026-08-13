@@ -972,7 +972,7 @@ fun consumptionBlobEffectiveProps(
 
 | Client | Auth | Notes |
 |--------|------|-------|
-| **Blob (Capture read)** | `DefaultAzureCredential` / Workload Identity | Account URL + container; **no** storage connection string in prod |
+| **Blob (Capture read)** | `DefaultAzureCredential` / Workload Identity | Account name + container; **no** storage connection string in prod |
 | **Blob (EH checkpoint write)** | Same MI | **Separate** container; contributor only on checkpoint container |
 | **Event Hubs (receive)** | Same MI | Namespace + hub + consumer group |
 | **Graph (Entra directory)** | Existing Graph path (MI or app secret) | Unchanged |
@@ -985,8 +985,14 @@ app:
   connectors:
     consumption-blob:
       enabled: true
-      storage-account-url: https://<account>.blob.core.windows.net
-      container: consumption-capture
+      storage-account-name: <account>
+      input-container: consumption-capture
+      output-container: consumption-curated
+      object-type: consumption_metric
+      input-blob-prefixes:
+        - eh-capture
+        - manual/import
+      output-blob-prefix: curated
       # auth: managed-identity (implicit via DefaultAzureCredential)
     consumption-eventhub:
       enabled: true

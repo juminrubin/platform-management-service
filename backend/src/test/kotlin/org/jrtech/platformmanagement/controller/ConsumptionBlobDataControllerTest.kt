@@ -25,7 +25,7 @@ class ConsumptionBlobDataControllerTest {
         val response = ConsumptionBlobViewResponse(
             fromDate = today,
             untilDate = today,
-            blobPrefixes = listOf(""),
+            inputBlobPrefixes = listOf(""),
             daysVisited = 1,
             blobCount = 0,
             blobs = emptyList()
@@ -45,7 +45,7 @@ class ConsumptionBlobDataControllerTest {
         val response = ConsumptionBlobViewResponse(
             fromDate = from,
             untilDate = until,
-            blobPrefixes = listOf("capture"),
+            inputBlobPrefixes = listOf("capture"),
             daysVisited = 3,
             blobCount = 1,
             blobs = listOf(ConsumptionBlobObjectView("capture/2024/07/01/14_30_00.avro", 100))

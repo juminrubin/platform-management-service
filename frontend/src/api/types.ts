@@ -170,6 +170,7 @@ export type ConnectorIdPath =
   | 'entra-directory'
   | 'consumption-storage'
   | 'consumption-eventhub'
+  | 'daily-consumption-aggregate'
   | string
 
 /** List row from GET /api/v1/connectors */

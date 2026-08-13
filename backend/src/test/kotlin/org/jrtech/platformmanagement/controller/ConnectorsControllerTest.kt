@@ -1,6 +1,7 @@
 package org.jrtech.platformmanagement.controller
 
 import org.jrtech.platformmanagement.connectors.ConnectorId
+import org.jrtech.platformmanagement.connectors.consumption.aggregate.DailyConsumptionAggregateConnector
 import org.jrtech.platformmanagement.connectors.consumption.blob.ConsumptionBlobContainerConnector
 import org.jrtech.platformmanagement.connectors.consumption.eventhub.ConsumptionEventHubConnector
 import org.jrtech.platformmanagement.connectors.datasource.DatasourceLoadingConnector
@@ -23,14 +24,16 @@ class ConnectorsControllerTest {
     private val blob = mock<ConsumptionBlobContainerConnector>()
     private val entra = mock<EntraDirectoryConnector>()
     private val datasource = mock<DatasourceLoadingConnector>()
+    private val dailyAgg = mock<DailyConsumptionAggregateConnector>()
     private val audit = mock<AuditPrincipalResolver>()
 
     private val controller = ConnectorsController(
-        managedConnectors = listOf(eventHub, blob, entra, datasource),
+        managedConnectors = listOf(eventHub, blob, entra, datasource, dailyAgg),
         eventHubConnector = eventHub,
         blobConnector = blob,
         entraDirectoryConnector = entra,
         datasourceLoadingConnector = datasource,
+        dailyAggregateConnector = dailyAgg,
         auditPrincipalResolver = audit
     )
 
@@ -39,6 +42,7 @@ class ConnectorsControllerTest {
         whenever(blob.id).thenReturn(ConnectorId.CONSUMPTION_BLOB_AVRO)
         whenever(entra.id).thenReturn(ConnectorId.ENTRA_DIRECTORY)
         whenever(datasource.id).thenReturn(ConnectorId.DATASOURCE_LOADING)
+        whenever(dailyAgg.id).thenReturn(ConnectorId.DAILY_CONSUMPTION_AGGREGATE)
     }
 
     @Test
@@ -47,14 +51,16 @@ class ConnectorsControllerTest {
         whenever(blob.info()).thenReturn(sampleInfo("consumption-storage", running = false))
         whenever(entra.info()).thenReturn(sampleInfo("entra-directory", running = true))
         whenever(datasource.info()).thenReturn(sampleInfo("datasource-loading", running = true))
+        whenever(dailyAgg.info()).thenReturn(sampleInfo("daily-consumption-aggregate", running = false))
 
         val list = controller.listConnectors()
-        assertThat(list.connectors).hasSize(4)
+        assertThat(list.connectors).hasSize(5)
         assertThat(list.connectors.map { it.id }).containsExactly(
             "consumption-eventhub",
             "consumption-storage",
             "entra-directory",
-            "datasource-loading"
+            "datasource-loading",
+            "daily-consumption-aggregate"
         )
         assertThat(list.connectors[2].running).isTrue()
         assertThat(list.connectors[2].status).isEqualTo("RUNNING")

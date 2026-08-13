@@ -6,59 +6,56 @@ import org.junit.jupiter.api.Test
 class ConsumptionBlobPropertiesTest {
 
     @Test
-    fun `resolved defaults to container root when nothing configured`() {
-        assertThat(ConsumptionBlobProperties().resolvedBlobPrefixes())
-            .containsExactly("")
+    fun `resolved input prefixes default to container root`() {
+        assertThat(ConsumptionBlobProperties().resolvedInputBlobPrefixes()).containsExactly("")
+        assertThat(ConsumptionBlobProperties().resolvedOutputBlobPrefix()).isEmpty()
     }
 
     @Test
-    fun `resolved uses singular blobPrefix`() {
+    fun `resolved input prefixes merge list and CSV and strip slashes`() {
         assertThat(
-            ConsumptionBlobProperties(blobPrefix = "capture").resolvedBlobPrefixes()
-        ).containsExactly("capture")
-    }
-
-    @Test
-    fun `resolved splits comma-separated singular prefix`() {
-        assertThat(
-            ConsumptionBlobProperties(blobPrefix = "eh-capture, manual/import").resolvedBlobPrefixes()
-        ).containsExactly("eh-capture", "manual/import")
-    }
-
-    @Test
-    fun `resolved uses blobPrefixes list`() {
+            ConsumptionBlobProperties(inputBlobPrefix = "/eh-capture/").resolvedInputBlobPrefixes()
+        ).containsExactly("eh-capture")
         assertThat(
             ConsumptionBlobProperties(
-                blobPrefixes = listOf("a", "b/c")
-            ).resolvedBlobPrefixes()
-        ).containsExactly("a", "b/c")
-    }
-
-    @Test
-    fun `resolved merges list and singular and de-duplicates`() {
-        assertThat(
-            ConsumptionBlobProperties(
-                blobPrefixes = listOf("a", "b"),
-                blobPrefix = "b,c"
-            ).resolvedBlobPrefixes()
+                inputBlobPrefixes = listOf("a", "b"),
+                inputBlobPrefix = "b,c"
+            ).resolvedInputBlobPrefixes()
         ).containsExactly("a", "b", "c")
+        assertThat(
+            ConsumptionBlobProperties(outputBlobPrefix = "  curated/metrics  ").resolvedOutputBlobPrefix()
+        ).isEqualTo("curated/metrics")
     }
 
     @Test
-    fun `resolved strips slashes and blanks`() {
-        assertThat(
-            ConsumptionBlobProperties(
-                blobPrefixes = listOf("/nested/path/", "  x  ")
-            ).resolvedBlobPrefixes()
-        ).containsExactly("nested/path", "x")
+    fun `blobEndpointUrl builds public Azure endpoint from account name`() {
+        assertThat(ConsumptionBlobProperties(storageAccountName = "MyAcct").blobEndpointUrl())
+            .isEqualTo("https://myacct.blob.core.windows.net")
+        assertThat(ConsumptionBlobProperties().blobEndpointUrl()).isEmpty()
     }
 
     @Test
-    fun `explicit empty list entry includes container root with named prefixes`() {
+    fun `isConfigured requires containers plus account name or connection string`() {
+        assertThat(ConsumptionBlobProperties().isConfigured()).isFalse()
         assertThat(
             ConsumptionBlobProperties(
-                blobPrefixes = listOf("", "capture")
-            ).resolvedBlobPrefixes()
-        ).containsExactly("", "capture")
+                inputContainer = "in",
+                outputContainer = "out",
+                storageAccountName = "acct"
+            ).isConfigured()
+        ).isTrue()
+        assertThat(
+            ConsumptionBlobProperties(
+                inputContainer = "in",
+                outputContainer = "out",
+                connectionString = "UseDevelopmentStorage=true"
+            ).isConfigured()
+        ).isTrue()
+        assertThat(
+            ConsumptionBlobProperties(
+                inputContainer = "in",
+                storageAccountName = "acct"
+            ).isConfigured()
+        ).isFalse()
     }
 }

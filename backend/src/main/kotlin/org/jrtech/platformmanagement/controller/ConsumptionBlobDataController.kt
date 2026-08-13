@@ -34,10 +34,10 @@ class ConsumptionBlobDataController(
     @PreAuthorize("@authz.canMaintain() or @authz.canRead()")
     @Operation(
         summary = "View consumption Avro blobs for a date range",
-        description = "Lists hierarchical Avro blob objects for inclusive UTC calendar days " +
-            "[fromDate, untilDate]. Defaults both to today (UTC). " +
-            "Does not import; use connector start after configuring dates to load into the DB. " +
-            "Domain rows: /api/v1/consumptions."
+        description = "Lists hierarchical Avro blob objects in the input container for inclusive " +
+            "UTC calendar days [fromDate, untilDate]. Defaults both to today (UTC). " +
+            "Does not run pipelines; use connector start after configuring dates to write Parquet " +
+            "to the output container."
     )
     fun viewBlobs(
         @Parameter(description = "Inclusive start day (YYYY-MM-DD). Defaults to today UTC.")

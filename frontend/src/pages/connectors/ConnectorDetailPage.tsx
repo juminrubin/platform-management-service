@@ -33,22 +33,22 @@ function stringifyConfigValue(value: unknown): string {
 
 function parseConfigField(key: string, raw: string): unknown {
   const trimmed = raw.trim()
-  if (key === 'dryRun' || key === 'requireSourceRefId') {
+  if (key === 'dryRun' || key === 'force' || key === 'requireSourceRefId') {
     if (trimmed === '') return null
     if (trimmed === 'true' || trimmed === '1') return true
     if (trimmed === 'false' || trimmed === '0') return false
     return trimmed
   }
-  if (key === 'refreshIntervalMs') {
+  if (key === 'inputBlobPrefixes') {
+    if (trimmed === '') return []
+    if (trimmed.startsWith('[')) return JSON.parse(trimmed) as string[]
+    return trimmed.split(',').map((s) => s.trim())
+  }
+  if (key === 'refreshIntervalMs' || key === 'runHourUtc') {
     if (trimmed === '') return null
     const n = Number(trimmed)
     if (Number.isNaN(n)) throw new Error(`${key} must be a number`)
     return n
-  }
-  if (key === 'blobPrefixes') {
-    if (trimmed === '') return []
-    if (trimmed.startsWith('[')) return JSON.parse(trimmed) as string[]
-    return trimmed.split(',').map((s) => s.trim())
   }
   return trimmed === '' ? null : trimmed
 }
@@ -239,15 +239,15 @@ export function ConnectorDetailPage() {
                       key={key}
                       label={key}
                       hint={
-                        key === 'blobPrefixes'
-                          ? 'Comma-separated prefixes, or JSON array. Empty uses all configured prefixes.'
+                        key === 'inputBlobPrefixes'
+                          ? 'Comma-separated input prefixes, or JSON array. Empty uses all configured input prefixes.'
                           : key === 'refreshIntervalMs'
-                            ? 'Milliseconds between Graph refreshes while running (0 disables schedule).'
-                            : key === 'dryRun' || key === 'requireSourceRefId'
-                              ? 'true or false'
-                              : key.includes('Date')
-                                ? 'YYYY-MM-DD'
-                                : undefined
+                          ? 'Milliseconds between Graph refreshes while running (0 disables schedule).'
+                          : key === 'dryRun' || key === 'force' || key === 'requireSourceRefId'
+                            ? 'true or false'
+                            : key.includes('Date')
+                              ? 'YYYY-MM-DD'
+                              : undefined
                       }
                     >
                       <input

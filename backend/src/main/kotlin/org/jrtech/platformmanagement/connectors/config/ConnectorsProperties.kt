@@ -44,100 +44,129 @@ data class ConsumptionEventHubProperties(
 /**
  * Blob hierarchical storage for consumption Avro files.
  *
- * Layout (under each configured root prefix; empty = container root):
+ * Input layout (under each [inputBlobPrefixes] / [inputBlobPrefix]; empty = input container root):
  * ```
- * {prefix}/yyyy/MM/dd/HH_mm_ss.avro
+ * {input-blob-prefix}/yyyy/MM/dd/HH_mm_ss.avro
  * ```
  *
- * Auth: [storageAccountUrl] + shared Azure credential (UAMI / SP / SAMI),
+ * Output layout in the output container (under [outputBlobPrefix]):
+ * ```
+ * {output-blob-prefix}/yyyy/MM/dd/HH_mm_ss.parquet
+ * ```
+ *
+ * Auth: [storageAccountName] + shared Azure credential (UAMI / SP / SAMI),
  * or optional [connectionString] for local only.
  */
 data class ConsumptionBlobProperties(
     val enabled: Boolean = false,
     /** Optional; reserved for scheduled runner (not required for on-demand import API). */
     val runnerEnabled: Boolean = false,
-    /** e.g. https://myaccount.blob.core.windows.net */
-    val storageAccountUrl: String = "",
-    val container: String = "",
     /**
-     * One or more root prefixes before the date hierarchy (no leading/trailing slash needed).
+     * Globally unique storage account name (not a URL).
+     * Public Azure endpoint is `https://{name}.blob.core.windows.net`.
+     */
+    val storageAccountName: String = "",
+    /** Input container holding Avro files. */
+    val inputContainer: String = "",
+    /** Output container for processed Parquet files. */
+    val outputContainer: String = "",
+    /**
+     * Keep only Avro records whose `object_type` / `objectType` equals this value.
+     */
+    val objectType: String = "consumption_metric",
+    /** Max Avro files processed in parallel (one pipeline thread per file). */
+    val maxConcurrentPipelines: Int = 4,
+    /**
+     * One or more root folders in the **input** container before `yyyy/MM/dd/`.
      *
-     * Example YAML:
      * ```yaml
-     * blob-prefixes:
+     * input-blob-prefixes:
      *   - eh-capture
      *   - manual/import
      * ```
      *
-     * Env index form: `APP_CONNECTOR_BLOB_PREFIXES_0`, `APP_CONNECTOR_BLOB_PREFIXES_1`, …
+     * Env: `APP_CONNECTOR_BLOB_INPUT_PREFIXES_0`, `_1`, …
      */
-    val blobPrefixes: List<String> = emptyList(),
+    val inputBlobPrefixes: List<String> = emptyList(),
     /**
-     * Backward-compatible single prefix (or comma-separated list).
-     * Merged with [blobPrefixes] via [resolvedBlobPrefixes].
-     * Example: `capture` or `eh-capture,manual/import`.
+     * Singular or comma-separated input prefixes. Merged with [inputBlobPrefixes].
+     * Env: `APP_CONNECTOR_BLOB_INPUT_PREFIX`.
      */
-    val blobPrefix: String = "",
+    val inputBlobPrefix: String = "",
+    /**
+     * Single root folder in the **output** container before `yyyy/MM/dd/`.
+     * Empty = output container root. Env: `APP_CONNECTOR_BLOB_OUTPUT_PREFIX`.
+     */
+    val outputBlobPrefix: String = "",
     /** Inclusive max calendar days for startDate..endDate (guard). */
     val maxRangeDays: Int = 31,
     /** Max Avro blobs processed in a single import request. */
     val maxBlobsPerJob: Int = 500,
+    /** Exclusive claim lease for one Avro file across JVMs. */
+    val claimLeaseSeconds: Int = 900,
     val requireSourceRefId: Boolean = true,
     /**
-     * Optional connection string (local/dev only). Prefer MI + [storageAccountUrl] in production.
+     * Optional connection string (local/dev only). Prefer MI + [storageAccountName] in production.
      */
     val connectionString: String = ""
 ) {
     fun isConfigured(): Boolean =
-        container.isNotBlank() &&
-            (storageAccountUrl.isNotBlank() || connectionString.isNotBlank())
+        inputContainer.isNotBlank() &&
+            outputContainer.isNotBlank() &&
+            (storageAccountName.isNotBlank() || connectionString.isNotBlank())
+
+    fun resolvedObjectType(): String = objectType.trim().ifBlank { "consumption_metric" }
+
+    fun resolvedMaxConcurrentPipelines(): Int = maxConcurrentPipelines.coerceAtLeast(1)
+
+    fun resolvedClaimLease(): java.time.Duration =
+        java.time.Duration.ofSeconds(claimLeaseSeconds.toLong().coerceAtLeast(30))
 
     /**
-     * Normalized, de-duplicated root prefixes to visit during import.
-     *
-     * - Empty configuration → `[""]` (container root only)
-     * - Values from [blobPrefixes] and [blobPrefix] (comma-split) are merged
-     * - Leading/trailing slashes stripped; order preserved
-     * - Use `""` (or a blank list entry) only when you intentionally want the container root
-     *   **in addition** to named prefixes; omit all entries for root-only default
+     * Normalized input roots to list. Empty configuration → `[""]` (container root).
+     * [inputBlobPrefixes] and [inputBlobPrefix] (comma-split) are merged; slashes stripped.
      */
-    fun resolvedBlobPrefixes(): List<String> {
+    fun resolvedInputBlobPrefixes(): List<String> {
         val collected = LinkedHashSet<String>()
         var sawExplicitEmpty = false
 
         fun accept(raw: String) {
             val normalized = raw.trim().trim('/')
             if (normalized.isEmpty()) {
-                // Explicit empty only from list entry or singular blank-after-split parts
                 sawExplicitEmpty = true
             } else {
                 collected += normalized
             }
         }
 
-        for (entry in blobPrefixes) {
-            // Each list item may itself be comma-separated (env convenience)
+        for (entry in inputBlobPrefixes) {
             entry.split(',').forEach { accept(it) }
         }
-        if (blobPrefix.isNotBlank()) {
-            blobPrefix.split(',').forEach { accept(it) }
-        } else if (blobPrefixes.isEmpty()) {
-            // Neither list nor singular configured → container root
+        if (inputBlobPrefix.isNotBlank()) {
+            inputBlobPrefix.split(',').forEach { accept(it) }
+        } else if (inputBlobPrefixes.isEmpty()) {
             return listOf("")
         }
 
         return buildList {
             if (collected.isEmpty() || sawExplicitEmpty) {
-                // Root-only, or root plus named prefixes when "" was explicit
-                if (collected.isEmpty()) {
-                    add("")
-                } else {
-                    add("")
-                    addAll(collected)
-                }
+                add("")
+                addAll(collected)
             } else {
                 addAll(collected)
             }
         }
+    }
+
+    fun resolvedOutputBlobPrefix(): String = outputBlobPrefix.trim().trim('/')
+
+    /**
+     * Blob service endpoint derived from [storageAccountName].
+     * Empty when the name is blank (connection-string auth does not need it).
+     */
+    fun blobEndpointUrl(): String {
+        val name = storageAccountName.trim().lowercase()
+        if (name.isEmpty()) return ""
+        return "https://$name.blob.core.windows.net"
     }
 }

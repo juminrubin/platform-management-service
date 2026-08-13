@@ -2,6 +2,9 @@ package org.jrtech.platformmanagement.persistence
 
 import org.jrtech.platformmanagement.config.azure.AzureCredentialProperties
 import org.jrtech.platformmanagement.logging.logger
+import org.jrtech.platformmanagement.connectors.consumption.blob.claim.AzureTableBlobFileClaimStore
+import org.jrtech.platformmanagement.connectors.consumption.blob.claim.BlobFileClaimStore
+import org.jrtech.platformmanagement.connectors.consumption.blob.claim.InMemoryBlobFileClaimStore
 import org.jrtech.platformmanagement.persistence.memory.InMemoryParticipantCallConsumptionRepository
 import org.jrtech.platformmanagement.persistence.memory.InMemoryParticipantCallerRegistrationRepository
 import org.jrtech.platformmanagement.persistence.memory.InMemoryParticipantRepository
@@ -65,6 +68,10 @@ class PersistenceConfiguration {
         store: InMemoryPlatformStore
     ): ParticipantCallConsumptionRepository =
         InMemoryParticipantCallConsumptionRepository(store)
+
+    @Bean
+    @ConditionalOnProperty(prefix = "app.azure-table", name = ["enabled"], havingValue = "false", matchIfMissing = true)
+    fun inMemoryBlobFileClaimStore(): BlobFileClaimStore = InMemoryBlobFileClaimStore()
 
     @Bean
     @ConditionalOnProperty(prefix = "app.azure-table", name = ["enabled"], havingValue = "true")
@@ -138,5 +145,15 @@ class PersistenceConfiguration {
             service.getTableClient(properties.tableName(properties.consumptionSourceRefTable)),
             callers,
             services
+        )
+
+    @Bean
+    @ConditionalOnProperty(prefix = "app.azure-table", name = ["enabled"], havingValue = "true")
+    fun azureBlobFileClaimStore(
+        service: com.azure.data.tables.TableServiceClient,
+        properties: AzureTableProperties
+    ): BlobFileClaimStore =
+        AzureTableBlobFileClaimStore(
+            service.getTableClient(properties.tableName(properties.consumptionBlobTable))
         )
 }

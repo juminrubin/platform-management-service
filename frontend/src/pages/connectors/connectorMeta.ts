@@ -10,11 +10,16 @@ export const CONNECTOR_LABELS: Record<string, { title: string; description: stri
   'consumption-storage': {
     title: 'Consumption blob storage',
     description:
-      'Imports consumption Avro files from Azure Blob for a configured date range. Data: /api/v1/consumption/blob.',
+      'Reads Avro from the input container, filters object_type, and writes Parquet to the output container. Data: /api/v1/consumption/blob.',
   },
   'consumption-eventhub': {
     title: 'Consumption Event Hub',
     description: 'Live Event Hub consumer for consumption events. Data: /api/v1/consumptions.',
+  },
+  'daily-consumption-aggregate': {
+    title: 'Daily consumption aggregate',
+    description:
+      'Compacts yesterday UTC 5-minute Parquet files into one daily file under the configured daily prefix.',
   },
 }
 
@@ -32,9 +37,11 @@ export function editableConfigKeys(id: ConnectorIdPath): string[] {
     case 'entra-directory':
       return ['refreshIntervalMs']
     case 'consumption-storage':
-      return ['startDate', 'endDate', 'dryRun', 'blobPrefixes']
+      return ['startDate', 'endDate', 'dryRun', 'force', 'inputBlobPrefixes']
     case 'consumption-eventhub':
       return ['requireSourceRefId']
+    case 'daily-consumption-aggregate':
+      return ['targetDate', 'force', 'runHourUtc']
     default:
       return []
   }

@@ -359,6 +359,7 @@ app:
 | Entitlements | participantId | serviceOfferingId |
 | Consumptions | callerId | consumption UUID |
 | Source-ref index | `sourceRef` | sourceRefId → consumption id |
+| Blob file claims | input container | URL-encoded Avro path (`[prefix]consumptionblob`) |
 
 Uniqueness and referential integrity are enforced in **application** code (services / repositories), not by SQL constraints.
 
@@ -462,10 +463,11 @@ Do **not** run a continuous Capture **poller** together with the Event Hub consu
 
 ### Blob hierarchical Avro import (implemented)
 
-Reads Avro files from a hierarchical-namespace blob container under **one or more** root prefixes:
+Reads Avro files from a hierarchical-namespace **input** container and writes Parquet under the **output** container:
 
 ```text
-{blob-prefix}/yyyy/MM/dd/HH_mm_ss.avro
+{input-blob-prefix}/yyyy/MM/dd/HH_mm_ss.avro   # one or more input prefixes
+{output-blob-prefix}/yyyy/MM/dd/HH_mm_ss.parquet  # single output prefix
 ```
 
 Connector API is unified under `/api/v1/connectors/{id}` where
@@ -474,19 +476,20 @@ Connector API is unified under `/api/v1/connectors/{id}` where
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | `GET` | `/api/v1/connectors` | System.Maintainer | List connector health |
-| `GET` | `/api/v1/connectors/consumption-storage` | System.Maintainer | Retrieve/import Avro for `startDate`..`endDate` |
+| `GET` | `/api/v1/connectors/consumption-storage` | System.Maintainer | Status of the Avro→Parquet runner |
 
 ```http
-GET /api/v1/connectors/consumption-storage?startDate=2024-07-01&endDate=2024-07-03&dryRun=false&blobPrefixes=eh-capture&blobPrefixes=manual/import
+PUT /api/v1/connectors/consumption-storage/config
 Authorization: Bearer <token with System.Maintainer>
+
+{ "configuration": { "startDate": "2024-07-01", "endDate": "2024-07-03", "dryRun": false } }
 ```
 
-| Query param | Required | Description |
-|-------------|----------|-------------|
-| `startDate` | yes | Inclusive start (`YYYY-MM-DD`) |
-| `endDate` | yes | Inclusive end (`YYYY-MM-DD`) |
-| `dryRun` | no | Default `false`; when `true`, parse without DB writes |
-| `blobPrefixes` | no | Subset of configured prefixes; omit for all |
+| Config key | Required | Description |
+|------------|----------|-------------|
+| `startDate` | yes (before start) | Inclusive start (`YYYY-MM-DD`) |
+| `endDate` | yes (before start) | Inclusive end (`YYYY-MM-DD`) |
+| `dryRun` | no | Default `false`; when `true`, parse without writing Parquet |
 
 ```bash
 # Connector health (all connectors; ids match path segments)
@@ -501,37 +504,65 @@ curl -s "http://localhost:8080/api/v1/connectors/consumption-storage?startDate=2
 | Concern | Behaviour |
 |---------|-----------|
 | Authz | **System.Maintainer only** |
-| Layout | Per root prefix: day folders `yyyy/MM/dd`; terminal files `HH_mm_ss.avro` |
-| Prefixes | Multiple roots supported; import walks **prefix × day**; blob paths de-duplicated |
-| Decode | **Two-layer**: Event Hub Capture Avro `Body` JSON **or** flat business Avro fields → `createFromImport` |
-| Idempotency | Domain: existing `source_ref_id` / optional event id (race-safe) |
-| Guards | `max-range-days`, `max-blobs-per-job`; `dryRun` parses without DB writes |
-| Auth to Azure | Managed Identity + `storage-account-url`, or local `connection-string` |
+| Layout | Day folders `yyyy/MM/dd`; terminal files `HH_mm_ss.avro` / `.parquet` |
+| Prefixes | One or more **input-blob-prefixes** (list Avro) and one **output-blob-prefix** (write Parquet); empty = container root |
+| Decode | Avro records (`callerId`, `serviceUrl`, `timestamp`, `objectType`, `usage`); keep `object_type=consumption_metric` |
+| Output | One Parquet file per input Avro under `output-blob-prefix` in the **output** container |
+| Pipelines | One non-Spring pipeline instance per Avro file, submitted to the process-wide [`JobExecutor`](src/main/kotlin/org/jrtech/platformmanagement/jobs/JobExecutor.kt) |
+| Guards | `max-range-days`, `max-blobs-per-job`, `max-concurrent-pipelines`; `dryRun` parses without writing Parquet |
+| Auth to Azure | Managed Identity + `storage-account-name`, or local `connection-string` |
 
 | Setting | Env / property | Default |
 |---------|----------------|---------|
 | Enable connector | `APP_CONNECTOR_BLOB_ENABLED` / `app.connectors.consumption-blob.enabled` | `false` |
-| Storage account URL | `APP_CONNECTOR_BLOB_ACCOUNT_URL` | _(required for MI)_ |
+| Storage account name | `APP_CONNECTOR_BLOB_ACCOUNT_NAME` | _(required for MI)_ |
 | Connection string | `APP_CONNECTOR_BLOB_CONNECTION_STRING` | _(local only)_ |
-| Container | `APP_CONNECTOR_BLOB_CONTAINER` | |
-| Blob prefixes (list) | `app.connectors.consumption-blob.blob-prefixes` / `APP_CONNECTOR_BLOB_PREFIXES_0`… | `[]` |
-| Blob prefix (singular / CSV) | `APP_CONNECTOR_BLOB_PREFIX` | _(merged with list; empty = container root)_ |
+| Input container (Avro) | `APP_CONNECTOR_BLOB_INPUT_CONTAINER` | |
+| Output container (Parquet) | `APP_CONNECTOR_BLOB_OUTPUT_CONTAINER` | |
+| Object type filter | `APP_CONNECTOR_BLOB_OBJECT_TYPE` | `consumption_metric` |
+| Process-wide job pool | `APP_JOBS_POOL_SIZE` / `app.jobs.pool-size` | `8` |
+| Max concurrent blob pipelines | `APP_CONNECTOR_BLOB_MAX_CONCURRENT_PIPELINES` | `4` (caps one job vs the shared pool) |
+| Input blob prefixes (list) | `app.connectors.consumption-blob.input-blob-prefixes` / `APP_CONNECTOR_BLOB_INPUT_PREFIXES_0`… | `[]` |
+| Input blob prefix (singular / CSV) | `APP_CONNECTOR_BLOB_INPUT_PREFIX` | _(merged with list; empty = input container root)_ |
+| Output blob prefix | `APP_CONNECTOR_BLOB_OUTPUT_PREFIX` / `app.connectors.consumption-blob.output-blob-prefix` | _(empty = output container root)_ |
 | Max range days | `APP_CONNECTOR_BLOB_MAX_RANGE_DAYS` | `31` |
 | Max blobs per request | `APP_CONNECTOR_BLOB_MAX_BLOBS` | `500` |
-| Require `source_ref_id` | `APP_CONNECTOR_BLOB_REQUIRE_SOURCE_REF_ID` | `true` |
+| File claim lease | `APP_CONNECTOR_BLOB_CLAIM_LEASE_SECONDS` | `900` |
 
 ```yaml
 app:
   connectors:
     consumption-blob:
       enabled: true
-      storage-account-url: https://acct.blob.core.windows.net
-      container: consumption-capture
-      blob-prefixes:
+      storage-account-name: acct
+      input-container: consumption-capture
+      output-container: consumption-curated
+      object-type: consumption_metric
+      input-blob-prefixes:
         - eh-capture
         - manual/import
-      # or: blob-prefix: eh-capture,manual/import
+      # or: input-blob-prefix: eh-capture,manual/import
+      output-blob-prefix: curated
 ```
+
+### Daily Parquet aggregate (`daily-consumption-aggregate`)
+
+Compacts **yesterday (UTC)** 5-minute Parquet files
+(`{consumption-blob.output-blob-prefix}/yyyy/MM/dd/HH_mm_ss.parquet`)
+into one daily file (`{daily-consumption-aggregate.output-blob-prefix}/yyyy/MM/dd.parquet`).
+Uses the same output container and file-claim table as consumption-storage so two
+pods do not compact the same day twice. Prefer a **different** daily prefix so the
+daily object is not a sibling of the 5-minute day folder.
+
+| Setting | Env / property | Default |
+|---------|----------------|---------|
+| Enable | `APP_CONNECTOR_DAILY_AGG_ENABLED` | `false` |
+| Auto-start schedule | `APP_CONNECTOR_DAILY_AGG_AUTO_START` | `false` |
+| Run hour (UTC) | `APP_CONNECTOR_DAILY_AGG_HOUR_UTC` | `1` (01:00 UTC) |
+| Daily output prefix | `APP_CONNECTOR_DAILY_AGG_OUTPUT_PREFIX` / `app.connectors.daily-consumption-aggregate.output-blob-prefix` | _(empty = same as `consumption-blob.output-blob-prefix`)_ |
+
+`POST /api/v1/connectors/daily-consumption-aggregate/start` aggregates yesterday (or
+runtime `targetDate`) and arms the next daily tick. Runtime keys: `targetDate`, `force`, `runHourUtc`.
 
 ### Event Hub continuous (implemented control plane)
 
@@ -613,8 +644,18 @@ app:
     consumption-blob:
       enabled: false          # default off
       runner-enabled: false   # default off (fail-closed)
-      storage-account-url: https://<account>.blob.core.windows.net
-      container: consumption-capture
+      storage-account-name: <account>
+      input-container: consumption-capture
+      output-container: consumption-curated
+      input-blob-prefixes:
+        - eh-capture
+        - manual/import
+      output-blob-prefix: curated
+    daily-consumption-aggregate:
+      enabled: false
+      auto-start: false
+      run-hour-utc: 1
+      output-blob-prefix: daily
     consumption-eventhub:
       enabled: false
       fully-qualified-namespace: <ns>.servicebus.windows.net

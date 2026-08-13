@@ -56,7 +56,7 @@ class ConsumptionBlobPathSupportTest {
     }
 
     @Test
-    fun `dayDirectoryPrefixes multiplies days by root prefixes`() {
+    fun `dayDirectoryPrefixes multiplies days by input roots`() {
         val days = listOf(LocalDate.of(2024, 7, 1), LocalDate.of(2024, 7, 2))
         assertThat(
             ConsumptionBlobPathSupport.dayDirectoryPrefixes(listOf("a", "b"), days)
@@ -69,9 +69,54 @@ class ConsumptionBlobPathSupportTest {
     }
 
     @Test
-    fun `dayDirectoryPrefixes empty roots means container root only`() {
+    fun `dayDirectoryPrefixes empty root means container root only`() {
         val day = LocalDate.of(2024, 1, 1)
-        assertThat(ConsumptionBlobPathSupport.dayDirectoryPrefixes(emptyList(), listOf(day)))
+        assertThat(ConsumptionBlobPathSupport.dayDirectoryPrefixes("", listOf(day)))
             .containsExactly("2024/01/01/")
+    }
+
+    @Test
+    fun `dailyParquetName is a sibling of the day folder`() {
+        val day = LocalDate.of(2024, 7, 1)
+        assertThat(ConsumptionBlobPathSupport.dailyParquetName("curated", day))
+            .isEqualTo("curated/2024/07/01.parquet")
+        assertThat(ConsumptionBlobPathSupport.dailyParquetName("", day))
+            .isEqualTo("2024/07/01.parquet")
+        assertThat(ConsumptionBlobPathSupport.isFiveMinuteParquet("curated/2024/07/01/10_00_00.parquet"))
+            .isTrue()
+        assertThat(ConsumptionBlobPathSupport.isFiveMinuteParquet("curated/2024/07/01.parquet"))
+            .isFalse()
+    }
+
+    @Test
+    fun `parquetOutputName swaps input prefix for output prefix`() {
+        assertThat(
+            ConsumptionBlobPathSupport.parquetOutputName(
+                "eh-capture/2024/07/01/14_30_00.avro",
+                "eh-capture",
+                "curated"
+            )
+        ).isEqualTo("curated/2024/07/01/14_30_00.parquet")
+        assertThat(
+            ConsumptionBlobPathSupport.parquetOutputName(
+                "2024/07/01/14_30_00.avro",
+                "",
+                "out"
+            )
+        ).isEqualTo("out/2024/07/01/14_30_00.parquet")
+        assertThat(
+            ConsumptionBlobPathSupport.parquetOutputName(
+                "eh-capture/2024/07/01/14_30_00.avro",
+                "eh-capture",
+                ""
+            )
+        ).isEqualTo("2024/07/01/14_30_00.parquet")
+        assertThat(
+            ConsumptionBlobPathSupport.parquetOutputName(
+                "manual/import/2024/07/01/11_00_00.avro",
+                listOf("eh-capture", "manual/import"),
+                "curated"
+            )
+        ).isEqualTo("curated/2024/07/01/11_00_00.parquet")
     }
 }

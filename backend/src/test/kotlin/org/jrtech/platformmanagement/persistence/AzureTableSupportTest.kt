@@ -106,6 +106,7 @@ class AzureTableSupportTest {
         val empty = AzureTableProperties()
         assertThat(empty.isConfigured()).isFalse()
         assertThat(empty.tableName("services")).isEqualTo("pmsservices")
+        assertThat(empty.tableName(empty.consumptionBlobTable)).isEqualTo("pmsconsumptionblob")
 
         val noPrefix = AzureTableProperties(tablePrefix = "  ", endpoint = "https://x.table.core.windows.net")
         assertThat(noPrefix.tableName("services")).isEqualTo("services")

@@ -15,6 +15,8 @@ class ConnectorIdTest {
             .isEqualTo(ConnectorId.CONSUMPTION_EVENT_HUB)
         assertThat(ConnectorId.fromPathId("entra-directory"))
             .isEqualTo(ConnectorId.ENTRA_DIRECTORY)
+        assertThat(ConnectorId.fromPathId("daily-consumption-aggregate"))
+            .isEqualTo(ConnectorId.DAILY_CONSUMPTION_AGGREGATE)
     }
 
     @Test

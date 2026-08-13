@@ -12,7 +12,9 @@ enum class ConnectorId(val pathId: String) {
     CONSUMPTION_BLOB_AVRO("consumption-storage"),
     CONSUMPTION_EVENT_HUB("consumption-eventhub"),
     /** Reloads the entitlement check cache from the durable catalog store. */
-    DATASOURCE_LOADING("datasource-loading");
+    DATASOURCE_LOADING("datasource-loading"),
+    /** Compacts yesterday's 5-minute Parquet files into one daily file. */
+    DAILY_CONSUMPTION_AGGREGATE("daily-consumption-aggregate");
 
     companion object {
         /**

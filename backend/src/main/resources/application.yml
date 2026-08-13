@@ -137,6 +137,11 @@ app:
         #   "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee":
         #     - System.Maintainer
 
+  # Process-wide background job pool (blob pipelines and other discrete work).
+  # Periodic connector ticks still use Spring TaskScheduler.
+  jobs:
+    pool-size: ${APP_JOBS_POOL_SIZE:8}
+
   # Durable catalog store: Azure Table Storage. When disabled, uses process-local memory
   # (fine for single-node local/dev; multi-instance production should enable Table).
   # Catalog seed is external (scripts) — the app does not load datasource.json.
@@ -234,25 +239,39 @@ app:
       checkpoint-container: ${APP_CONNECTOR_EH_CHECKPOINT_CONTAINER:eh-checkpoints}
       require-source-ref-id: ${APP_CONNECTOR_EH_REQUIRE_SOURCE_REF_ID:true}
       poison-skip-after: ${APP_CONNECTOR_EH_POISON_SKIP_AFTER:5}
-    # Hierarchical Avro: {blob-prefix}/yyyy/MM/dd/HH_mm_ss.avro (multiple prefixes supported)
+    # Hierarchical Avro: {input-blob-prefix}/yyyy/MM/dd/HH_mm_ss.avro (multiple input prefixes)
+    # Output Parquet: {output-blob-prefix}/yyyy/MM/dd/HH_mm_ss.parquet (single output prefix)
     # GET /api/v1/connectors/consumption-storage?startDate=&endDate=
     consumption-blob:
       enabled: ${APP_CONNECTOR_BLOB_ENABLED:false}
       runner-enabled: ${APP_CONNECTOR_BLOB_RUNNER_ENABLED:false}
-      storage-account-url: ${APP_CONNECTOR_BLOB_ACCOUNT_URL:}
-      # Optional local-only override; prefer TokenCredential + storage-account-url in prod
-      connection-string: ${APP_CONNECTOR_BLOB_CONNECTION_STRING:${APP_AZURE_STORAGE_CONNECTION_STRING:}}
-      container: ${APP_CONNECTOR_BLOB_CONTAINER:}
-      # Prefer list form (YAML) or APP_CONNECTOR_BLOB_PREFIXES_0 / _1 / …
-      # blob-prefixes:
+      storage-account-name: ${APP_CONNECTOR_BLOB_ACCOUNT_NAME:}
+      # Optional local-only override; prefer TokenCredential + storage-account-name in prod
+      #connection-string: ${APP_CONNECTOR_BLOB_CONNECTION_STRING:${APP_AZURE_STORAGE_CONNECTION_STRING:}}
+      input-container: ${APP_CONNECTOR_BLOB_INPUT_CONTAINER:}
+      output-container: ${APP_CONNECTOR_BLOB_OUTPUT_CONTAINER:}
+      object-type: ${APP_CONNECTOR_BLOB_OBJECT_TYPE:consumption_metric}
+      max-concurrent-pipelines: ${APP_CONNECTOR_BLOB_MAX_CONCURRENT_PIPELINES:4}
+      # Prefer list form or APP_CONNECTOR_BLOB_INPUT_PREFIXES_0 / _1 / …
+      # input-blob-prefixes:
       #   - eh-capture
       #   - manual/import
-      blob-prefixes: []
-      # Singular or comma-separated (merged with blob-prefixes); e.g. "a,b" or APP_CONNECTOR_BLOB_PREFIX
-      blob-prefix: ${APP_CONNECTOR_BLOB_PREFIX:}
+      input-blob-prefixes: []
+      input-blob-prefix: ${APP_CONNECTOR_BLOB_INPUT_PREFIX:}
+      output-blob-prefix: ${APP_CONNECTOR_BLOB_OUTPUT_PREFIX:}
       max-range-days: ${APP_CONNECTOR_BLOB_MAX_RANGE_DAYS:31}
       max-blobs-per-job: ${APP_CONNECTOR_BLOB_MAX_BLOBS:500}
+      claim-lease-seconds: ${APP_CONNECTOR_BLOB_CLAIM_LEASE_SECONDS:900}
       require-source-ref-id: ${APP_CONNECTOR_BLOB_REQUIRE_SOURCE_REF_ID:true}
+    # Compacts yesterday's 5-minute Parquet into one daily file (UTC).
+    # Reads {consumption-blob.output-blob-prefix}/yyyy/MM/dd/HH_mm_ss.parquet
+    # Writes {output-blob-prefix}/yyyy/MM/dd.parquet (empty prefix = same as source).
+    # Control: POST /api/v1/connectors/daily-consumption-aggregate/start|stop
+    daily-consumption-aggregate:
+      enabled: ${APP_CONNECTOR_DAILY_AGG_ENABLED:false}
+      auto-start: ${APP_CONNECTOR_DAILY_AGG_AUTO_START:false}
+      run-hour-utc: ${APP_CONNECTOR_DAILY_AGG_HOUR_UTC:1}
+      output-blob-prefix: ${APP_CONNECTOR_DAILY_AGG_OUTPUT_PREFIX:}
 
 # Logging is configured in logback-spring.xml (Logback).
 # Levels here still work as overrides via Spring Boot's LoggingSystem.

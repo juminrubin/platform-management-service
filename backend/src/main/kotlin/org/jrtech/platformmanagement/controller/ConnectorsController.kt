@@ -1,6 +1,7 @@
 package org.jrtech.platformmanagement.controller
 
 import org.jrtech.platformmanagement.connectors.ConnectorId
+import org.jrtech.platformmanagement.connectors.consumption.aggregate.DailyConsumptionAggregateConnector
 import org.jrtech.platformmanagement.connectors.consumption.blob.ConsumptionBlobContainerConnector
 import org.jrtech.platformmanagement.connectors.consumption.eventhub.ConsumptionEventHubConnector
 import org.jrtech.platformmanagement.connectors.datasource.DatasourceLoadingConnector
@@ -40,7 +41,8 @@ import org.springframework.web.bind.annotation.RestController
  * - Blob import result: /api/v1/consumption/blob
  * - Consumption rows: /api/v1/consumptions
  *
- * Known path ids: consumption-storage, consumption-eventhub, entra-directory, datasource-loading.
+ * Known path ids: consumption-storage, consumption-eventhub, entra-directory,
+ * datasource-loading, daily-consumption-aggregate.
  */
 @RestController
 @RequestMapping("/api/v1/connectors")
@@ -52,6 +54,7 @@ class ConnectorsController(
     private val blobConnector: ConsumptionBlobContainerConnector,
     private val entraDirectoryConnector: EntraDirectoryConnector,
     private val datasourceLoadingConnector: DatasourceLoadingConnector,
+    private val dailyAggregateConnector: DailyConsumptionAggregateConnector,
     private val auditPrincipalResolver: AuditPrincipalResolver
 ) {
 
@@ -99,7 +102,7 @@ class ConnectorsController(
     @Operation(
         summary = "Update connector runtime configuration",
         description = "Keys are connector-specific. Example for consumption-storage: " +
-            "startDate, endDate, dryRun, blobPrefixes. Example for entra-directory: " +
+            "startDate, endDate, dryRun, force, inputBlobPrefixes. Example for entra-directory: " +
             "refreshIntervalMs. Example for consumption-eventhub: requireSourceRefId."
     )
     fun putConfig(
@@ -117,8 +120,9 @@ class ConnectorsController(
         summary = "Start connector process",
         description = "entra-directory: arm schedule + Graph load. " +
             "consumption-eventhub: start processor. " +
-            "consumption-storage: run one import using configured startDate/endDate. " +
-            "datasource-loading: entitlement check cache refresh + hourly schedule."
+            "consumption-storage: run Avro→Parquet pipelines for configured startDate/endDate. " +
+            "datasource-loading: entitlement check cache refresh + hourly schedule. " +
+            "daily-consumption-aggregate: compact yesterday's Parquet and arm the daily UTC schedule."
     )
     fun startConnector(@PathVariable id: String): ConnectorInfoResponse {
         val actor = auditPrincipalResolver.current()
@@ -144,6 +148,7 @@ class ConnectorsController(
             ConnectorId.CONSUMPTION_BLOB_AVRO -> blobConnector
             ConnectorId.ENTRA_DIRECTORY -> entraDirectoryConnector
             ConnectorId.DATASOURCE_LOADING -> datasourceLoadingConnector
+            ConnectorId.DAILY_CONSUMPTION_AGGREGATE -> dailyAggregateConnector
         }
     }
 }

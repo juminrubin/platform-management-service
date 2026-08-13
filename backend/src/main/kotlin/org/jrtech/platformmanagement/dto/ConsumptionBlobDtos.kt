@@ -20,16 +20,18 @@ data class ConsumptionBlobImportRequest(
     val endDate: LocalDate,
 
     /**
-     * When true, Avro files are downloaded and parsed but not written to the database.
+     * When true, Avro files are downloaded and parsed but Parquet is not written.
      */
     val dryRun: Boolean = false,
 
     /**
-     * Optional subset of configured root prefixes to visit.
-     * When null or empty, all configured [app.connectors.consumption-blob] prefixes are used.
-     * Values must match a resolved configured prefix (or `""` for container root).
+     * Optional subset of configured input prefixes.
+     * When null or empty, all configured [app.connectors.consumption-blob] input prefixes are used.
      */
-    val blobPrefixes: List<String>? = null
+    val inputBlobPrefixes: List<String>? = null,
+
+    /** When true, steal existing SUCCEEDED claims and convert again. */
+    val force: Boolean = false
 )
 
 data class ConsumptionBlobImportResponse(
@@ -39,17 +41,20 @@ data class ConsumptionBlobImportResponse(
     val requestedBy: String,
     val startedAt: Instant,
     val finishedAt: Instant,
-    /** Root prefixes that were visited (empty string = container root). */
-    val blobPrefixes: List<String> = emptyList(),
+    /** Input roots visited (empty string = container root). */
+    val inputBlobPrefixes: List<String> = emptyList(),
+    /** Single output root (empty = output container root). */
+    val outputBlobPrefix: String = "",
     val daysVisited: Int,
     val blobsDiscovered: Int,
     val blobsProcessed: Int,
     val blobsFailed: Int,
-    val rowsParsed: Int,
-    val rowsInserted: Int,
-    val rowsDuplicate: Int,
-    val rowsInvalid: Int,
-    val rowsFailed: Int,
+    val blobsSkipped: Int = 0,
+    val recordsRead: Int,
+    val recordsMatched: Int,
+    val recordsWritten: Int,
+    val recordsInvalid: Int,
+    val outputFiles: Int,
     val errors: List<String> = emptyList()
 )
 
@@ -60,8 +65,8 @@ data class ConsumptionBlobImportResponse(
 data class ConsumptionBlobViewResponse(
     val fromDate: LocalDate,
     val untilDate: LocalDate,
-    /** Root prefixes visited (empty string = container root). */
-    val blobPrefixes: List<String> = emptyList(),
+    /** Input roots visited (empty string = container root). */
+    val inputBlobPrefixes: List<String> = emptyList(),
     val daysVisited: Int,
     val blobCount: Int,
     val blobs: List<ConsumptionBlobObjectView> = emptyList(),
@@ -82,18 +87,12 @@ data class ConsumptionBlobConnectorStatusResponse(
     val id: String,
     val enabled: Boolean,
     val configured: Boolean,
-    val storageAccountUrl: String?,
-    val container: String?,
-    /**
-     * Resolved root prefixes (empty string entry means container root).
-     * Prefer this over the legacy [blobPrefix] field.
-     */
-    val blobPrefixes: List<String> = emptyList(),
-    /**
-     * Legacy single-prefix view: first resolved prefix, or null when only container root.
-     */
-    @Deprecated("Use blobPrefixes")
-    val blobPrefix: String? = null,
+    val storageAccountName: String?,
+    val inputContainer: String?,
+    val outputContainer: String?,
+    val objectType: String,
+    val inputBlobPrefixes: List<String> = emptyList(),
+    val outputBlobPrefix: String = "",
     val maxRangeDays: Int,
     val maxBlobsPerJob: Int,
     val requireSourceRefId: Boolean,

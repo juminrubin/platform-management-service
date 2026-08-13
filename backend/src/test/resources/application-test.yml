@@ -17,6 +17,8 @@ spring:
       - org.springframework.boot.security.oauth2.server.resource.autoconfigure.servlet.OAuth2ResourceServerAutoConfiguration
 
 app:
+  jobs:
+    pool-size: 4
   security:
     permit-all: true
   azure-table:
@@ -44,13 +46,21 @@ app:
     consumption-eventhub:
       enabled: false
       auto-start: false
+    daily-consumption-aggregate:
+      enabled: false
+      auto-start: false
+      run-hour-utc: 1
+      output-blob-prefix: ""
     consumption-blob:
       enabled: false
       runner-enabled: false
-      storage-account-url: ""
-      container: ""
-      blob-prefixes: []
-      blob-prefix: ""
+      storage-account-name: ""
+      input-container: ""
+      output-container: ""
+      object-type: consumption_metric
+      input-blob-prefixes: []
+      input-blob-prefix: ""
+      output-blob-prefix: ""
       require-source-ref-id: true
 
 logging:

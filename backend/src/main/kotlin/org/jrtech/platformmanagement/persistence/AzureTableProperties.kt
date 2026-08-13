@@ -30,6 +30,8 @@ data class AzureTableProperties(
     val consumptionsTable: String = "consumptions",
     /** Secondary index table: sourceRefId → consumption id. */
     val consumptionSourceRefTable: String = "consumptionsourceref",
+    /** Per-file Avro→Parquet claims (`[prefix]consumptionblob`). */
+    val consumptionBlobTable: String = "consumptionblob",
     /** Create tables on startup if missing. */
     val createTablesIfNotExist: Boolean = true
 ) {
